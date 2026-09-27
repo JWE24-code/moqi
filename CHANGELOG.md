@@ -11,6 +11,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The dshfind listing is documented as automatic.** The repository carries
   the `dsh-plugin` topic its marketplace indexes, so the README no longer
   describes a listing step that no release needs.
+
+### Fixed
+
+- **`/resume` lists stored sessions again.** Two defects left the picker
+  empty: the query call passed a plain object where the session-query service
+  takes an optional `AbortSignal` (`signal?.throwIfAborted()` threw, and the
+  failure surfaced as "no earlier sessions found"), and the row mapper read
+  `id`/`createdAt` off the top level of rows that carry them nested inside
+  `header`, so every row was filtered out. The mapper now reads both shapes,
+  and no signal is passed. `/tree` benefits from the same fix.
 ## [0.3.0]
 
 ### Added

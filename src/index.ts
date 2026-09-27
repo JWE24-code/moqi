@@ -5058,7 +5058,7 @@ interface SessionQueryLike {
 async function listSessions(query: SessionQueryLike): Promise<PickerItem[]> {
   const method = query.listSessions ?? query.list ?? query.querySessions
   if (method === undefined) return []
-  const raw = await method.call(query, {})
+  const raw = await method.call(query, undefined)
   const rows = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as { items?: unknown[] })?.items)
@@ -5066,9 +5066,12 @@ async function listSessions(query: SessionQueryLike): Promise<PickerItem[]> {
       : []
   return rows.slice(0, 200).map((row) => {
     const record = row as Record<string, unknown>
-    const id = String(record['sessionId'] ?? record['id'] ?? '')
-    const title = String(record['title'] ?? record['summary'] ?? id)
-    const when = record['updatedAt'] ?? record['createdAt']
+    // The corpus rows are `{ header, live, persisted }` with id and createdAt
+    // nested inside `header`; search-shaped rows carry them flat. Read both.
+    const header = (record['header'] ?? {}) as Record<string, unknown>
+    const id = String(record['sessionId'] ?? record['id'] ?? header['id'] ?? '')
+    const title = String(record['title'] ?? record['summary'] ?? '') || id
+    const when = record['updatedAt'] ?? record['createdAt'] ?? header['createdAt']
     const subtitle = typeof when === 'number' ? relativeTime(when) : ''
     return { id, title, subtitle }
   }).filter((item) => item.id !== '')
@@ -5215,7 +5218,7 @@ async function listSessionsWithParents(
 ): Promise<{ id: string; title?: string; parentSession?: string }[]> {
   const method = query.listSessions ?? query.list ?? query.querySessions
   if (method === undefined) return []
-  const raw = await method.call(query, {})
+  const raw = await method.call(query, undefined)
   const rows = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as { items?: unknown[] })?.items)
@@ -5223,9 +5226,11 @@ async function listSessionsWithParents(
       : []
   return rows.slice(0, 500).map((row) => {
     const record = row as Record<string, unknown>
-    const parent = record['parentSession'] ?? record['parent']
+    // Same nested `header` shape as listSessions above.
+    const header = (record['header'] ?? {}) as Record<string, unknown>
+    const parent = record['parentSession'] ?? record['parent'] ?? header['parentSession']
     return {
-      id: String(record['sessionId'] ?? record['id'] ?? ''),
+      id: String(record['sessionId'] ?? record['id'] ?? header['id'] ?? ''),
       title: typeof record['title'] === 'string' ? record['title'] : undefined,
       parentSession: parent === undefined || parent === null ? undefined : String(parent),
     }
