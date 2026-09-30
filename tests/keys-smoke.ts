@@ -24,6 +24,7 @@ function sleep(ms: number): Promise<void> {
 
 check('a printable key carries its text', decode('a').keys[0]?.text === 'a')
 check('enter is named', decode('\r').keys[0]?.name === 'enter')
+check('a line feed is ctrl+j, not enter', decode('\n').keys[0]?.name === 'ctrl+j')
 check('tab is named', decode('\t').keys[0]?.name === 'tab')
 check('ctrl+a is named', decode('\x01').keys[0]?.name === 'ctrl+a')
 check('a lone escape is held, not guessed', decode('\x1b').keys.length === 0)
@@ -32,6 +33,44 @@ check('an arrow key decodes', decode('\x1b[A').keys[0]?.name === 'up')
 check('a modified arrow decodes', decode('\x1b[1;5A').keys[0]?.name === 'ctrl+up')
 check('a split sequence stays held', decode('\x1b[').keys.length === 0)
 check('alt+char decodes', decode('\x1bj').keys[0]?.name === 'alt+j')
+
+// ------------------------------------------- paste and extended key reports
+
+// Bracketed paste: the terminal wraps the clipboard in start/end markers, so
+// its newlines must not be read as individual Enters.
+check('bracketed paste is one key', (() => {
+  const key = decode('\x1b[200~alpha\nbeta\x1b[201~').keys[0]
+  return key?.name === 'paste' && key?.text === 'alpha\nbeta'
+})())
+check('a paste normalizes CRLF and CR to LF', (() => {
+  const key = decode('\x1b[200~a\r\nb\rc\x1b[201~').keys[0]
+  return key?.name === 'paste' && key?.text === 'a\nb\nc'
+})())
+check('an incomplete paste is held', decode('\x1b[200~alpha\nbe').keys.length === 0)
+check('text after a paste still decodes', (() => {
+  const keys = decode('\x1b[200~p\x1b[201~q').keys
+  return keys.length === 2 && keys[0]?.name === 'paste' && keys[1]?.name === 'q'
+})())
+
+// Terminals that speak CSI-u or xterm's modifyOtherKeys spell a key as its
+// codepoint: `13` is carriage return, `5` the ctrl modifier.
+check('CSI-u names ctrl+enter', decode('\x1b[13;5u').keys[0]?.name === 'ctrl+enter')
+check('CSI-u names shift+enter', decode('\x1b[13;2u').keys[0]?.name === 'shift+enter')
+check('modifyOtherKeys names ctrl+enter', decode('\x1b[27;5;13~').keys[0]?.name === 'ctrl+enter')
+check('modifyOtherKeys names shift+enter', decode('\x1b[27;2;13~').keys[0]?.name === 'shift+enter')
+check('a tilde ctrl+enter still decodes', decode('\x1b[13;5~').keys[0]?.name === 'ctrl+enter')
+
+{
+  // A paste split across chunks is held until its closing marker.
+  const decoder = createDecoder()
+  check('a split paste emits nothing until it closes', decoder('\x1b[200~line one\nli').length === 0)
+  const keys = decoder('ne two\x1b[201~')
+  check(
+    'the completed paste arrives as one key',
+    keys.length === 1 && keys[0]?.name === 'paste' && keys[0]?.text === 'line one\nline two',
+  )
+  decoder.dispose()
+}
 
 // --------------------------------------------------- the lone-escape flush
 

@@ -178,6 +178,7 @@ export type PickerKind =
   | 'models'
   | 'themes'
   | 'plugins'
+  | 'panel'
   | 'open'
   | 'delete'
   | 'rewind'
@@ -490,7 +491,9 @@ export class Palette {
       return
     }
     const prefix = input.slice(1).toLowerCase()
-    this.matches = commands.filter((command) => command.name.startsWith(prefix))
+    // Case-insensitive so a plugin may register `JevLoop` and still answer to
+    // `/jevloop`; every built-in is already lowercase, so this changes nothing.
+    this.matches = commands.filter((command) => command.name.toLowerCase().startsWith(prefix))
     this.open = this.matches.length > 0
     if (this.selected >= this.matches.length) this.selected = this.matches.length - 1
     if (this.selected < 0) this.selected = 0

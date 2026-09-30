@@ -59,7 +59,7 @@ const EN: Catalog = {
   'help.body': [
     '**Keys**',
     '',
-    '- `enter` — send · steers into a running reply · `ctrl+j` — newline',
+    '- `enter` — send · steers into a running reply · `shift+enter` — newline',
     '- `↑` / `↓` on the first / last row — recall earlier prompts',
     '- `/` — command palette · `tab` accept · `esc` dismiss',
     '- `@` — file completion · `tab`/`enter` accept · `esc` dismiss',
@@ -88,6 +88,7 @@ const EN: Catalog = {
     '',
     '- `enter` — enable or disable the selected package · restart to apply',
     '- `/plugins add|remove <pkg>` — both confirm; install scripts run as you',
+    '- plugin panels (`/JevLoop` is one) join the palette while mounted',
     '',
     '**Searching, palettes and lists**',
     '',
@@ -139,7 +140,7 @@ const ZH: Catalog = {
   'help.body': [
     '**按键**',
     '',
-    '- `enter` — 发送 · 回复中则插入运行中的回合 · `ctrl+j` — 换行',
+    '- `enter` — 发送 · 回复中则插入运行中的回合 · `shift+enter` — 换行',
     '- 首行 / 末行的 `↑` / `↓` — 调出历史提示词',
     '- `/` — 命令面板 · `tab` 接受 · `esc` 关闭',
     '- `@` — 文件补全 · `tab`/`enter` 接受 · `esc` 关闭',
@@ -168,6 +169,7 @@ const ZH: Catalog = {
     '',
     '- `enter` — 启用或停用所选包 · 重启后生效',
     '- `/plugins add|remove <包>` — 都会确认；安装脚本以你的身份运行',
+    '- 插件面板（如 `/JevLoop`）在挂载时加入命令面板',
     '',
     '**搜索、配色与列表**',
     '',

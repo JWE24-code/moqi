@@ -46,8 +46,30 @@ const TILDE_NAMES: Record<string, string> = {
   '7': 'home',
   '8': 'end',
   // Enter as a tilde code, so terminals speaking CSI-u can report
-  // ctrl+enter (`ESC [ 13;5 ~`) for interrupt-and-send.
+  // ctrl+enter (`ESC [ 13;5 ~`) as its own chord.
   '13': 'enter',
+}
+
+/**
+ * Key names for the codepoints the extended keyboard encodings report.
+ *
+ * xterm's modifyOtherKeys (`ESC [ 27 ; modifier ; codepoint ~`) and CSI-u
+ * (`ESC [ codepoint ; modifier u`) both spell a key as its Unicode codepoint,
+ * so the names have to be looked up from the number rather than the final
+ * byte. Only the keys this app binds are translated; any other codepoint is
+ * dropped rather than typed, so an unknown sequence can never reach the
+ * composer.
+ */
+const CODEPOINT_NAMES: Record<string, string> = {
+  '9': 'tab',
+  '13': 'enter',
+  '27': 'esc',
+}
+
+/** Translate one extended-encoding codepoint to a key name, if known. */
+function codepointName(code: string | undefined): string | undefined {
+  if (code === undefined) return undefined
+  return CODEPOINT_NAMES[code]
 }
 
 /** Modifier bitmask from a CSI parameter, per the xterm convention. */
@@ -108,6 +130,20 @@ export function decode(input: string): { keys: Key[]; rest: string } {
         continue
       }
 
+      // Bracketed paste: everything between the start and end markers is one
+      // paste. Delivering it as a single `paste` key keeps its newlines out of
+      // the submit path, and normalizing CR/CRLF to LF matches the composer's
+      // own line separator. An incomplete paste is held until the terminator
+      // arrives, the same way a split escape sequence is.
+      if (rest.startsWith(`${ESC}[200~`)) {
+        const end = rest.indexOf(`${ESC}[201~`, 6)
+        if (end === -1) return { keys, rest }
+        const text = rest.slice(6, end).replace(/\r\n?/g, '\n')
+        keys.push({ name: 'paste', text })
+        index += end + 6
+        continue
+      }
+
       if (rest[1] === '[' || rest[1] === 'O') {
         const match = /^[[O]([0-9;]*)([A-Za-z~])/.exec(rest)
         if (match === null) {
@@ -118,13 +154,25 @@ export function decode(input: string): { keys: Key[]; rest: string } {
         }
         const parameters = (match[1] ?? '').split(';')
         const final = match[2] ?? ''
-        if (final === '~') {
-          const name = TILDE_NAMES[parameters[0] ?? '']
-          if (name !== undefined) keys.push({ name: modifiers(parameters[1]) + name, text: '' })
+        let name: string | undefined
+        if (final === 'u') {
+          // CSI-u (fixterms / kitty): `ESC [ codepoint ; modifier u`.
+          const base = codepointName(parameters[0])
+          if (base !== undefined) name = modifiers(parameters[1]) + base
+        } else if (final === '~' && parameters[0] === '27' && parameters.length >= 3) {
+          // xterm modifyOtherKeys: `ESC [ 27 ; modifier ; codepoint ~`, which
+          // is how Ghostty and foot report ctrl+enter without the app asking
+          // for the kitty protocol.
+          const base = codepointName(parameters[2])
+          if (base !== undefined) name = modifiers(parameters[1]) + base
+        } else if (final === '~') {
+          const base = TILDE_NAMES[parameters[0] ?? '']
+          if (base !== undefined) name = modifiers(parameters[1]) + base
         } else {
-          const name = CSI_NAMES[final]
-          if (name !== undefined) keys.push({ name: modifiers(parameters[1]) + name, text: '' })
+          const base = CSI_NAMES[final]
+          if (base !== undefined) name = modifiers(parameters[1]) + base
         }
+        if (name !== undefined) keys.push({ name, text: '' })
         index += match[0].length
         continue
       }
@@ -144,7 +192,9 @@ export function decode(input: string): { keys: Key[]; rest: string } {
 
     const code = char.codePointAt(0) ?? 0
 
-    if (char === '\r' || char === '\n') {
+    if (char === '\r') {
+      // Return submits. A line feed is Ctrl+J, so it deliberately falls
+      // through to the ctrl+<letter> branch below and stays a newline.
       keys.push({ name: 'enter', text: '' })
       index += 1
       continue

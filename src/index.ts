@@ -75,7 +75,7 @@ import {
   type AtMatch,
 } from './tui/atfile.ts'
 import { FileIndex } from './file-index.ts'
-import { TuiHost } from './tui-host.ts'
+import { TuiHost, type TuiPanel, type TuiPanelResult, type TuiPanelSecret } from './tui-host.ts'
 import { Vim } from './tui/vim.ts'
 import { forkCut, lineage, projectUserTurns, rewindTarget } from './rewind.ts'
 import { renderJobs, type JobLike } from './tui/jobs.ts'
@@ -475,6 +475,8 @@ class TuiApp {
   private pendingLoginPrompt: { resolve: (value: string) => void; reject: (error: unknown) => void } | undefined
   /** Withdraws the sign-in a {@link LoginPanel} is running, if one is. */
   private loginAbort: AbortController | undefined
+  /** The plugin panel the picker is currently showing, for `enter` routing. */
+  private activePanel: TuiPanel | undefined
   /** What `/providers` last listed, indexed the same way its picker rows are. */
   private loginEntries: readonly AuthorizationEntry[] = []
   /** The flow `/providers` is choosing a method for, between the two pickers. */
@@ -1345,10 +1347,19 @@ class TuiApp {
         // Discovery is best-effort; the built-ins still work without it.
       }
     }
-    const seen = new Set(fromHarness.map((command) => command.name))
+    const seen = new Set(fromHarness.map((command) => command.name.toLowerCase()))
     const merged = [...fromHarness]
     for (const command of BUILTIN_COMMANDS) {
-      if (!seen.has(command.name)) merged.push(command)
+      if (seen.has(command.name.toLowerCase())) continue
+      merged.push(command)
+      seen.add(command.name.toLowerCase())
+    }
+    // Panels contributed by other plugins are commands too: `/JevLoop` is the
+    // plugin's, not this app's.
+    for (const panel of this.tuiHost.panels()) {
+      if (seen.has(panel.name.toLowerCase())) continue
+      merged.push({ name: panel.name, args: '', description: panel.description })
+      seen.add(panel.name.toLowerCase())
     }
     merged.sort((left, right) => left.name.localeCompare(right.name))
     return merged
@@ -2463,6 +2474,7 @@ class TuiApp {
           else this.selectSession(Number.parseInt(item.id, 10))
         }
         else if (kind === 'plugins') this.togglePlugin(item.id)
+        else if (kind === 'panel') void this.activatePanelRow(item.id)
         else if (kind === 'delete') this.confirmDelete(item.id, item.title)
         else if (kind === 'rewind') void this.performRewind(Number.parseInt(item.id, 10))
         else if (kind === 'stored') void this.openStoredHit(item)
@@ -2524,47 +2536,18 @@ class TuiApp {
         else if (this.tab.streaming) this.interrupt()
         break
 
-      case 'enter': {
-        const chosen = this.palette.current()
-        if (chosen !== undefined) {
-          const rawInput = this.composer.value().slice(1).split(' ').slice(1).join(' ')
-          this.palette.close()
-          this.composer.reset()
-          void this.runCommand(chosen.name, rawInput)
-          break
-        }
-        if (this.atMenu.open) {
-          // The completion menu is offering paths: enter picks one rather
-          // than sending, the same contract the command palette has.
-          this.acceptAtCompletion()
-          break
-        }
-        const text = this.composer.value().trim()
-        if (text === '') break
-        if (text.startsWith('/')) {
-          const [head, ...rest] = text.slice(1).split(' ')
-          this.composer.reset()
-          void this.runCommand((head ?? '').toLowerCase(), rest.join(' '))
-          break
-        }
-        if (this.tab.streaming) {
-          // The turn is busy: steer the prompt into it at the next step
-          // boundary rather than waiting — the queued form is `tab`.
-          const prompt = this.materializePrompt()
-          this.composer.reset()
-          this.history.add(prompt.text)
-          this.persistSoon()
-          void this.steer(prompt)
-          break
-        }
-        // Materialize first: the draft has to be read out of the composer
-        // before the composer is emptied, or the prompt is born blank — the
-        // transcript commits an empty turn and the model is asked nothing.
-        const prompt = this.materializePrompt()
-        this.composer.reset()
-        void this.sendPrompt(prompt)
+      case 'enter':
+        // Enter submits, wherever the draft belongs: a menu selection, a slash
+        // command, a steer into a streaming turn, or a fresh prompt.
+        this.submitComposer()
         break
-      }
+
+      case 'shift+enter':
+        // Shift+Enter is the composer's carriage return, so a draft can span
+        // several lines without submitting on the first one.
+        this.history.reset()
+        this.composer.insert('\n')
+        break
 
       case 'ctrl+enter': {
         // Interrupt-and-send: the redirection form of steering, the same
@@ -2582,7 +2565,17 @@ class TuiApp {
       }
 
       case 'ctrl+j':
+        // Ctrl+J is a line feed: the same newline as shift+enter, for
+        // terminals that deliver it as its own control byte.
+        this.history.reset()
         this.composer.insert('\n')
+        break
+
+      case 'paste':
+        // Bracketed paste arrives as one key: insert it whole, newlines and
+        // all, without letting its contents trigger a menu or a submit.
+        this.history.reset()
+        this.composer.insert(key.text)
         break
 
       case 'tab': {
@@ -2829,6 +2822,52 @@ class TuiApp {
     this.palette.update(this.composer.value(), this.commands())
     this.updateAtMenu()
     this.paint()
+  }
+
+  /**
+   * Deliver the composer's draft wherever it belongs.
+   *
+   * Enter's path: a menu selection, a slash command, a steer into a streaming
+   * turn, or a fresh prompt. The draft is materialized before the composer is
+   * emptied, or the prompt is born blank and the transcript commits an empty
+   * turn.
+   */
+  private submitComposer(): void {
+    const chosen = this.palette.current()
+    if (chosen !== undefined) {
+      const rawInput = this.composer.value().slice(1).split(' ').slice(1).join(' ')
+      this.palette.close()
+      this.composer.reset()
+      void this.runCommand(chosen.name, rawInput)
+      return
+    }
+    if (this.atMenu.open) {
+      // The completion menu is offering paths: submitting picks one rather
+      // than sending, the same contract the command palette has.
+      this.acceptAtCompletion()
+      return
+    }
+    const text = this.composer.value().trim()
+    if (text === '') return
+    if (text.startsWith('/')) {
+      const [head, ...rest] = text.slice(1).split(' ')
+      this.composer.reset()
+      void this.runCommand((head ?? '').toLowerCase(), rest.join(' '))
+      return
+    }
+    if (this.tab.streaming) {
+      // The turn is busy: steer the prompt into it at the next step boundary
+      // rather than waiting — the queued form is `tab`.
+      const prompt = this.materializePrompt()
+      this.composer.reset()
+      this.history.add(prompt.text)
+      this.persistSoon()
+      void this.steer(prompt)
+      return
+    }
+    const prompt = this.materializePrompt()
+    this.composer.reset()
+    void this.sendPrompt(prompt)
   }
 
   /**
@@ -3587,6 +3626,12 @@ class TuiApp {
   /** Run a slash command: this app's own first, then the Harness registry. */
   private async runCommand(name: string, rawInput: string): Promise<void> {
     this.tab.scrollBack = 0
+    // A plugin-contributed panel owns its command outright.
+    const panel = this.tuiHost.findPanel(name)
+    if (panel !== undefined) {
+      this.showPanel(panel)
+      return
+    }
     switch (name) {
       case 'new':
         await this.newSession()
@@ -3993,7 +4038,9 @@ class TuiApp {
     if (forked === undefined) return
     this.composer.setValue(target.text)
     this.history.reset()
-    this.setStatus(`rewound — edit the prompt and press enter (${String(target.cutSeq)} events kept)`)
+    this.setStatus(
+      `rewound — edit the prompt and press enter (${String(target.cutSeq)} events kept)`,
+    )
     this.paint()
   }
 
@@ -4780,6 +4827,80 @@ class TuiApp {
     }
     writeProfileManifest(profile.dir, edit.manifest)
     this.setStatus(`${name} ${enabled ? 'enabled' : 'disabled'} — restart to apply`)
+  }
+
+  // ------------------------------------------------------- plugin panels
+
+  /** Open a plugin-contributed panel in the picker. */
+  private showPanel(panel: TuiPanel, select?: string): void {
+    this.activePanel = panel
+    const rows: PickerItem[] = panel.rows().map((row) => ({ ...row }))
+    this.picker.show('panel', panel.title ?? panel.name, rows)
+    if (select !== undefined) this.picker.selectById(select)
+    this.paint()
+  }
+
+  /** Enter on a panel row: run it, then raise any secret it asks for. */
+  private async activatePanelRow(id: string): Promise<void> {
+    const panel = this.activePanel
+    if (panel === undefined) return
+    let result: TuiPanelResult
+    try {
+      result = await panel.activate(id)
+    } catch (error) {
+      this.setStatus(describeError(error), true)
+      this.paint()
+      return
+    }
+    if (result !== undefined && result.kind === 'secret') {
+      const value = await this.promptSecret(panel, result)
+      if (value === undefined) {
+        this.setStatus('cancelled')
+        this.paint()
+        return
+      }
+      try {
+        await result.submit(value)
+      } catch (error) {
+        this.setStatus(describeError(error), true)
+        this.paint()
+        return
+      }
+    }
+    this.showPanel(panel, id)
+  }
+
+  /**
+   * Raise a panel's masked prompt.
+   *
+   * The host owns the input surface: the draft is drawn as bullets and the
+   * value crosses the seam only on submit. `undefined` means the user backed
+   * out, and the panel is left unchanged.
+   */
+  private async promptSecret(
+    panel: TuiPanel,
+    secret: TuiPanelSecret,
+  ): Promise<string | undefined> {
+    const login = new LoginPanel(panel.title ?? panel.name)
+    this.panel = login
+    const answer = new Promise<string>((resolve, reject) => {
+      this.pendingLoginPrompt = { resolve, reject }
+    })
+    login.setPrompt({ kind: 'secret', message: secret.message, placeholder: secret.placeholder })
+    this.setStatus('typing is masked · enter submits · esc cancels')
+    this.paint()
+
+    let value: string
+    try {
+      value = await answer
+    } catch {
+      this.pendingLoginPrompt = undefined
+      if (this.panel === login) this.panel = undefined
+      return undefined
+    }
+    this.pendingLoginPrompt = undefined
+    if (this.panel === login) this.panel = undefined
+    return value.trim() === '' ? undefined : value
   }
 
   /** `/plugins add <pkg>` — install into the profile, then compose it. */

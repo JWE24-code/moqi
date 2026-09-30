@@ -6,14 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Panel commands on the `tuiHost` seam.** `ctx.tuiHost.registerPanel()` lets a
+  plugin contribute a command panel — rows the host draws, an `enter` action,
+  and an optional masked secret prompt — so a feature's UI ships with its
+  plugin instead of this app. `moqi-jev-loop` uses it for `/JevLoop` (its API key
+  and four gates). Command matching is now case-insensitive, so a panel
+  registered as `JevLoop` answers to `/jevloop`.
+
 ### Changed
 
+- **`shift+enter` is the composer's carriage return.** Enter still submits;
+  `shift+enter` (or `ctrl+j`) inserts a newline, so a draft can span several
+  lines. Bracketed paste is enabled, so a multi-line paste is inserted whole
+  rather than sending on its first line.
 - **The dshfind listing is documented as automatic.** The repository carries
   the `dsh-plugin` topic its marketplace indexes, so the README no longer
   describes a listing step that no release needs.
 
 ### Fixed
 
+- **CSI-u and modifyOtherKeys key reports are decoded.** Terminals such as
+  Ghostty and foot report modified keys as `ESC [ 13 ; 2 u` (shift+enter) or
+  `ESC [ 27 ; 5 ; 13 ~` (ctrl+enter) rather than a bare control byte; the
+  decoder now names those keys instead of dropping them.
+- **`ctrl+j` inserts a newline, as documented.** The decoder had folded both
+  Return (`\r`) and line feed (`\n`) into `enter`, so the advertised `ctrl+j`
+  newline submitted instead. Return and line feed are now distinct.
 - **`/resume` lists stored sessions again.** Two defects left the picker
   empty: the query call passed a plain object where the session-query service
   takes an optional `AbortSignal` (`signal?.throwIfAborted()` threw, and the
