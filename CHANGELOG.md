@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Added
 
 - **Panel commands on the `tuiHost` seam.** `ctx.tuiHost.registerPanel()` lets a
