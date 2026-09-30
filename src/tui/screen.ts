@@ -24,6 +24,13 @@ const ALT_SCREEN_OFF = `${ESC}[?1049l`
  */
 const MOUSE_ON = `${ESC}[?1000h${ESC}[?1006h`
 const MOUSE_OFF = `${ESC}[?1006l${ESC}[?1000l`
+/**
+ * Bracketed paste: the terminal wraps a paste in `ESC [ 200 ~` … `ESC [ 201 ~`
+ * so the app can tell it from typing. Without it every newline in a pasted
+ * block arrives as a bare Enter, which the composer reads as a submit.
+ */
+const PASTE_ON = `${ESC}[?2004h`
+const PASTE_OFF = `${ESC}[?2004l`
 const CURSOR_HIDE = `${ESC}[?25l`
 const CURSOR_SHOW = `${ESC}[?25h`
 const CLEAR_ALL = `${ESC}[2J`
@@ -133,7 +140,9 @@ export class Screen {
     process.stdin.resume()
     process.stdin.on('data', this.onData)
     process.stdout.on('resize', this.onResize)
-    process.stdout.write(ALT_SCREEN_ON + (this.mouse ? MOUSE_ON : '') + CURSOR_HIDE + CLEAR_ALL)
+    process.stdout.write(
+      ALT_SCREEN_ON + (this.mouse ? MOUSE_ON : '') + PASTE_ON + CURSOR_HIDE + CLEAR_ALL,
+    )
   }
 
   /** Restore the terminal. Safe to call repeatedly and after a failed start. */
@@ -146,7 +155,9 @@ export class Screen {
     process.stdout.off('resize', this.onResize)
     if (process.stdin.isTTY === true) process.stdin.setRawMode(false)
     process.stdin.pause()
-    process.stdout.write(RESET_SGR + (this.mouse ? MOUSE_OFF : '') + CURSOR_SHOW + ALT_SCREEN_OFF)
+    process.stdout.write(
+      RESET_SGR + PASTE_OFF + (this.mouse ? MOUSE_OFF : '') + CURSOR_SHOW + ALT_SCREEN_OFF,
+    )
   }
 
   /**

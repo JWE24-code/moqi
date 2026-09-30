@@ -27,6 +27,9 @@ const SUBJECT = 'tests/pty-subject.ts'
 const ALT_ON = '\x1b[?1049h'
 const ALT_OFF = '\x1b[?1049l'
 
+/** Shift+Enter in CSI-u, how Omarchy's terminals report the carriage return. */
+const SHIFT_ENTER = '\x1b[13;2u'
+
 // ---------------------------------------------------------------- utilities
 
 function sleep(ms: number): Promise<void> {
@@ -142,9 +145,16 @@ async function main(): Promise<void> {
       paintedWidths(output).every((width) => width <= 80),
     )
 
-    // (d) enter clears the composer (the placeholder is repainted) and the
-    // text reappears as a transcript turn (the accent bar row).
+    // (d) shift+enter inserts a newline instead of submitting; enter sends.
+    // The placeholder only paints on an empty composer, so its absence is the
+    // witness that shift+enter kept the draft.
     const beforeEnter = output.length
+    write(SHIFT_ENTER)
+    await sleep(200)
+    check(
+      'shift+enter does not submit the draft',
+      !stripAnsi(output.slice(beforeEnter)).includes('Ask the harness'),
+    )
     write('\r')
     check(
       'enter restores the composer placeholder',
@@ -155,6 +165,25 @@ async function main(): Promise<void> {
       stripAnsi(output.slice(beforeEnter)).includes('▌') &&
         stripAnsi(output.slice(beforeEnter)).includes('hello world'),
     )
+
+    // (m) a bracketed multi-line paste lands in the composer whole and never
+    // submits on its first line. It is cleared so the later steps start clean.
+    const beforePaste = output.length
+    write('\x1b[200~alpha line\nbeta line\x1b[201~')
+    check(
+      'a multi-line paste is painted into the composer',
+      await until(
+        (t) =>
+          stripAnsi(t.slice(beforePaste)).includes('alpha line') &&
+          stripAnsi(t.slice(beforePaste)).includes('beta line'),
+      ),
+    )
+    check(
+      'the paste did not submit a turn',
+      !stripAnsi(output.slice(beforePaste)).includes('Ask the harness'),
+    )
+    write('\x15') // clear
+    await sleep(150)
 
     // (g) the @ file menu opens on a token and tab accepts a path.
     write('@st')

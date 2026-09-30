@@ -670,7 +670,7 @@ function pickerPane(snapshot: Snapshot, geometry: Layout): string[] {
   const action = picker.kind === 'models' || picker.kind === 'themes' ||
     picker.kind === 'login' || picker.kind === 'login-method'
     ? 'select'
-    : picker.kind === 'plugins'
+    : picker.kind === 'plugins' || picker.kind === 'panel'
       ? 'enable or disable'
       : picker.kind === 'delete' ? 'delete' : 'open'
   // The open-sessions list is the only one a key can act on beyond selecting

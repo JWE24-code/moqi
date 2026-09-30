@@ -13,7 +13,7 @@
  */
 import { Service } from '@deepseek-ai/cordis';
 import type { Context } from '@deepseek-ai/cordis';
-import type { TuiShortcut } from './tui-host-core.ts';
+import type { TuiPanel, TuiShortcut } from './tui-host-core.ts';
 export * from './tui-host-core.ts';
 /**
  * The extension seam (`ctx.tuiHost`). Plugins register shortcuts and a status
@@ -22,6 +22,7 @@ export * from './tui-host-core.ts';
 export declare class TuiHost extends Service {
     private readonly shortcuts;
     private readonly line;
+    private readonly panelRegistry;
     constructor(ctx: Context);
     /** Claim a key combination; see {@link ShortcutRegistry.register}. */
     registerShortcut(shortcut: TuiShortcut): (() => void) | undefined;
@@ -29,6 +30,15 @@ export declare class TuiHost extends Service {
     registered(): readonly TuiShortcut[];
     /** Run a key's plugin handler, if one is registered. */
     dispatch(combo: string): boolean;
+    /**
+     * Contribute a command panel; `<name>` joins the command palette and the
+     * host draws its rows, runs its actions, and raises its masked prompts.
+     */
+    registerPanel(panel: TuiPanel): (() => void) | undefined;
+    /** Every contributed panel, for the palette and tests. */
+    panels(): readonly TuiPanel[];
+    /** The panel behind a command name, case-insensitively. */
+    findPanel(name: string): TuiPanel | undefined;
     /** Contribute the one-line status above the composer. */
     setStatusLine(text: string | undefined): () => void;
     /** The status line a plugin contributed, if any. */

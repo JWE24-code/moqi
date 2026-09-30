@@ -60,3 +60,59 @@ export declare class StatusLine {
     set(text: string | undefined): () => void;
     get(): string | undefined;
 }
+/** One row a plugin panel asks the host to draw. */
+export interface TuiPanelRow {
+    id: string;
+    title: string;
+    subtitle: string;
+    /** Draws the row's "on" marker. */
+    active?: boolean;
+}
+/**
+ * A masked prompt the host raises on a panel's behalf.
+ *
+ * The host owns the input surface, so the plugin never sees the draft until
+ * `submit`; the value crosses the seam only once, answered.
+ */
+export interface TuiPanelSecret {
+    kind: 'secret';
+    message: string;
+    placeholder?: string;
+    submit: (value: string) => void | Promise<void>;
+}
+/** What activating a panel row produced: nothing, or a secret to ask for. */
+export type TuiPanelResult = void | TuiPanelSecret;
+/**
+ * A command panel a plugin contributes to the host.
+ *
+ * The plugin owns what the panel means — its rows, its toggles, its prompts —
+ * and the host owns how a panel looks and which keys drive it. Registering one
+ * adds `<name>` to the command palette.
+ */
+export interface TuiPanel {
+    /** Palette command name, without the slash. */
+    name: string;
+    /** Panel heading; defaults to `name`. */
+    title?: string;
+    /** One-line palette description. */
+    description: string;
+    /** The rows to draw right now. */
+    rows(): TuiPanelRow[];
+    /** The row chosen with enter; may return a secret prompt to raise. */
+    activate(id: string): TuiPanelResult | Promise<TuiPanelResult>;
+}
+/** Contributed panels, keyed by lowercased command name. */
+export declare class PanelRegistry {
+    private readonly panels;
+    /**
+     * Claim a panel command.
+     *
+     * @returns a disposer that releases it, or `undefined` when the name is
+     *   empty or already taken.
+     */
+    register(panel: TuiPanel): (() => void) | undefined;
+    /** Every registered panel, in registration order. */
+    registered(): readonly TuiPanel[];
+    /** The panel registered under a command name, case-insensitively. */
+    find(name: string): TuiPanel | undefined;
+}

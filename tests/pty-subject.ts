@@ -9,7 +9,7 @@
  *
  *   - printable keys insert into the composer
  *   - ctrl+a / ctrl+e move to line start / end
- *   - enter clears the composer and appends the typed text to the transcript
+ *   - shift+enter inserts a newline; enter appends the typed text to the transcript
  *   - ctrl+c twice within 1.5s quits (mirroring the app's two-step exit)
  *   - resize repaints
  *
@@ -166,6 +166,16 @@ const screen = new Screen({
       } else {
         notices.push('escape reached the app')
       }
+      return
+    }
+    if (key.name === 'shift+enter' || key.name === 'ctrl+j') {
+      composer.insert('\n')
+      repaint()
+      return
+    }
+    if (key.name === 'paste') {
+      composer.insert(key.text)
+      repaint()
       return
     }
     if (key.name === 'enter') {

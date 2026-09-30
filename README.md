@@ -131,7 +131,8 @@ overrides background detection; `NO_COLOR` disables styling.
 
 | Key | Action |
 |---|---|
-| `enter` | Send · steers into a running reply · `ctrl+j` inserts a newline |
+| `enter` | Send · steers into a running reply · a menu on top chooses with `enter` too |
+| `shift+enter` | Insert a newline · `ctrl+j` does the same · multi-line pastes land whole |
 | `↑` / `↓` | On the first / last composer row, recall earlier prompts |
 | `/` | Command palette, 3 rows at a time and scrolling past that · `tab` accepts · `esc` dismisses |
 | `@` | File completion over the workspace · `tab`/`enter` accepts · `esc` dismisses |
@@ -177,6 +178,11 @@ destinations, one per key:
   between.
 - **`ctrl+enter` interrupts and sends** — the running reply stops and the
   prompt goes in immediately (the same thing `/interrupt` does to a queue).
+
+`enter` submits, and `shift+enter` (or `ctrl+j`) is the composer's carriage
+return: it makes a newline, so a draft can be several lines. A bracketed paste
+is inserted whole, so a multi-line block lands as lines instead of submitting
+on its first one.
 
 Interrupting with `esc` keeps the queue; it flushes the next time a turn
 completes cleanly, `/interrupt` stops the reply and flushes it now, and
@@ -691,13 +697,30 @@ const dispose = ctx.tuiHost.registerShortcut({
   combo: 'ctrl+shift+g', label: 'git status', handler: () => { /* … */ },
 })
 ctx.tuiHost.setStatusLine('2 agents spinning')
+
+// A command panel: `<name>` joins the palette; the host draws the rows,
+// routes `enter`, and raises any masked prompt the panel asks for.
+ctx.tuiHost.registerPanel({
+  name: 'JevLoop',
+  title: 'Jev Loop',
+  description: 'Jev gates and API key (moqi-jev-loop)',
+  rows: () => [{ id: 'gate', title: 'Pre-execute', subtitle: 'on', active: true }],
+  activate: (id) => { /* toggle, or return { kind: 'secret', message, submit } */ },
+})
 ```
 
 A shortcut must carry `ctrl` or `alt`; a combination the app already uses is
 refused rather than ordered, so a plugin can never swallow the quit
-confirmation or a scroll key. `registerShortcut` and `setStatusLine` both
-return disposers, and the status line is one row — replaced, not stacked, last
-registration wins — that the layout surrenders first when the window is short.
+confirmation or a scroll key. `registerShortcut`, `setStatusLine`, and
+`registerPanel` all return disposers, and the status line is one row —
+replaced, not stacked, last registration wins — that the layout surrenders
+first when the window is short. A panel owns what its rows mean; the host owns
+how they look and which keys drive them. A panel is a fallback command, not an
+override: if its name collides with a built-in or a Harness command, the app's
+command wins in both the palette and `/name`. The host side of the seam lives in
+one framework-free module, `src/tui/panel-host.ts`, so an action that throws
+leaves the panel open rather than vanishing behind the error; the seam and its
+adapter are drawn in [`docs/whiteboards/`](docs/whiteboards/).
 
 Searching across sessions is built in: `/find --sessions <text>` reads the
 stored session logs (plain or zstd) under `$DSH_HOME/sessions`, shows every

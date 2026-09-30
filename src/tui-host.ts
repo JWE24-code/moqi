@@ -15,8 +15,8 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 
-import { ShortcutRegistry, StatusLine, TUI_HOST_NAME } from './tui-host-core.ts'
-import type { TuiShortcut } from './tui-host-core.ts'
+import { PanelRegistry, ShortcutRegistry, StatusLine, TUI_HOST_NAME } from './tui-host-core.ts'
+import type { TuiPanel, TuiShortcut } from './tui-host-core.ts'
 
 export * from './tui-host-core.ts'
 
@@ -27,6 +27,7 @@ export * from './tui-host-core.ts'
 export class TuiHost extends Service {
   private readonly shortcuts = new ShortcutRegistry()
   private readonly line = new StatusLine()
+  private readonly panelRegistry = new PanelRegistry()
 
   constructor(ctx: Context) {
     super(ctx, TUI_HOST_NAME)
@@ -45,6 +46,24 @@ export class TuiHost extends Service {
   /** Run a key's plugin handler, if one is registered. */
   dispatch(combo: string): boolean {
     return this.shortcuts.dispatch(combo)
+  }
+
+  /**
+   * Contribute a command panel; `<name>` joins the command palette and the
+   * host draws its rows, runs its actions, and raises its masked prompts.
+   */
+  registerPanel(panel: TuiPanel): (() => void) | undefined {
+    return this.panelRegistry.register(panel)
+  }
+
+  /** Every contributed panel, for the palette and tests. */
+  panels(): readonly TuiPanel[] {
+    return this.panelRegistry.registered()
+  }
+
+  /** The panel behind a command name, case-insensitively. */
+  findPanel(name: string): TuiPanel | undefined {
+    return this.panelRegistry.find(name)
   }
 
   /** Contribute the one-line status above the composer. */
