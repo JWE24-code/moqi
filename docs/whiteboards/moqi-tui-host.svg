@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2813" height="1450" viewBox="-48 -256 2813 1450">
+<title>moqi — the tuiHost plugin seam</title>
+<rect x="-48" y="-256" width="2813" height="1450" fill="#ffffff"/>
+<rect x="0" y="0" width="2716.5" height="1146" rx="18" fill="#f8f9fa" stroke="#1971c2" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16" fill="#0b3d63" text-anchor="start"><tspan x="20" y="25.12">root</tspan><tspan x="20" y="45.12">The Cordis service (`tui-host.ts`) and the framework-free contract (`tui-host-core.ts`) are deliberately split, so the suites run from a bare npm ci.</tspan></text>
+<rect x="40" y="50" width="2636.5" height="1046" rx="18" fill="#f8f9fa" stroke="#1971c2" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16" fill="#0b3d63" text-anchor="start"><tspan x="60" y="75.12">root</tspan><tspan x="60" y="95.12">The Cordis service (`tui-host.ts`) and the framework-free contract (`tui-host-core.ts`) are deliberately split, so the suites run from a bare npm ci.</tspan></text>
+<rect x="60" y="596" width="1070" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="72" y="615.66">class PanelRegistry</tspan></text>
+<rect x="1158" y="596" width="1428" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1170" y="615.66">class ShortcutRegistry</tspan></text>
+<rect x="1516" y="834" width="712" height="242" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1528" y="853.66">class StatusLine</tspan></text>
+<rect x="60" y="90" width="1786" height="440" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="72" y="109.66">class TuiHost</tspan></text>
+<rect x="72" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="788" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="3"/>
+<rect x="430" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1886" y="628" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="1528" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2244" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1170" y="628" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1528" y="886" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1886" y="886" width="330" height="178" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="72" y="130.5" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="788" y="390" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="72" y="373" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="430" y="139" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="430" y="356.5" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1146" y="323" width="330" height="195" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="3"/>
+<rect x="1504" y="373" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="788" y="122" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1146" y="130.5" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2326.5" y="834" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="88" y="655.94">PanelRegistry.find</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="88" y="680.32">find(name:string):TuiPanel | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="88" y="697.2">why: The panel registered under a</tspan><tspan x="88" y="714.08">command name, case-insensitively.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="88" y="737.27">Domain / core · exported · ←12 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="804" y="655.94">PanelRegistry.register</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="804" y="680.32">register(panel:TuiPanel):(()=&gt; void)|</tspan><tspan x="804" y="697.2">undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="804" y="714.07">why: Claim a panel command.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="804" y="737.27">Domain / core · exported · →2</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="446" y="655.94">PanelRegistry.registered</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="446" y="680.32">registered():readonly TuiPanel[]</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="446" y="697.2">why: Every registered panel, in</tspan><tspan x="446" y="714.08">registration order.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="446" y="737.27">Domain / core · exported</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="1902" y="655.94">ShortcutRegistry.dispatch</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1902" y="680.32">dispatch(combo:string):boolean</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1902" y="697.2">why: Run the handler for one key, if</tspan><tspan x="1902" y="714.08">a plugin owns it.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1902" y="737.27">Entry point · exported · ←2 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1544" y="655.94">ShortcutRegistry.labelOf</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1544" y="680.32">labelOf(combo:string):string | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1544" y="697.2">why: The label for one combination,</tspan><tspan x="1544" y="714.08">when it is claimed.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1544" y="737.27">Domain / core · exported · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2260" y="655.94">ShortcutRegistry.register</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2260" y="680.32">register(shortcut:TuiShortcut):(()=&gt;</tspan><tspan x="2260" y="697.2">void)| undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2260" y="714.07">why: Claim a key combination.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2260" y="737.27">Domain / core · exported · ←2 · →3</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1186" y="655.94">ShortcutRegistry.registered</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1186" y="680.32">registered():readonly TuiShortcut[]</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1186" y="697.2">why: Every registered combination,</tspan><tspan x="1186" y="714.08">in registration order.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1186" y="737.27">Domain / core · exported · ←1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1544" y="913.94">StatusLine.get</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1544" y="938.32">get():string | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1544" y="955.2">why: Read the one line plugins are</tspan><tspan x="1544" y="972.08">sharing.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1544" y="995.27">Domain / core · exported · ←5</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1902" y="913.94">StatusLine.set</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1902" y="938.32">set(text:string | undefined):()=&gt; void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1902" y="955.2">why: Contribute the line. The slot</tspan><tspan x="1902" y="972.08">is replaced, not stacked: a terminal</tspan><tspan x="1902" y="988.95">has one line to give, and last</tspan><tspan x="1902" y="1005.83">registration wins — the same rule a</tspan><tspan x="1902" y="1022.7">status bar has.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1902" y="1045.27">Domain / core · exported · ←2</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="88" y="158.44">TuiHost.constructor</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="88" y="182.82">constructor(ctx:Context)</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="88" y="199.7">why: Mount the service on the</tspan><tspan x="88" y="216.58">context as `ctx.tuiHost`.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="88" y="239.77">Domain / core · exported</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="804" y="417.94">TuiHost.dispatch</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="804" y="442.32">dispatch(combo:string):boolean</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="804" y="459.2">why: Run a key&apos;s plugin handler, if</tspan><tspan x="804" y="476.08">one is registered.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="804" y="499.27">Entry point · exported · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="88" y="400.94">TuiHost.findPanel</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="88" y="425.32">findPanel(name:string):TuiPanel |</tspan><tspan x="88" y="442.2">undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="88" y="459.07">why: The panel behind a command</tspan><tspan x="88" y="475.95">name, case-insensitively.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="88" y="499.27">Domain / core · exported · ←1 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="446" y="166.94">TuiHost.panels</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="446" y="191.32">panels():readonly TuiPanel[]</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="446" y="208.2">why: Every contributed panel, for</tspan><tspan x="446" y="225.08">the palette and tests.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="446" y="248.27">Domain / core · exported · ←1 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="446" y="384.44">TuiHost.registered</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="446" y="408.82">registered():readonly TuiShortcut[]</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="446" y="425.7">why: Every registered combination,</tspan><tspan x="446" y="442.58">for help output and tests.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="446" y="465.77">Domain / core · exported · ←1 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1162" y="350.94">TuiHost.registerPanel</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1162" y="375.32">registerPanel(panel:TuiPanel):(()=&gt; void)|</tspan><tspan x="1162" y="392.2">undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1162" y="409.07">why: Contribute a command panel;</tspan><tspan x="1162" y="425.95">`&lt;name&gt;` joins the command palette</tspan><tspan x="1162" y="442.82">and the host draws its rows, runs</tspan><tspan x="1162" y="459.7">its actions, and raises its masked</tspan><tspan x="1162" y="476.57">prompts.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1162" y="499.27">Domain / core · exported · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1520" y="400.94">TuiHost.registerShortcut</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1520" y="425.32">registerShortcut(shortcut:TuiShortcut):(()</tspan><tspan x="1520" y="442.2">=&gt; void)| undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1520" y="459.07">why: Claim a key combination; see</tspan><tspan x="1520" y="475.95">{@link ShortcutRegistry.register}.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1520" y="499.27">Domain / core · exported · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="804" y="149.94">TuiHost.setStatusLine</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="804" y="174.32">setStatusLine(text:string |</tspan><tspan x="804" y="191.2">undefined):()=&gt; void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="804" y="208.07">why: Contribute the one-line status</tspan><tspan x="804" y="224.95">above the composer.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="804" y="248.27">Domain / core · exported · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1162" y="158.44">TuiHost.statusLine</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1162" y="182.82">statusLine():string | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1162" y="199.7">why: The status line a plugin</tspan><tspan x="1162" y="216.58">contributed, if any.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1162" y="239.77">Domain / core · exported · ←1 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2342.5" y="861.94">shortcutProblem</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2342.5" y="886.32">function</tspan><tspan x="2342.5" y="903.2">shortcutProblem(combo:string,taken:Readonl</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2342.5" y="920.07">why: Why a registration was refused,</tspan><tspan x="2342.5" y="936.95">or `undefined` when it was accepted.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2342.5" y="960.27">Domain / core · exported · ←1</tspan></text>
+<path d="M2409,756 L2409,795 L2491.5,795 L2491.5,834" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="2491.5,834 2488.46,827.69 2494.54,827.69" fill="#adb5bd"/>
+<path d="M2244,692 L2230,692 L2230,975 L2216,975" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="2216,975 2222.31,971.96 2222.31,978.04" fill="#adb5bd"/>
+<path d="M2244,692 L2051,692 L2051,950 L1858,950" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1858,950 1864.31,946.96 1864.31,953.04" fill="#adb5bd"/>
+<path d="M1693,756 L1693,821 L1693,821 L1693,886" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1693,886 1689.96,879.69 1696.04,879.69" fill="#adb5bd"/>
+<path d="M1886,692 L1872,692 L1872,950 L1858,950" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1858,950 1864.31,946.96 1864.31,953.04" fill="#adb5bd"/>
+<path d="M1118,692 L1502,692 L1502,975 L1886,975" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1886,975 1879.69,978.04 1879.69,971.96" fill="#adb5bd"/>
+<path d="M1118,692 L1323,692 L1323,950 L1528,950" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1528,950 1521.69,953.04 1521.69,946.96" fill="#adb5bd"/>
+<path d="M402,692 L965,692 L965,950 L1528,950" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1528,950 1521.69,953.04 1521.69,946.96" fill="#adb5bd"/>
+<path d="M1834,445.5 L2039,445.5 L2039,692 L2244,692" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="2244,692 2237.69,695.04 2237.69,688.96" fill="#adb5bd"/>
+<path d="M760,420.5 L965,420.5 L965,692 L1170,692" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1170,692 1163.69,695.04 1163.69,688.96" fill="#adb5bd"/>
+<path d="M1118,454 L1502,454 L1502,692 L1886,692" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="1886,692 1879.69,695.04 1879.69,688.96" fill="#adb5bd"/>
+<path d="M1476,420.5 L1860,420.5 L1860,692 L2244,692" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="2244,692 2237.69,695.04 2237.69,688.96" fill="#adb5bd"/>
+<path d="M595,267 L595,311.75 L595,311.75 L595,356.5" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="595,356.5 591.96,350.19 598.04,350.19" fill="#adb5bd"/>
+<path d="M237,518 L237,573 L237,573 L237,628" fill="none" stroke="#adb5bd" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4.4 4" opacity="0.7" marker-end="none"/><polygon points="237,628 233.96,621.69 240.04,621.69" fill="#adb5bd"/>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="30" fill="#1e1e1e" text-anchor="start" font-weight="600"><tspan x="0" y="-183.4">moqi — the tuiHost plugin seam — function map</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#495057" text-anchor="start"><tspan x="2" y="-153.7">What a plugin may contribute — shortcuts, a status line, and command panels — and the registry each claim lives in.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#868e96" text-anchor="start"><tspan x="2" y="-131.75">How to read: each box is a function · arrows are calls (dark = crosses modules) · clusters are modules · &quot;why&quot; is the recorded purpose  ·  documented: 100%</tspan></text>
+<rect x="2" y="-112" width="15" height="15" rx="3.75" fill="#d0ebff" stroke="#1971c2" stroke-width="1.2"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#495057" text-anchor="start"><tspan x="22" y="-101.25">Domain / core</tspan></text>
+<rect x="137" y="-112" width="15" height="15" rx="3.75" fill="#fff3bf" stroke="#e67700" stroke-width="1.2"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#495057" text-anchor="start"><tspan x="157" y="-101.25">Entry point</tspan></text>
+</svg>

@@ -715,7 +715,12 @@ confirmation or a scroll key. `registerShortcut`, `setStatusLine`, and
 `registerPanel` all return disposers, and the status line is one row —
 replaced, not stacked, last registration wins — that the layout surrenders
 first when the window is short. A panel owns what its rows mean; the host owns
-how they look and which keys drive them.
+how they look and which keys drive them. A panel is a fallback command, not an
+override: if its name collides with a built-in or a Harness command, the app's
+command wins in both the palette and `/name`. The host side of the seam lives in
+one framework-free module, `src/tui/panel-host.ts`, so an action that throws
+leaves the panel open rather than vanishing behind the error; the seam and its
+adapter are drawn in [`docs/whiteboards/`](docs/whiteboards/).
 
 Searching across sessions is built in: `/find --sessions <text>` reads the
 stored session logs (plain or zstd) under `$DSH_HOME/sessions`, shows every

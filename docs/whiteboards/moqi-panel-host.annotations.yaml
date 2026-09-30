@@ -1,0 +1,75 @@
+meta:
+  title: "moqi — the PanelHost adapter"
+  subtitle: "The host side of the tuiHost panel seam: one active panel, drawn and
+    driven through the app's own surfaces."
+  instructions: "Fill in `why` (why the function exists) and optionally `roleNote`
+    (how it fits the system). role can override the layer:
+    entry|ui|domain|adapter|util|test. Set hide: true to drop a node."
+functions:
+  tui/panel-host.ts#PanelHost.activate:
+    name: PanelHost.activate
+    file: tui/panel-host.ts
+    line: 116
+    signature: async activate(id:string):Promise<void>
+    layer: domain
+    why: "`enter` on a panel row: run it, then raise any secret it asks for."
+    roleNote: "The seam's centre: run the row, optionally prompt and submit, then
+      re-read the rows. A failure is reported and the panel stays open."
+    importance: high
+  tui/panel-host.ts#PanelHost.commands:
+    name: PanelHost.commands
+    file: tui/panel-host.ts
+    line: 76
+    signature: commands():readonly PanelCommand[]
+    layer: domain
+    why: Every contributed panel as a palette command.
+    roleNote: "Dedupes case-insensitively, the same rule PanelRegistry uses."
+  tui/panel-host.ts#PanelHost.constructor:
+    name: PanelHost.constructor
+    file: tui/panel-host.ts
+    line: 65
+    signature: constructor(source:PanelSource,surface:PanelSurface)
+    layer: domain
+    why: "Take the app's surfaces in, so this module imports no Cordis and no terminal."
+    roleNote: "Both arguments are ports: TuiApp is the production adapter, the
+      recording fake in tests is the second one."
+    importance: high
+  tui/panel-host.ts#PanelHost.fail:
+    name: PanelHost.fail
+    file: tui/panel-host.ts
+    line: 159
+    signature: private fail(error:unknown):void
+    layer: domain
+    why: Report a failure and redraw.
+    roleNote: "The app words the error; this module only decides that it happened."
+  tui/panel-host.ts#PanelHost.open:
+    name: PanelHost.open
+    file: tui/panel-host.ts
+    line: 102
+    signature: open(panel:TuiPanel,select?:string):void
+    layer: domain
+    why: Show a panel's rows, with the cursor on `select` when it survives.
+    roleNote: "Opening is the refresh: plugins are never polled, only asked again
+      after each action."
+  tui/panel-host.ts#PanelHost.openByName:
+    name: PanelHost.openByName
+    file: tui/panel-host.ts
+    line: 94
+    signature: openByName(name:string):boolean
+    layer: domain
+    why: Look a panel up by command name and open it.
+    roleNote: "Reached only after a built-in and the Harness registry both decline
+      the name, so a panel can never shadow them."
+    importance: high
+  tui/panel-host.ts#PanelHost.show:
+    name: PanelHost.show
+    file: tui/panel-host.ts
+    line: 153
+    signature: private show(panel:TuiPanel,select?:string):void
+    layer: domain
+    why: Read the panel's rows and hand them to the surface.
+    roleNote: "The one place rows() is called."
+modules:
+  tui:
+    title: tui
+    note: "Pure state plus a view shape; the app layer does the Cordis wiring."

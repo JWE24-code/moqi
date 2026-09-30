@@ -1,0 +1,176 @@
+meta:
+  title: "moqi — the tuiHost plugin seam"
+  subtitle: "What a plugin may contribute — shortcuts, a status line, and command
+    panels — and the registry each claim lives in."
+  instructions: "Fill in `why` (why the function exists) and optionally `roleNote`
+    (how it fits the system). role can override the layer:
+    entry|ui|domain|adapter|util|test. Set hide: true to drop a node."
+functions:
+  tui-host-core.ts#PanelRegistry.find:
+    name: PanelRegistry.find
+    file: tui-host-core.ts
+    line: 227
+    signature: find(name:string):TuiPanel | undefined
+    layer: domain
+    why: The panel registered under a command name, case-insensitively.
+    roleNote: "The same case-insensitive rule the palette match uses."
+  tui-host-core.ts#PanelRegistry.register:
+    name: PanelRegistry.register
+    file: tui-host-core.ts
+    line: 212
+    signature: register(panel:TuiPanel):(()=> void)| undefined
+    layer: domain
+    why: Claim a panel command.
+    roleNote: "A blank or taken name is refused with `undefined`; the returned
+      disposer releases the name."
+    importance: high
+  tui-host-core.ts#PanelRegistry.registered:
+    name: PanelRegistry.registered
+    file: tui-host-core.ts
+    line: 222
+    signature: registered():readonly TuiPanel[]
+    layer: domain
+    why: Every registered panel, in registration order.
+    roleNote: "The live list the palette merges, so a late plugin still appears."
+  tui-host-core.ts#ShortcutRegistry.dispatch:
+    name: ShortcutRegistry.dispatch
+    file: tui-host-core.ts
+    line: 126
+    signature: dispatch(combo:string):boolean
+    layer: entry
+    why: Run the handler for one key, if a plugin owns it.
+    roleNote: "Returns whether the key was claimed, so the app can stop before
+      treating it as text."
+  tui-host-core.ts#ShortcutRegistry.labelOf:
+    name: ShortcutRegistry.labelOf
+    file: tui-host-core.ts
+    line: 116
+    signature: labelOf(combo:string):string | undefined
+    layer: domain
+    why: The label for one combination, when it is claimed.
+    roleNote: ""
+  tui-host-core.ts#ShortcutRegistry.register:
+    name: ShortcutRegistry.register
+    file: tui-host-core.ts
+    line: 100
+    signature: register(shortcut:TuiShortcut):(()=> void)| undefined
+    layer: domain
+    why: Claim a key combination.
+    roleNote: "Validation lives in shortcutProblem; a built-in binding is refused,
+      never ordered."
+  tui-host-core.ts#ShortcutRegistry.registered:
+    name: ShortcutRegistry.registered
+    file: tui-host-core.ts
+    line: 111
+    signature: registered():readonly TuiShortcut[]
+    layer: domain
+    why: Every registered combination, in registration order.
+    roleNote: ""
+  tui-host-core.ts#StatusLine.get:
+    name: StatusLine.get
+    file: tui-host-core.ts
+    line: 152
+    signature: get():string | undefined
+    layer: domain
+    why: "Read the one line plugins are sharing."
+    roleNote: ""
+  tui-host-core.ts#StatusLine.set:
+    name: StatusLine.set
+    file: tui-host-core.ts
+    line: 142
+    signature: set(text:string | undefined):()=> void
+    layer: domain
+    why: "Contribute the line. The slot is replaced, not stacked: a terminal has one
+      line to give, and last registration wins — the same rule a status bar
+      has."
+    roleNote: ""
+  tui-host-core.ts#shortcutProblem:
+    name: shortcutProblem
+    file: tui-host-core.ts
+    line: 80
+    signature: function
+      shortcutProblem(combo:string,taken:ReadonlySet<string>):string | undefined
+    layer: domain
+    why: Why a registration was refused, or `undefined` when it was accepted.
+    roleNote: "A pure function, so the refusal rules are tested without a registry."
+  tui-host.ts#TuiHost.constructor:
+    name: TuiHost.constructor
+    file: tui-host.ts
+    line: 32
+    signature: constructor(ctx:Context)
+    layer: domain
+    why: "Mount the service on the context as `ctx.tuiHost`."
+    roleNote: ""
+  tui-host.ts#TuiHost.dispatch:
+    name: TuiHost.dispatch
+    file: tui-host.ts
+    line: 47
+    signature: dispatch(combo:string):boolean
+    layer: entry
+    why: Run a key's plugin handler, if one is registered.
+    roleNote: ""
+  tui-host.ts#TuiHost.findPanel:
+    name: TuiHost.findPanel
+    file: tui-host.ts
+    line: 65
+    signature: findPanel(name:string):TuiPanel | undefined
+    layer: domain
+    why: The panel behind a command name, case-insensitively.
+    roleNote: "The lookup PanelHost.openByName rides once the app's own commands
+      decline the name."
+  tui-host.ts#TuiHost.panels:
+    name: TuiHost.panels
+    file: tui-host.ts
+    line: 60
+    signature: panels():readonly TuiPanel[]
+    layer: domain
+    why: Every contributed panel, for the palette and tests.
+    roleNote: "The PanelSource the host adapter reads."
+  tui-host.ts#TuiHost.registerPanel:
+    name: TuiHost.registerPanel
+    file: tui-host.ts
+    line: 55
+    signature: registerPanel(panel:TuiPanel):(()=> void)| undefined
+    layer: domain
+    why: Contribute a command panel; `<name>` joins the command palette and the host
+      draws its rows, runs its actions, and raises its masked prompts.
+    roleNote: "The single entry point a plugin sees; it delegates to PanelRegistry."
+    importance: high
+  tui-host.ts#TuiHost.registerShortcut:
+    name: TuiHost.registerShortcut
+    file: tui-host.ts
+    line: 37
+    signature: registerShortcut(shortcut:TuiShortcut):(()=> void)| undefined
+    layer: domain
+    why: Claim a key combination; see {@link ShortcutRegistry.register}.
+    roleNote: ""
+  tui-host.ts#TuiHost.registered:
+    name: TuiHost.registered
+    file: tui-host.ts
+    line: 42
+    signature: registered():readonly TuiShortcut[]
+    layer: domain
+    why: Every registered combination, for help output and tests.
+    roleNote: ""
+  tui-host.ts#TuiHost.setStatusLine:
+    name: TuiHost.setStatusLine
+    file: tui-host.ts
+    line: 70
+    signature: setStatusLine(text:string | undefined):()=> void
+    layer: domain
+    why: Contribute the one-line status above the composer.
+    roleNote: ""
+  tui-host.ts#TuiHost.statusLine:
+    name: TuiHost.statusLine
+    file: tui-host.ts
+    line: 75
+    signature: statusLine():string | undefined
+    layer: domain
+    why: The status line a plugin contributed, if any.
+    roleNote: ""
+modules:
+  root:
+    title: root
+    note: "The Cordis service (`tui-host.ts`) and the framework-free contract
+      (`tui-host-core.ts`) are deliberately split, so the suites run from a bare
+      npm ci."

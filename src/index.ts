@@ -75,7 +75,8 @@ import {
   type AtMatch,
 } from './tui/atfile.ts'
 import { FileIndex } from './file-index.ts'
-import { TuiHost, type TuiPanel, type TuiPanelResult, type TuiPanelSecret } from './tui-host.ts'
+import { TuiHost } from './tui-host.ts'
+import { PanelHost } from './tui/panel-host.ts'
 import { Vim } from './tui/vim.ts'
 import { forkCut, lineage, projectUserTurns, rewindTarget } from './rewind.ts'
 import { renderJobs, type JobLike } from './tui/jobs.ts'
@@ -475,8 +476,8 @@ class TuiApp {
   private pendingLoginPrompt: { resolve: (value: string) => void; reject: (error: unknown) => void } | undefined
   /** Withdraws the sign-in a {@link LoginPanel} is running, if one is. */
   private loginAbort: AbortController | undefined
-  /** The plugin panel the picker is currently showing, for `enter` routing. */
-  private activePanel: TuiPanel | undefined
+  /** The host adapter for plugin-contributed panels. */
+  private readonly panelHost: PanelHost
   /** What `/providers` last listed, indexed the same way its picker rows are. */
   private loginEntries: readonly AuthorizationEntry[] = []
   /** The flow `/providers` is choosing a method for, between the two pickers. */
@@ -586,6 +587,22 @@ class TuiApp {
     this.showThinking = config.thinking === true
     this.vim.setEnabled(config.vim === true)
     this.tuiHost = new TuiHost(ctx)
+    this.panelHost = new PanelHost(this.tuiHost, {
+      showList: (title, rows, select) => {
+        this.picker.show('panel', title, [...rows])
+        if (select !== undefined) this.picker.selectById(select)
+      },
+      askSecret: (title, message, placeholder) => this.askSecret(title, message, placeholder),
+      report: (text) => {
+        this.setStatus(text)
+      },
+      fail: (error) => {
+        this.setStatus(describeError(error), true)
+      },
+      paint: () => {
+        this.paint()
+      },
+    })
     this.presence = new PresencePublisher(localDshHome())
     this.screen = new Screen({
       onKey: (key) => {
@@ -1355,11 +1372,13 @@ class TuiApp {
       seen.add(command.name.toLowerCase())
     }
     // Panels contributed by other plugins are commands too: `/JevLoop` is the
-    // plugin's, not this app's.
-    for (const panel of this.tuiHost.panels()) {
-      if (seen.has(panel.name.toLowerCase())) continue
-      merged.push({ name: panel.name, args: '', description: panel.description })
-      seen.add(panel.name.toLowerCase())
+    // plugin's, not this app's. A built-in or Harness command of the same name
+    // wins here, and `runCommand` honors that too, so the palette never lies.
+    for (const command of this.panelHost.commands()) {
+      const key = command.name.trim().toLowerCase()
+      if (key === '' || seen.has(key)) continue
+      merged.push({ name: command.name, args: '', description: command.description })
+      seen.add(key)
     }
     merged.sort((left, right) => left.name.localeCompare(right.name))
     return merged
@@ -2474,7 +2493,7 @@ class TuiApp {
           else this.selectSession(Number.parseInt(item.id, 10))
         }
         else if (kind === 'plugins') this.togglePlugin(item.id)
-        else if (kind === 'panel') void this.activatePanelRow(item.id)
+        else if (kind === 'panel') void this.panelHost.activate(item.id)
         else if (kind === 'delete') this.confirmDelete(item.id, item.title)
         else if (kind === 'rewind') void this.performRewind(Number.parseInt(item.id, 10))
         else if (kind === 'stored') void this.openStoredHit(item)
@@ -3626,12 +3645,6 @@ class TuiApp {
   /** Run a slash command: this app's own first, then the Harness registry. */
   private async runCommand(name: string, rawInput: string): Promise<void> {
     this.tab.scrollBack = 0
-    // A plugin-contributed panel owns its command outright.
-    const panel = this.tuiHost.findPanel(name)
-    if (panel !== undefined) {
-      this.showPanel(panel)
-      return
-    }
     switch (name) {
       case 'new':
         await this.newSession()
@@ -3897,6 +3910,9 @@ class TuiApp {
     const registry = this.ctx.get('commands')
     const agent = this.tab.agent
     if (registry === undefined || agent === undefined) {
+      // A plugin panel is the last stop before "unknown": it may claim a name
+      // the app and the Harness registry both leave free, never one they use.
+      if (this.panelHost.openByName(name)) return
       this.setStatus(`unknown command /${name} — type / to see them`, true)
       this.paint()
       return
@@ -3913,6 +3929,7 @@ class TuiApp {
       const controller = new AbortController()
       const execution = await registry.execute(agent, line, [], controller.signal)
       if (execution === undefined) {
+        if (this.panelHost.openByName(name)) return
         this.setStatus(`unknown command /${name} — type / to see them`, true)
         this.paint()
         return
@@ -4831,62 +4848,24 @@ class TuiApp {
 
   // ------------------------------------------------------- plugin panels
 
-  /** Open a plugin-contributed panel in the picker. */
-  private showPanel(panel: TuiPanel, select?: string): void {
-    this.activePanel = panel
-    const rows: PickerItem[] = panel.rows().map((row) => ({ ...row }))
-    this.picker.show('panel', panel.title ?? panel.name, rows)
-    if (select !== undefined) this.picker.selectById(select)
-    this.paint()
-  }
-
-  /** Enter on a panel row: run it, then raise any secret it asks for. */
-  private async activatePanelRow(id: string): Promise<void> {
-    const panel = this.activePanel
-    if (panel === undefined) return
-    let result: TuiPanelResult
-    try {
-      result = await panel.activate(id)
-    } catch (error) {
-      this.setStatus(describeError(error), true)
-      this.paint()
-      return
-    }
-    if (result !== undefined && result.kind === 'secret') {
-      const value = await this.promptSecret(panel, result)
-      if (value === undefined) {
-        this.setStatus('cancelled')
-        this.paint()
-        return
-      }
-      try {
-        await result.submit(value)
-      } catch (error) {
-        this.setStatus(describeError(error), true)
-        this.paint()
-        return
-      }
-    }
-    this.showPanel(panel, id)
-  }
-
   /**
-   * Raise a panel's masked prompt.
+   * Raise a plugin panel's masked prompt.
    *
    * The host owns the input surface: the draft is drawn as bullets and the
    * value crosses the seam only on submit. `undefined` means the user backed
-   * out, and the panel is left unchanged.
+   * out or answered nothing, and no secret is submitted.
    */
-  private async promptSecret(
-    panel: TuiPanel,
-    secret: TuiPanelSecret,
+  private async askSecret(
+    title: string,
+    message: string,
+    placeholder?: string,
   ): Promise<string | undefined> {
-    const login = new LoginPanel(panel.title ?? panel.name)
+    const login = new LoginPanel(title)
     this.panel = login
     const answer = new Promise<string>((resolve, reject) => {
       this.pendingLoginPrompt = { resolve, reject }
     })
-    login.setPrompt({ kind: 'secret', message: secret.message, placeholder: secret.placeholder })
+    login.setPrompt({ kind: 'secret', message, placeholder })
     this.setStatus('typing is masked · enter submits · esc cancels')
     this.paint()
 

@@ -24,6 +24,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The dshfind listing is documented as automatic.** The repository carries
   the `dsh-plugin` topic its marketplace indexes, so the README no longer
   describes a listing step that no release needs.
+- **A plugin panel cannot shadow the app's own commands.** The palette and
+  `runCommand` now agree: on a name collision a built-in or Harness command
+  wins, and a panel answers only to a name both leave free.
 
 ### Fixed
 
@@ -41,6 +44,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `id`/`createdAt` off the top level of rows that carry them nested inside
   `header`, so every row was filtered out. The mapper now reads both shapes,
   and no signal is passed. `/tree` benefits from the same fix.
+- **A panel survives a failed action or a cancelled prompt.** Enter on a panel
+  row used to close the panel and leave only a status line behind when the
+  action threw; the panel now stays open and refreshes.
+
 ## [0.3.0]
 
 ### Added

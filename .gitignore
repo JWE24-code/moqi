@@ -12,3 +12,6 @@ node_modules
 
 # Packed artifacts from npm pack / the package check.
 *.tgz
+
+# Scratch code maps; kept maps live in docs/whiteboards.
+.exdraw
