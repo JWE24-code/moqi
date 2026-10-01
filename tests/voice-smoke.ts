@@ -73,8 +73,8 @@ const EVERYTHING = probe(
     equal('arecord is chosen when present', resolved.setup.recorder.command, 'arecord')
     equal(
       'arecord is asked for 16 kHz mono 16-bit wav',
-      resolved.setup.recorder.args('/tmp/a.wav'),
-      ['-q', '-f', 'S16_LE', '-r', '16000', '-c', '1', '-t', 'wav', '/tmp/a.wav'],
+      resolved.setup.recorder.args('/home/tester/a.wav'),
+      ['-q', '-f', 'S16_LE', '-r', '16000', '-c', '1', '-t', 'wav', '/home/tester/a.wav'],
     )
   }
 }
@@ -88,7 +88,7 @@ const EVERYTHING = probe(
   )
   check('sox alone is enough to record', soxOnly.ok)
   if (soxOnly.ok) {
-    equal('sox is told to open the default device', soxOnly.setup.recorder.args('/tmp/a.wav'), [
+    equal('sox is told to open the default device', soxOnly.setup.recorder.args('/home/tester/a.wav'), [
       '-q',
       '-d',
       '-r',
@@ -97,7 +97,7 @@ const EVERYTHING = probe(
       '1',
       '-b',
       '16',
-      '/tmp/a.wav',
+      '/home/tester/a.wav',
     ])
   }
 }
@@ -107,7 +107,7 @@ const EVERYTHING = probe(
   check('rec is preferred over sox', both.ok && both.setup.recorder.command === 'rec')
   equal(
     'rec is not handed the -d that sox needs',
-    both.ok ? both.setup.recorder.args('/tmp/a.wav').includes('-d') : true,
+    both.ok ? both.setup.recorder.args('/home/tester/a.wav').includes('-d') : true,
     false,
   )
 }
@@ -126,8 +126,8 @@ const EVERYTHING = probe(
 }
 
 check('every recorder produces 16 kHz mono', RECORDERS.every((recorder) => {
-  const args = recorder.args('/tmp/a.wav')
-  return args.includes('16000') && args.includes('1') && args.includes('/tmp/a.wav')
+  const args = recorder.args('/home/tester/a.wav')
+  return args.includes('16000') && args.includes('1') && args.includes('/home/tester/a.wav')
 }))
 
 // --------------------------------------------------------------- binary choice
@@ -319,16 +319,16 @@ check('the model names are all ggml weights', MODEL_FILES.every((file) => /^ggml
     model: '/m.bin',
     language: undefined,
   }
-  equal('whisper is given the model, the file, and nothing to print', whisperArgs(setup, '/tmp/a.wav'), [
+  equal('whisper is given the model, the file, and nothing to print', whisperArgs(setup, '/home/tester/a.wav'), [
     '-m',
     '/m.bin',
     '-f',
-    '/tmp/a.wav',
+    '/home/tester/a.wav',
     '-np',
   ])
   equal(
     'a configured language is passed through',
-    whisperArgs({ ...setup, language: 'nl' }, '/tmp/a.wav').slice(-2),
+    whisperArgs({ ...setup, language: 'nl' }, '/home/tester/a.wav').slice(-2),
     ['-l', 'nl'],
   )
 }
@@ -361,7 +361,7 @@ check('the model names are all ggml weights', MODEL_FILES.every((file) => /^ggml
     'whisper_model_load: n_vocab = 51864',
     'system_info: n_threads = 4 / 8 | AVX = 1 |',
     '',
-    'main: processing /tmp/a.wav (48000 samples, 3.0 sec)',
+    'main: processing /home/tester/a.wav (48000 samples, 3.0 sec)',
     '',
     '[00:00:00.000 --> 00:00:03.000]   Ship it.',
     '',

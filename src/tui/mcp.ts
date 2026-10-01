@@ -59,7 +59,7 @@ export function groupMcpTools(toolNames: readonly string[]): McpServer[] {
     servers.set(parsed.server, list)
   }
   return [...servers.entries()]
-    .map(([name, tools]) => ({ name, tools: [...tools].sort() }))
+    .map(([name, tools]) => ({ name, tools: [...tools].sort((a, b) => a.localeCompare(b)) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 

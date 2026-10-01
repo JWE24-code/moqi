@@ -242,7 +242,7 @@ export function listPlugins(manifest: ProfileManifest | undefined): PluginEntry[
     seen.add(packageName)
     entries.push(pluginEntry(packageName, dependencies.get(packageName), true))
   }
-  for (const packageName of [...dependencies.keys()].sort()) {
+  for (const packageName of [...dependencies.keys()].sort((a, b) => a.localeCompare(b))) {
     if (seen.has(packageName)) continue
     seen.add(packageName)
     entries.push(pluginEntry(packageName, dependencies.get(packageName), false))

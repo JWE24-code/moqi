@@ -43,7 +43,7 @@ const sequence = buildOsc52('clip me').sequence
 
 check('with no multiplexer, the sequence passes through unchanged', wrapForMultiplexer(sequence, {}) === sequence)
 
-const tmuxWrapped = wrapForMultiplexer(sequence, { TMUX: '/tmp/tmux-1000/default,1234,0' })
+const tmuxWrapped = wrapForMultiplexer(sequence, { TMUX: '/home/tester/tmux/default,1234,0' })
 check('inside tmux, the sequence is wrapped in a Ptmux DCS', tmuxWrapped.startsWith(`${ESC}Ptmux;`))
 check('the tmux wrapper closes with ST', tmuxWrapped.endsWith(`${ESC}\\`))
 check(
