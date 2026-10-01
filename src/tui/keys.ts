@@ -145,7 +145,7 @@ export function decode(input: string): { keys: Key[]; rest: string } {
       }
 
       if (rest[1] === '[' || rest[1] === 'O') {
-        const match = /^\x1b[[O]([0-9;]*)([A-Za-z~])/.exec(rest)
+        const match = new RegExp(`^${ESC}[[O]([0-9;]*)([A-Za-z~])`).exec(rest)
         if (match === null) {
           // Incomplete CSI: keep it for the next chunk, unless it is clearly junk.
           if (rest.length < 16) return { keys, rest }
