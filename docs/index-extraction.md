@@ -57,3 +57,64 @@ persistence triggers.
 Non-goals: no behaviour change in any slice; every slice is gated on
 typecheck, the full suite (local + sandbox), and a rebuilt `lib/` committed
 with the source.
+
+## The big four: state inventory (measured)
+
+Reads dominated by the app's own reactions (`paint`, `setStatus`,
+`persistSoon`, `screen.invalidate`) are reactions, not state — the owned
+mutable state per cluster is what follows.
+
+| Section | Top reads | Owned writes |
+|---|---|---|
+| fleet (646) | paint(32), setStatus(25) | `fleet`, `peers`, `presenceKey`, `usageLedger`+`usageEntries` (shared), 1 tab write |
+| key handling (671) | setStatus(17), composer.value(14), runCommand(9), scroll(8) | `confirming`/`confirmAction`/`confirmPrompt`, `atDismissed`, `overlay`, 5 tab writes (via accessors) |
+| behaviors (912) | setStatus(53), paint(39), persistSoon(10) | `stagedImages`, `previewBaseLang`, turn lifecycle on the active tab |
+| login (550) | setStatus(27), paint(26), panel(6) | `pendingLoginPrompt`, `loginAbort`, `loginPendingEntry`, `previewBaseTheme`/`previewBaseLang` |
+
+### LoginFlow (from `login`)
+
+- **Owns:** `pendingLoginPrompt`, `loginAbort`, `loginPendingEntry`, and the
+  preview base theme/language a login pauses and restores.
+- **Rules:** one login flow at a time; a new prompt supersedes the previous;
+  abort on quit; the paused theme/language is restored exactly once.
+- **Reactions (stay in TuiApp):** mounting the login panel, status, paint,
+  picker, persistence.
+- Shape: like `SearchState` — the controller returns what to mount or restore;
+  the app draws it.
+
+### UsageLedger, then FleetController (from `fleet`)
+
+- **Blocker:** `usageLedger`/`usageEntries` are written here but read by
+  persistence and the usage view — shared mutable state a fleet controller
+  must not drag in.
+- **Slice 1 — `UsageLedger`:** owns the ledger, the entries, and the fold rule
+  built on `billedAtLastFold` (see the `SessionTab` field doc); consumers read.
+- **Slice 2 — `FleetController`:** owns the fleet panel state, `peers`, and
+  `presenceKey`; rules: presence-key derivation, refresh triggers; reactions:
+  paint/status.
+
+### KeyRouter (from `key handling`)
+
+- **Owns:** the confirm state (`confirming`, `confirmAction`,
+  `confirmPrompt`) and the key→intent binding table. Intent handlers stay on
+  `TuiApp`.
+- **Design decision at implementation:** whether the binding table is data (a
+  key→intent map — inspectable, testable) with the app registering handlers,
+  or the router owns semantics for a subset (scroll, search keys, palette) and
+  delegates the rest. The 5 tab writes already go through the `SessionTabs`
+  accessors; none move.
+
+### TurnRunner (from `behaviors`)
+
+- **Owns:** `stagedImages` and the turn lifecycle around a tab — send →
+  stream → settle → queue drain (`drainQueue`).
+- **Depends on:** `SessionTabs` (tab writes) and the queue rules. The
+  stream/event plumbing is the largest surface here; design it after
+  `LoginFlow` and `FleetController` have proven the callback pattern at
+  bigger sizes.
+
+### Sequencing
+
+LoginFlow → UsageLedger → FleetController → KeyRouter → TurnRunner. Every
+slice keeps the M2/M3 gates: typecheck, full suite local + sandbox, rebuilt
+`lib/` committed with the source, and no behaviour change.
