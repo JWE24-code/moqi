@@ -55,16 +55,41 @@ if (!existsSync(join(repoRoot, 'lib', 'index.js'))) {
 }
 
 const manifestPath = join(profileDir, 'package.json')
+// Preserve whatever else the profile composes. The installer's job is to point
+// the profile at this checkout and put it in the bundle stack — not to delete
+// the plugins the user added, which is what a plain overwrite used to do.
+let existing = {}
+try {
+  existing = JSON.parse(readFileSync(manifestPath, 'utf8'))
+} catch {
+  // No manifest yet, or an unreadable one: start from empty.
+}
+const priorDependencies =
+  existing.dependencies !== null && typeof existing.dependencies === 'object'
+    ? existing.dependencies
+    : {}
+const priorBundles = Array.isArray(existing.dsh?.profile?.bundles)
+  ? existing.dsh.profile.bundles
+  : []
+const bundles = [
+  '@deepseek-ai/dsh-base',
+  packageName,
+  ...priorBundles.filter((entry) => entry !== '@deepseek-ai/dsh-base' && entry !== packageName),
+]
 const manifest = {
+  ...existing,
   name: `dsh-profile-${profileName}`,
   private: true,
   dependencies: {
     // Absolute, so the profile keeps resolving wherever the Harness home is.
+    ...priorDependencies,
     [packageName]: `link:${repoRoot}`,
   },
   dsh: {
+    ...existing.dsh,
     profile: {
-      bundles: ['@deepseek-ai/dsh-base', packageName],
+      ...existing.dsh?.profile,
+      bundles,
       // This bundle disables HMR: a reload repainting under the alternate
       // screen would corrupt it, so patches apply on restart.
       patchReload: 'startup',
