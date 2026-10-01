@@ -60,7 +60,6 @@ import {
   type PickerItem,
   type Segment,
   type SessionStatus,
-  type SessionSummary,
   type ToolActivity,
 } from './tui/state.ts'
 import {
@@ -83,6 +82,7 @@ import { groupMcpTools, renderMcp } from './tui/mcp.ts'
 import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i18n.ts'
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
+import { SessionTabs } from './session-tabs.ts'
 import { labelFor, promptBlocks, toLoginPrompt } from './tui-adapt.ts'
 import {
   copyWithLocalHelper,
@@ -459,20 +459,35 @@ function newTab(id: string): SessionTab {
 
 /** The app: owns the screen, the sessions, and every piece of mutable state. */
 class TuiApp {
-  /** Open sessions, in creation order. */
-  private tabs: SessionTab[] = [newTab('pending')]
-  /** Index into {@link tabs} of the session being drawn. */
-  private active = 0
+  /** The open-session strip: owns the tabs and the rules between them. */
+  private readonly tabStrip: SessionTabs<SessionTab>
 
   /** The session currently on screen. */
   private get tab(): SessionTab {
-    const tab = this.tabs[this.active]
+    const tab = this.tabStrip.current()
     if (tab !== undefined) return tab
     // Unreachable in practice; keeps every accessor total rather than optional.
     const replacement = newTab('pending')
-    this.tabs = [replacement]
-    this.active = 0
+    this.tabStrip.replaceAll([replacement], 0)
     return replacement
+  }
+
+  /** Open sessions, in creation order. */
+  private get tabs(): SessionTab[] {
+    return this.tabStrip.tabs
+  }
+
+  private set tabs(tabs: SessionTab[]) {
+    this.tabStrip.tabs = tabs
+  }
+
+  /** Index into {@link tabs} of the session being drawn. */
+  private get active(): number {
+    return this.tabStrip.active
+  }
+
+  private set active(index: number) {
+    this.tabStrip.active = index
   }
 
   private readonly screen: Screen
@@ -599,6 +614,7 @@ class TuiApp {
     this.ctx = ctx
     this.config = config
     this.exit = exit
+    this.tabStrip = new SessionTabs([newTab('pending')], { bell: config.bell !== false })
     this.showThinking = config.thinking === true
     this.vim.setEnabled(config.vim === true)
     this.tuiHost = new TuiHost(ctx)
@@ -1191,7 +1207,7 @@ class TuiApp {
   private subscribeToStream(): void {
     const dispose = this.ctx.on('agent/assistant-stream', (payload) => {
       // Any open session may be streaming, not just the one on screen.
-      const tab = this.tabFor(payload.agent)
+      const tab = this.tabStrip.forAgent(payload.agent)
       if (tab === undefined) return
       this.onFrame(tab, payload.frame)
     })
@@ -1401,59 +1417,13 @@ class TuiApp {
 
   // ----------------------------------------------------------------- sessions
 
-  /** The tab bar's view of the open sessions. */
-  private sessionSummaries(): SessionSummary[] {
-    return this.tabs.map((tab, index) => ({
-      id: tab.id,
-      title: tab.title,
-      status: tab.status,
-      active: index === this.active,
-    }))
-  }
-
-  /** Find the session that owns an agent, if any. */
-  private tabFor(agent: Agent): SessionTab | undefined {
-    return this.tabs.find((tab) => tab.agent === agent)
-  }
-
-  /**
-   * Move a session to a new status, ringing the bell when it becomes `ready`.
-   *
-   * `ready` is the only state worth a sound: a turn finished and its answer is
-   * waiting. A session you are already looking at is marked seen instead, so
-   * the bar does not nag about a reply on screen.
-   */
-  private setSessionStatus(tab: SessionTab, status: SessionStatus): void {
-    const wasReady = tab.status === 'ready'
-    if (status === 'ready' && this.tabs[this.active] === tab) {
-      tab.status = 'idle'
-      if (!wasReady) this.ring()
-      return
-    }
-    tab.status = status
-    if (status === 'ready' && !wasReady) this.ring()
-  }
-
-  /** Sound the terminal bell, unless it has been turned off. */
-  private ring(): void {
-    if (this.config.bell === false) return
-    try {
-      process.stdout.write('\u0007')
-    } catch {
-      // A closed stdout is not a reason to fail a turn.
-    }
-  }
-
   /** Switch the view to another session. */
   private selectSession(index: number): void {
-    if (index < 0 || index >= this.tabs.length) return
-    this.active = index
-    // Looking at it counts as reading it.
-    const tab = this.tabs[index]
-    if (tab !== undefined && tab.status === 'ready') tab.status = 'idle'
+    const tab = this.tabStrip.select(index)
+    if (tab === undefined) return
     // Each session can be on its own palette; switching to one repaints in
     // its color, not whichever tab last called /theme.
-    if (tab !== undefined) applyTheme(tab.theme)
+    applyTheme(tab.theme)
     // Which tab you were on is part of what a restart should bring back.
     this.persistSoon()
     this.picker.hide()
@@ -1465,15 +1435,13 @@ class TuiApp {
 
   /** Close a session, keeping at least one open. */
   private closeSession(index: number): void {
-    if (this.tabs.length <= 1) {
+    const removed = this.tabStrip.remove(index)
+    if (removed === undefined) {
       this.setStatus('the last session cannot be closed — /new opens another', true)
       this.paint()
       return
     }
-    const [closed] = this.tabs.splice(index, 1)
-    if (closed?.streaming === true) this.setStatus('closed a session that was still replying')
-    if (this.active >= this.tabs.length) this.active = this.tabs.length - 1
-    else if (index < this.active) this.active -= 1
+    if (removed.closed.streaming === true) this.setStatus('closed a session that was still replying')
     // Closing a tab can leave a different one active, on its own palette.
     applyTheme(this.tab.theme)
     // A closed session must not come back on the next launch.
@@ -1507,7 +1475,7 @@ class TuiApp {
       picker: this.picker,
       scrollBack: this.tab.scrollBack,
       queued: this.tab.queued.map((prompt) => prompt.text),
-      sessions: this.sessionSummaries(),
+      sessions: this.tabStrip.summaries(),
       expandTools: this.expandTools,
       background: [...this.tab.background.values()],
       expandBackground: this.expandBackground,
@@ -2251,7 +2219,7 @@ class TuiApp {
     })
     // A dispatch outlives attention the same way a background job does, so
     // its arrival gets the same bell a finished turn gets.
-    this.ring()
+    this.tabStrip.ring()
     const body = result.out === '' ? '(no output)' : result.out.slice(-8000)
     this.showOverlay(
       `**${device}** · \`${profile}\`\n\n${body}`,
@@ -3494,7 +3462,7 @@ class TuiApp {
     // frame fires; the sync reads them from here on. Events before this point
     // belong to earlier turns and must not color this one's rows.
     tab.logSyncedSeq = tab.agent === undefined ? 0 : tab.agent.session.seq
-    this.setSessionStatus(tab, 'running')
+    this.tabStrip.setStatus(tab, 'running')
     this.setStatus('')
     if (tab.queued.length > 0) {
       // More still waiting behind this one: say so, or the queue silently
@@ -3553,7 +3521,7 @@ class TuiApp {
       tab.streamingSegments = []
       tab.streamingReasoning = ''
       // The answer is in: ring unless it is already on screen.
-      this.setSessionStatus(tab, 'ready')
+      this.tabStrip.setStatus(tab, 'ready')
       void this.flush(tab)
       // An interrupted turn must not launch the next prompt unbidden: the
       // user asked for silence, so the queue waits for a clean finish —
@@ -4500,7 +4468,7 @@ class TuiApp {
       if (previous === 'running') {
         this.jobStatus.set(id, job.status)
         const label = typeof job.label === 'string' ? job.label : ''
-        this.ring()
+        this.tabStrip.ring()
         this.setStatus(`background job ${label === '' ? id : label} finished`)
         this.paint()
       } else if (previous === undefined) {
