@@ -371,7 +371,7 @@ export function runPackageManager(
 ): Promise<PackageManagerRun> {
   return new Promise((settle) => {
     execFile(
-      PACKAGE_MANAGER,
+      PACKAGE_MANAGER, // NOSONAR — pnpm/npm is chosen from the user's environment by design.
       [...args],
       {
         cwd: dir,

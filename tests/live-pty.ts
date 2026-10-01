@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   }
 
   const child: ChildProcess = spawn(
-    'script',
+    'script', // NOSONAR — util-linux script(1) from PATH is the intended tool.
     ['-qec', `stty cols 110 rows 34 && dsh --profile ${PROFILE}`, '/dev/null'],
     { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] },
   )

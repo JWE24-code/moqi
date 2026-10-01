@@ -96,7 +96,7 @@ const snapshot: Snapshot = {
       : [],
   streaming: state === 'stream',
   spinner: '⠹',
-  status: state === 'stream' ? '' : '',
+  status: '',
   statusIsError: false,
   overlay: '',
   showThinking: state === 'think',

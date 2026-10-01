@@ -23,7 +23,7 @@ export interface Key {
   mouse?: { column: number; row: number }
 }
 
-const ESC = ''
+const ESC = '\x1b'
 
 /** CSI final bytes mapped to key names. */
 const CSI_NAMES: Record<string, string> = {
@@ -110,7 +110,7 @@ export function decode(input: string): { keys: Key[]; rest: string } {
       // reporting is on, and treating that workaround as an app click would
       // make copying impossible.
       if (rest.startsWith(`${ESC}[<`)) {
-        const mouse = /^\[<(\d+);(\d+);(\d+)([Mm])/.exec(rest)
+        const mouse = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])/.exec(rest)
         if (mouse === null) {
           if (rest.length < 24) return { keys, rest }
           index += 1
@@ -145,7 +145,7 @@ export function decode(input: string): { keys: Key[]; rest: string } {
       }
 
       if (rest[1] === '[' || rest[1] === 'O') {
-        const match = /^[[O]([0-9;]*)([A-Za-z~])/.exec(rest)
+        const match = /^\x1b[[O]([0-9;]*)([A-Za-z~])/.exec(rest)
         if (match === null) {
           // Incomplete CSI: keep it for the next chunk, unless it is clearly junk.
           if (rest.length < 16) return { keys, rest }

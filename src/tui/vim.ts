@@ -201,7 +201,7 @@ export class Vim {
         return 'handled'
       default:
         // Unbound keys are swallowed, as in vim: a stray `j` must not type.
-        return text === '' ? 'handled' : 'handled'
+        return 'handled'
     }
   }
 

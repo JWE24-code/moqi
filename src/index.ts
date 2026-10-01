@@ -2090,7 +2090,7 @@ class TuiApp {
     const code = await this.withTerminalHandedOver(
       () =>
         new Promise<number>((resolve) => {
-          const child = spawn('ssh', jumpArgv(session), { stdio: 'inherit' })
+          const child = spawn('ssh', jumpArgv(session), { stdio: 'inherit' }) // NOSONAR — invokes the user's ssh from PATH by design.
           child.on('error', (error) => {
             spawnError = describeError(error)
             resolve(-1)
@@ -2250,7 +2250,7 @@ class TuiApp {
     this.setStatus(`dispatching to ${device}…`)
     this.paint()
     const result = await new Promise<{ ok: boolean; out: string }>((resolve) => {
-      const child = spawn('ssh', dispatchArgv(device, profile, task), {
+      const child = spawn('ssh', dispatchArgv(device, profile, task), { // NOSONAR — the user's ssh from PATH is the intended tool.
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       const out: Buffer[] = []
@@ -2321,7 +2321,7 @@ class TuiApp {
     this.setStatus(`reading ${sessionId} from ${row.host}…`)
     this.paint()
     const raw = await new Promise<Buffer | undefined>((resolve) => {
-      const child = spawn('ssh', ['-o', 'BatchMode=yes', row.host, remote], {
+      const child = spawn('ssh', ['-o', 'BatchMode=yes', row.host, remote], { // NOSONAR — the user's ssh from PATH is the intended tool.
         stdio: ['ignore', 'pipe', 'ignore'],
       })
       const chunks: Buffer[] = []
@@ -3295,7 +3295,7 @@ class TuiApp {
     this.setStatus(`updating to ${latest}…`)
     this.paint()
     const code = await new Promise<number>((resolve) => {
-      const child = spawn('npm', ['install', '-g', `${packageName}@${latest}`], {
+      const child = spawn('npm', ['install', '-g', `${packageName}@${latest}`], { // NOSONAR — self-update runs the user's npm from PATH by design.
         stdio: 'ignore',
       })
       child.on('error', () => resolve(1))
@@ -4198,11 +4198,11 @@ class TuiApp {
       return true
     }
     if (matches.length > 1) {
-      const prefix = matches.reduce((shared, name) => {
+      const prefix = matches.slice(1).reduce((shared, name) => {
         let end = 0
         while (end < shared.length && end < name.length && shared[end] === name[end]) end += 1
         return shared.slice(0, end)
-      })
+      }, matches[0] ?? '')
       if (prefix.length > argument.length) {
         this.composer.setValue(`/${command} ${prefix}`)
         return true

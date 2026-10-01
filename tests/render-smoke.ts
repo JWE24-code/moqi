@@ -90,7 +90,7 @@ const history = new InputHistory()
 check('recall on empty history yields nothing', history.recall(-1, 'draft') === undefined)
 history.add('first prompt')
 history.add('second prompt')
-history.add('second prompt') // immediate repeat, dropped
+history.add('second prompt') // NOSONAR — the immediate repeat is the case under test.
 check('recall ignores immediate repeats', history.snapshot().length === 2)
 check('recall walks back to the newest', history.recall(-1, '') === 'second prompt')
 check('recall walks back to the oldest', history.recall(-1, '') === 'first prompt')

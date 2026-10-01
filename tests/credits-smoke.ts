@@ -52,6 +52,11 @@ function check(name: string, condition: boolean): void {
   }
 }
 
+/** Decimal-string parses are asserted with a tolerance, not exact `===`. */
+function closeTo(actual: number | undefined, expected: number): boolean {
+  return actual !== undefined && Math.abs(actual - expected) < 1e-9
+}
+
 // --------------------------------------------------------- DeepSeek balance
 
 // The documented shape, with the amounts as decimal strings — which is how
@@ -64,9 +69,9 @@ const deepSeekBody = {
 }
 const balance = parseDeepSeekBalance(deepSeekBody)
 check('a DeepSeek balance parses', balance !== undefined)
-check('numeric strings are read as numbers', balance?.total === 14.32)
+check('numeric strings are read as numbers', closeTo(balance?.total, 14.32))
 check('the granted portion is split out', balance?.granted === 10)
-check('the topped-up portion is split out', balance?.toppedUp === 4.32)
+check('the topped-up portion is split out', closeTo(balance?.toppedUp, 4.32))
 check('the currency is carried through', balance?.currency === 'USD')
 check('availability is carried through', balance?.available === true)
 
@@ -165,7 +170,7 @@ const zaiPlanBody = {
 const zaiPlan = parseZaiPlan(zaiPlanBody)
 check('a plan name parses from productName', zaiPlan?.plan === 'GLM Coding Lite')
 check('a date-string renewal parses to epoch millis', zaiPlan?.renewsAt === Date.parse('2026-11-30'))
-check('a renewal price parses', zaiPlan?.renewPrice === 43.2)
+check('a renewal price parses', closeTo(zaiPlan?.renewPrice, 43.2))
 check('a billing cycle parses', zaiPlan?.billingCycle === 'quarterly')
 
 // An expired entry must not win over the live one, whatever the order.
@@ -297,7 +302,7 @@ const collected = await collectPlans(
 check('one block comes back per probeable route', collected.length === 3)
 check('a route with no probe is left out entirely', !collected.some((plan) => plan.provider === 'some-local-llama'))
 const ds = collected.find((plan) => plan.provider === 'deepseek')
-check('a provider that answered carries its balance', ds?.balance?.total === 14.32)
+check('a provider that answered carries its balance', closeTo(ds?.balance?.total, 14.32))
 check('a provider that answered has no problem line', ds?.problem === undefined)
 check('DeepSeek carries its peak notes even alongside a balance', (ds?.notes.length ?? 0) >= 1)
 
@@ -439,7 +444,7 @@ check('the 5h window gets the session label', codexParsed?.windows[0]?.label ===
 check('the 7d window gets the week label', codexParsed?.windows[1]?.label === 'Week (7d)')
 check('utilization is a percentage of 100', codexParsed?.windows[0]?.used === 6 && codexParsed?.windows[0]?.limit === 100)
 check('a seconds reset is converted to millis', codexParsed?.windows[0]?.resetAt === 1_738_300_000_000)
-check('a credit balance parses as credits, not currency', codexParsed?.balance?.total === 820.6969075 && codexParsed?.balance?.currency === 'credits')
+check('a credit balance parses as credits, not currency', closeTo(codexParsed?.balance?.total, 820.6969075) && codexParsed?.balance?.currency === 'credits')
 
 check('a payload with no secondary window yields only the primary', parseCodexUsage({ rate_limit: { primary_window: { used_percent: 3 } } })?.windows.length === 1)
 check('an unrecognized window length is named by that length', codexWindowLabel(9_000) === 'Window (3h)' )

@@ -105,7 +105,7 @@ function parseRecords(stdout: string): PresenceRecord[] {
 function ssh(host: string, command: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
-      'ssh',
+      'ssh', // NOSONAR — the user's ssh from PATH is the intended tool.
       [
         '-o',
         'BatchMode=yes',
