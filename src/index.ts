@@ -36,7 +36,6 @@ import {
   AuthorizationDeclinedError,
   type AuthorizationEntry,
   type AuthorizationInteraction,
-  type AuthorizationPrompt,
 } from '@deepseek-ai/dsh-authorization'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 
@@ -84,6 +83,7 @@ import { groupMcpTools, renderMcp } from './tui/mcp.ts'
 import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i18n.ts'
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
+import { labelFor, promptBlocks, toLoginPrompt } from './tui-adapt.ts'
 import {
   copyWithLocalHelper,
   describeError,
@@ -5118,8 +5118,6 @@ class TuiApp {
   }
 }
 
-// ----------------------------------------------------------------- utilities
-
 /** The subset of `ctx.sessionTitle` that `/rename` uses, probed defensively. */
 interface SessionTitleLike {
   rename?: (session: Session, title: string) => unknown
@@ -5157,46 +5155,6 @@ interface JobRegistryLike {
     finishedAt?: number
   }[]
   kill: (id: string, caller?: unknown, reason?: string) => 'requested' | 'already-finished'
-}
-
-/**
- * A short label for a background agent: the preset it was composed from when
- * there is one, else its origin, else a short form of the session id.
- */
-function labelFor(agent: Agent): string {
-  const header = agent.session.header
-  const preset = header.agentPreset
-  if (preset !== undefined && preset !== '') return preset
-  if (header.origin === 'subagent') return 'subagent'
-  return String(header.id).replace(/^session-/, '').slice(0, 8)
-}
-
-/** Content blocks for one prompt: its text plus any staged image blocks. */
-function promptBlocks(prompt: PromptDraft): { type: 'text'; text: string }[] | ({ type: 'text'; text: string } | { type: 'image'; attachment: ImageAttachmentRef })[] {
-  if (prompt.images.length === 0) return [{ type: 'text', text: prompt.text }]
-  return [
-    { type: 'text', text: prompt.text },
-    ...prompt.images.map(
-      (attachment): { type: 'image'; attachment: ImageAttachmentRef } => ({
-        type: 'image',
-        attachment,
-      }),
-    ),
-  ]
-}
-
-/**
- * Narrow a Harness `AuthorizationPrompt` to the shape {@link LoginPanel} draws.
- *
- * Drops only the prompt's own `signal` — the caller wires that separately,
- * since `LoginPanel` may depend on nothing from the Harness, abort signals
- * included.
- */
-function toLoginPrompt(prompt: AuthorizationPrompt): LoginPrompt {
-  if (prompt.kind === 'select') {
-    return { kind: 'select', message: prompt.message, options: prompt.options }
-  }
-  return { kind: prompt.kind, message: prompt.message, placeholder: prompt.placeholder }
 }
 
 /**
