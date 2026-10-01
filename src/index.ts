@@ -2490,8 +2490,6 @@ class TuiApp {
         this.picker.key(key)
         break
       }
-      default:
-        this.picker.key(key)
       case 'enter': {
         const item = this.picker.current()
         const kind = this.picker.kind
@@ -2521,6 +2519,11 @@ class TuiApp {
         else void this.openSession(item.id, item.title)
         break
       }
+      default:
+        // Navigation, paging and narrowing belong to the picker; this branch
+        // must never fall through, or an arrow key would also activate a row.
+        this.picker.key(key)
+        break
     }
     this.paint()
   }
