@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2]
+
+### Security
+
+- **The profile installer refuses names that could leave the profiles
+  directory.** It blocked `/` and `\` but accepted `..`, so a profile name could
+  write one level up; it now takes a flat, dotless allowlist plus a
+  resolved-path containment check.
+- **CI installs and child processes are hardened.** Workflow installs pass
+  `--ignore-scripts` (npm is pinned; pnpm and the Harness install keep their
+  scripts deliberately), and the dev scripts invoke `/bin/sh` and
+  `/usr/bin/env git` by absolute path.
+
+### Changed
+
+- **The Sonar backlog is down to maintainability smells.** Every BUG and
+  VULNERABILITY finding is resolved; a dead ternary, a `reduce` with no initial
+  value, a redundant `void`, and a control character in the CSI regex are
+  corrected, and dead imports and length-index reads are gone.
+
 ## [0.4.1]
 
 ### Changed
