@@ -85,6 +85,7 @@ import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } fro
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
 import { SearchState } from './search-state.ts'
+import { TurnRunner } from './turn-runner.ts'
 import { labelFor, promptBlocks } from './tui-adapt.ts'
 import { LoginFlow, type AuthorizationLike } from './login-flow.ts'
 import {
@@ -540,6 +541,50 @@ class TuiApp {
 
   /** Sent prompts, recalled with ↑/↓ on the composer's outer rows. */
   private readonly history = new InputHistory()
+  /** The turn lifecycle: send, stream, settle, and the queue's drain rules. */
+  private readonly turns = new TurnRunner({
+    isForeground: (tab) => this.tabs[this.active] === tab,
+    clearOverlay: () => {
+      this.overlay = ''
+    },
+    followOutput: () => {
+      this.scrollToBottom()
+    },
+    rememberPrompt: (text) => {
+      this.history.add(text)
+      this.persistSoon()
+    },
+    status: (text, isError) => {
+      this.setStatus(text, isError)
+    },
+    repaint: () => {
+      this.paint()
+    },
+    spinner: (on) => {
+      if (on) this.startSpinner()
+      else this.releaseSpinner()
+    },
+    setAbort: (controller) => {
+      this.abort = controller
+    },
+    // The runner only ever hands back a tab the app handed it, so these
+    // narrow back to the app's own SessionTab shape.
+    sessionStatus: (tab, status) => {
+      this.tabStrip.setStatus(tab as SessionTab, status)
+    },
+    foldUsage: (tab, provider) => {
+      this.foldBilledUsage(tab as SessionTab, provider)
+    },
+    syncToolLog: (tab) => {
+      this.syncToolLog(tab as SessionTab)
+    },
+    flush: (tab) => {
+      void this.flush(tab as SessionTab)
+    },
+    persist: () => {
+      this.persistSoon()
+    },
+  })
   /** The active transcript search: its query, cursor, and jump math. */
   private readonly searchState = new SearchState()
   /** Read-only view of the live search, for callers that only test it. */
@@ -3324,7 +3369,7 @@ class TuiApp {
   }
 
   private async send(text: string): Promise<void> {
-    await this.sendTo(this.tab, { text, images: [] })
+    await this.turns.send(this.tab, text)
   }
 
   /**
@@ -3375,145 +3420,12 @@ class TuiApp {
 
   /** Send a materialized prompt to the active session. */
   private async sendPrompt(prompt: PromptDraft): Promise<void> {
-    await this.sendTo(this.tab, prompt)
+    await this.turns.run(this.tab, prompt)
   }
 
-  /**
-   * Send a prompt to one specific session and stream the reply.
-   *
-   * `fromQueue` marks a prompt that was already recorded in the composer
-   * history at the moment it was queued, so the drain must not record it a
-   * second time (recall would then surface it twice).
-   */
+  /** Send a prompt to one specific session and stream the reply. */
   private async sendTo(tab: SessionTab, prompt: PromptDraft, fromQueue = false): Promise<void> {
-    const agent = tab.agent
-    if (agent === undefined) return
-    const text = prompt.text
-
-    this.overlay = ''
-    // Only follow the newest output when the queued conversation is the one
-    // on screen; a backgrounded session must not yank the view around.
-    if (this.tabs[this.active] === tab) this.scrollToBottom()
-    if (!fromQueue) {
-      this.history.add(text)
-      this.persistSoon()
-    }
-    tab.messages.push(
-      textMessage('user', text, {
-        attachments:
-          prompt.images.length === 0
-            ? undefined
-            : prompt.images.map((ref) => ({
-                name: ref.name ?? 'image',
-                width: ref.width,
-                height: ref.height,
-              })),
-      }),
-    )
-    if (tab.title === '') {
-      tab.title = text.slice(0, 60)
-      // A tab restored with no title reads as "new session" in the bar, which
-      // is exactly the wrong label for a conversation that already has one.
-      this.persistSoon()
-    }
-
-    tab.streaming = true
-    tab.streamStartedAt = Date.now()
-    tab.turnStartTokens = tab.completionTokens
-    tab.drainQueue = false
-    tab.streamingSegments = []
-    tab.streamingReasoning = ''
-    // Tool results land in the session log between model streams, where no
-    // frame fires; the sync reads them from here on. Events before this point
-    // belong to earlier turns and must not color this one's rows.
-    tab.logSyncedSeq = tab.agent === undefined ? 0 : tab.agent.session.seq
-    this.tabStrip.setStatus(tab, 'running')
-    this.setStatus('')
-    if (tab.queued.length > 0) {
-      // More still waiting behind this one: say so, or the queue silently
-      // draining looks like prompts disappearing.
-      this.setStatus(
-        `${String(tab.queued.length)} queued — sends when the reply finishes`,
-      )
-    }
-    this.startSpinner()
-    this.paint()
-
-    const abort = new AbortController()
-    this.abort = abort
-
-    try {
-      agent.followup(
-        createUserMessage({ content: promptBlocks(prompt), source: { kind: 'user' } }),
-      )
-      await agent.whenIdle()
-    } catch (error) {
-      this.setStatus(describeError(error), true)
-    } finally {
-      this.abort = undefined
-      const turnSeconds = (Date.now() - tab.streamStartedAt) / 1000
-      const turnOutput = tab.completionTokens - tab.turnStartTokens
-      tab.tps = turnSeconds > 0 && turnOutput > 0 ? turnOutput / turnSeconds : 0
-      // Attribute this turn's own spend to whichever provider actually
-      // answered it — `assembled` is what prompt assembly captured for the
-      // request just settled, which stays correct even though `current`
-      // already points at a switch queued for the next turn.
-      const provider = tab.selection.assembled?.provider ?? tab.selection.current?.provider ?? ''
-      this.foldBilledUsage(tab, provider)
-      this.persistSoon()
-      tab.streaming = false
-      tab.streamStartedAt = 0
-      this.releaseSpinner()
-      // Commit whatever streamed, even on an interrupt, so nothing is lost.
-      // One last log sync first: the final tool results may have landed after
-      // the last frame, and the committed rows are what /export and a restart
-      // will show.
-      this.syncToolLog(tab)
-      const reasoning = tab.streamingReasoning.trim()
-      // The turn commits with its order intact — the same segments that were
-      // on screen while it streamed, so nothing rearranges itself once it
-      // settles.
-      const segments = tab.streamingSegments.filter(
-        (segment) => segment.kind === 'tool' || segment.text.trim() !== '',
-      )
-      if (segments.length > 0 || reasoning !== '') {
-        tab.messages.push({
-          role: 'assistant',
-          segments,
-          reasoning: reasoning === '' ? undefined : reasoning,
-        })
-      }
-      tab.streamingSegments = []
-      tab.streamingReasoning = ''
-      // The answer is in: ring unless it is already on screen.
-      this.tabStrip.setStatus(tab, 'ready')
-      void this.flush(tab)
-      // An interrupted turn must not launch the next prompt unbidden: the
-      // user asked for silence, so the queue waits for a clean finish —
-      // unless the interrupt was the redirection kind (`/interrupt`), which
-      // stops this answer precisely so the queue can carry on. The follow-up
-      // is fire-and-forget like every other send call site — awaiting it here
-      // would stack one frame per queued prompt.
-      const drain = queueShouldDrain({
-        interrupted: abort.signal.aborted,
-        drainRequested: tab.drainQueue,
-      })
-      tab.drainQueue = false
-      if (drain && tab.queued.length > 0) {
-        const next = tab.queued.shift()
-        if (next !== undefined) {
-          void this.sendTo(tab, next, true)
-          this.paint()
-          return
-        }
-      }
-      if (!drain && tab.queued.length > 0 && this.tabs[this.active] === tab) {
-        this.setStatus(
-          `${String(tab.queued.length)} queued — kept after the interrupt · /interrupt runs them`,
-        )
-      }
-      this.paint()
-    }
+    await this.turns.run(tab, prompt, fromQueue)
   }
 
   /** Persist the session, ignoring a backend that does not support it. */
