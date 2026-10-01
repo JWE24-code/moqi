@@ -42,7 +42,6 @@ import {
   colMuted,
   colRose,
   colText,
-  colWarn,
   muted,
   ok,
   selected,

@@ -10,7 +10,7 @@
  */
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderUsage, TokenBuckets, UsageEntry, UsageLedger } from './usage.ts'

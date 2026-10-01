@@ -8,7 +8,6 @@ import {
   lineage,
   projectUserTurns,
   rewindTarget,
-  type LogEventLike,
   type MessageEventLike,
 } from '../src/rewind.ts'
 

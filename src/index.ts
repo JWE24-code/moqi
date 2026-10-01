@@ -25,17 +25,16 @@ import type {
   ModelSelection,
   ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-agent-default-model'
+import type {} from '@deepseek-ai/dsh-agent-default-model' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/cordis-plugin-loader'
-import type {} from '@deepseek-ai/dsh-cmdline'
+import type {} from '@deepseek-ai/cordis-plugin-loader' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
+import type {} from '@deepseek-ai/dsh-cmdline' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   AuthorizationDeclinedError,
   type AuthorizationEntry,
-  type AuthorizationInteraction,
 } from '@deepseek-ai/dsh-authorization'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 
@@ -52,7 +51,6 @@ import {
   messageTools,
   moveSelection,
   ownerOfDelegated,
-  queueShouldDrain,
   segmentTools,
   textMessage,
   type Message,
@@ -61,7 +59,6 @@ import {
   type PickerItem,
   type Segment,
   type SessionStatus,
-  type ToolActivity,
 } from './tui/state.ts'
 import {
   AtMenu,
@@ -109,14 +106,12 @@ import {
   QuestionsPanel,
   interpretApproval,
   type ApprovalDecision,
-  type LoginPrompt,
 } from './tui/panels.ts'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
-import type {} from '@deepseek-ai/dsh-user-approval'
+import type {} from '@deepseek-ai/dsh-user-approval' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
 import {
   keyReference,
-  findMatches,
   hostLabel,
   layout,
   maxScrollBack,
@@ -155,15 +150,11 @@ import {
 } from './persist.ts'
 import { VERSION } from './version.ts'
 import {
-  SESSION_MS,
-  WEEK_MS,
   bucketDelta,
   isEmptyBuckets,
   noBuckets,
   UsageStore,
   type TokenBuckets,
-  type UsageEntry,
-  type UsageLedger,
 } from './usage.ts'
 import { collectPlans, hasProbe, PlanCache, type CredentialLookup, type Route } from './credits.ts'
 import { UsageView } from './tui/usage-view.ts'

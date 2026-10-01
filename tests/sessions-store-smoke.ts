@@ -13,7 +13,6 @@ import { join } from 'node:path'
 
 import {
   deleteStoredSession,
-  deleteStoredSessionDir,
   encodeSegment,
   findStoredSessionDir,
   projectKey,
