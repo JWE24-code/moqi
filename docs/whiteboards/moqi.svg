@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="3054" height="2808" viewBox="-48 -256 3054 2808">
+<title>/home/joeri/Projects/moqi/src</title>
+<rect x="-48" y="-256" width="3054" height="2808" fill="#ffffff"/>
+<rect x="0" y="0" width="1456" height="2504" rx="18" fill="#f8f9fa" stroke="#e67700" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16" fill="#7a3d00" text-anchor="start"><tspan x="20" y="25.12">root</tspan></text>
+<rect x="1502" y="0" width="1456" height="1178" rx="18" fill="#f8f9fa" stroke="#1971c2" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16" fill="#0b3d63" text-anchor="start"><tspan x="1522" y="25.12">tui</tspan></text>
+<rect x="20" y="40" width="708" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="32" y="59.66">class PlanCache</tspan></text>
+<rect x="20" y="234" width="354" height="155" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="32" y="253.66">class SessionTabs</tspan></text>
+<rect x="398" y="234" width="354" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="410" y="253.66">class PanelRegistry</tspan></text>
+<rect x="776" y="234" width="354" height="189" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="788" y="253.66">class TurnRunner</tspan></text>
+<rect x="20" y="445" width="1062" height="2039" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="32" y="464.66">class TuiApp</tspan></text>
+<rect x="2584" y="607" width="354" height="140" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="2596" y="626.66">class AtMenu</tspan></text>
+<rect x="1522" y="824" width="354" height="140" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1534" y="843.66">class FleetView</tspan></text>
+<rect x="1900" y="824" width="354" height="140" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1912" y="843.66">class PeerList</tspan></text>
+<rect x="2278" y="824" width="354" height="140" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="2290" y="843.66">class Composer</tspan></text>
+<rect x="1522" y="986" width="354" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1534" y="1005.66">class Vim</tspan></text>
+<rect x="1900" y="986" width="354" height="172" rx="18" fill="none" stroke="#ced4da" stroke-width="1" stroke-dasharray="1 3" stroke-linecap="round"/>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13" fill="#868e96" text-anchor="start"><tspan x="1912" y="1005.66">class Screen</tspan></text>
+<rect x="32" y="72" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="386" y="72" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="752" y="40" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1106" y="40" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="32" y="266" width="330" height="111" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="410" y="266" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="788" y="266" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="32" y="477" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="477" width="330" height="195" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="477" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="694" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="694" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="694" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="861" width="330" height="161" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="861" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="861" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1044" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1044" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1044" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1194" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1194" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1194" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1361" width="330" height="178" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1361" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1361" width="330" height="161" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1561" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1561" width="330" height="145" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1561" width="330" height="161" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1744" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1744" width="330" height="195" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1744" width="330" height="161" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="1961" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="1961" width="330" height="111" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="1961" width="330" height="161" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="2144" width="330" height="178" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="2144" width="330" height="96" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="740" y="2144" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="32" y="2344" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="386" y="2344" width="330" height="128" rx="18" fill="#fff3bf" stroke="#e67700" stroke-width="1.5"/>
+<rect x="1522" y="40" width="330" height="111" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1876" y="40" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2230" y="40" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2584" y="40" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1522" y="207" width="330" height="161" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1876" y="207" width="330" height="161" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2230" y="207" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2584" y="207" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1522" y="390" width="330" height="195" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1876" y="390" width="330" height="161" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2230" y="390" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2584" y="390" width="330" height="145" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1522" y="607" width="330" height="161" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1876" y="607" width="330" height="178" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2230" y="607" width="330" height="195" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2596" y="639" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1534" y="856" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1912" y="856" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="2290" y="856" width="330" height="96" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1534" y="1018" width="330" height="128" rx="18" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5"/>
+<rect x="1912" y="1018" width="330" height="128" rx="18" fill="#e9ecef" stroke="#868e96" stroke-width="1.5"/>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="48" y="99.94">PlanCache.get</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="124.32">get():ProviderPlan[] | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="141.2">why: The cached reading, when one is</tspan><tspan x="48" y="158.07">still fresh enough to show.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="181.27">Domain / core · exported · ←33</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="402" y="99.94">PlanCache.set</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="124.32">set(plans:ProviderPlan[]):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="141.2">why: Remember a reading from</tspan><tspan x="402" y="158.07">`collectPlans`, stamped now.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="181.27">Domain / core · exported · ←11</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="768" y="67.94">describeError</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="768" y="92.32">function</tspan><tspan x="768" y="109.2">describeError(error:unknown):string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="768" y="126.07">why: A one-line, human-readable form</tspan><tspan x="768" y="142.95">of anything thrown.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="768" y="166.27">Domain / core · exported · ←26</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1122" y="67.94">resolve</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1122" y="92.32">function resolve():string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1122" y="109.2">why: Read the version out of</tspan><tspan x="1122" y="126.07">`package.json`, with a safe</tspan><tspan x="1122" y="142.95">fallback.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1122" y="166.27">Domain / core · ←18 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="48" y="293.94">SessionTabs.current</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="318.32">current():T | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="335.2">why: The tab currently on screen.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="358.27">Domain / core · exported · ←9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="426" y="293.94">PanelRegistry.find</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="426" y="318.32">find(name:string):TuiPanel | undefined</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="426" y="335.2">why: The panel registered under a</tspan><tspan x="426" y="352.08">command name, case-insensitively.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="426" y="375.27">Domain / core · exported · ←12 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="804" y="293.94">TurnRunner.sendTo</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="804" y="318.32">private async</tspan><tspan x="804" y="335.2">sendTo(tab:TurnTab,prompt:TurnPrompt,fromQ</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="804" y="352.07">why: Send a prompt to one specific</tspan><tspan x="804" y="368.95">session and stream the reply.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="804" y="392.27">Domain / core · async · exported · ←1 · →18</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="504.94">TuiApp.acceptAtCompletion</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="529.32">private acceptAtCompletion():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="546.2">why: Accept the selected completion,</tspan><tspan x="48" y="563.08">replacing the `@` token with the</tspan><tspan x="48" y="579.95">path.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="603.27">Entry point · ←2 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="504.94">TuiApp.attachRemoteSession</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="529.32">private async</tspan><tspan x="402" y="546.2">attachRemoteSession(session:FleetSession):</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="563.07">why: Hand the terminal to a real</tspan><tspan x="402" y="579.95">`ssh -t` running the remote profile,</tspan><tspan x="402" y="596.82">so a remote session is driven</tspan><tspan x="402" y="613.7">exactly like a local one — the same</tspan><tspan x="402" y="630.57">keys, the same screen — instead of</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="653.27">Entry point · async · ←1 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="504.94">TuiApp.beginVoice</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="529.32">private beginVoice():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="546.2">why: Start capturing, or say in one</tspan><tspan x="756" y="563.08">line why this machine cannot.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="586.27">Entry point · ←1 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="721.94">TuiApp.dispatchTo</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="746.32">private async</tspan><tspan x="48" y="763.2">dispatchTo(device:string,task:string):Prom</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="780.07">why: Run a task on a peer&apos;s headless</tspan><tspan x="48" y="796.95">profile over the SSH channel.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="820.27">Entry point · async · ←2 · →7</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="721.94">TuiApp.editDraft</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="746.32">private async editDraft():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="763.2">why: Round-trip the draft through</tspan><tspan x="402" y="780.08">`$VISUAL`/`$EDITOR`.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="803.27">Entry point · async · ←1 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="721.94">TuiApp.finishVoice</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="746.32">private async finishVoice():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="763.2">why: Stop the recorder, run whisper,</tspan><tspan x="756" y="780.08">and splice the result into the</tspan><tspan x="756" y="796.95">composer.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="820.27">Entry point · async · ←1 · →13</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="888.94">TuiApp.forkAt</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="913.32">private async</tspan><tspan x="48" y="930.2">forkAt(cut:number):Promise&lt;SessionTab |</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="947.07">why: Create a new session seeded</tspan><tspan x="48" y="963.95">with the current log&apos;s first `cut`</tspan><tspan x="48" y="980.82">events.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1003.27">Entry point · async · ←2 · →11</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="888.94">TuiApp.handleChatKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="913.32">private handleChatKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="938.27">Entry point · ←1 · →54</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="888.94">TuiApp.handleFleetKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="913.32">private handleFleetKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="938.27">Entry point · ←1 · →13</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1071.94">TuiApp.handleFleetPromptKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="1096.32">private handleFleetPromptKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1121.27">Entry point · ←1 · →8</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1071.94">TuiApp.handleKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="1096.32">private handleKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="1121.27">Entry point · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1071.94">TuiApp.handlePanelKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="1096.32">private handlePanelKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="1113.2">why: Keys while a trust-surface</tspan><tspan x="756" y="1130.08">panel owns the keyboard.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="1153.27">Entry point · ←1 · →21</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1221.94">TuiApp.handlePickerKey</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="1246.32">private handlePickerKey(key:Key):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1271.27">Entry point · ←1 · →23</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1221.94">TuiApp.newSession</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="1246.32">private async newSession():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="1263.2">why: Replace the transcript with a</tspan><tspan x="402" y="1280.08">fresh agent and session.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="1303.27">Entry point · async · ←2 · →12</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1221.94">TuiApp.openSession</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="1246.32">private async</tspan><tspan x="756" y="1263.2">openSession(id:string,title:string):Promis</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="1280.07">why: Adopt an existing session and</tspan><tspan x="756" y="1296.95">load its transcript.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="1320.27">Entry point · async · ←1 · →8</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1388.94">TuiApp.openUsageView</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="1413.32">private openUsageView():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="1430.2">why: `/usage`: compute the session</tspan><tspan x="48" y="1447.08">(5h) and week (7d) rolling windows</tspan><tspan x="48" y="1463.95">from the entry log, then show the</tspan><tspan x="48" y="1480.83">dashboard and ask each provider for</tspan><tspan x="48" y="1497.7">its plan.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1520.27">Entry point · ←1 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1388.94">TuiApp.paint</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="1413.32">private paint():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="1438.27">Entry point · ←77 · →6</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1388.94">TuiApp.performRewind</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="1413.32">private async</tspan><tspan x="756" y="1430.2">performRewind(chosenIndex:number):Promise&lt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="1447.07">why: Fork at the chosen prompt&apos;s</tspan><tspan x="756" y="1463.95">turn boundary and restore it to the</tspan><tspan x="756" y="1480.82">composer.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="1503.27">Entry point · async · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1588.94">TuiApp.persistNow</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="1613.32">private persistNow():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="1630.2">why: Write the durable state</tspan><tspan x="48" y="1647.08">immediately, ignoring a failing</tspan><tspan x="48" y="1663.95">backend.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1687.27">Entry point · ←2 · →10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1588.94">TuiApp.persistSoon</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="1613.32">private persistSoon():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="1630.2">why: Write the durable state,</tspan><tspan x="402" y="1647.08">coalescing a burst of edits into one</tspan><tspan x="402" y="1663.95">save.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="1687.27">Entry point · ←17 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1588.94">TuiApp.previewFleetSelection</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="1613.32">private async</tspan><tspan x="756" y="1630.2">previewFleetSelection():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="1647.07">why: Preview a peer session&apos;s</tspan><tspan x="756" y="1663.95">transcript, read over the SSH</tspan><tspan x="756" y="1680.82">channel that already exists.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="1703.27">Entry point · async · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1771.94">TuiApp.refreshFleet</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="1796.32">private async refreshFleet():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="1813.2">why: Collect from this device and</tspan><tspan x="48" y="1830.08">every configured peer.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="1853.27">Entry point · async · ←3 · →7</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1771.94">TuiApp.renameSession</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="1796.32">private async</tspan><tspan x="402" y="1813.2">renameSession(rawInput:string):Promise&lt;voi</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="1830.07">why: Name the active session</tspan><tspan x="402" y="1846.95">(`/rename &lt;title&gt;`), or with no</tspan><tspan x="402" y="1863.82">argument ask the title service to</tspan><tspan x="402" y="1880.7">regenerate the automatic one. A</tspan><tspan x="402" y="1897.57">rename pins the title in the</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="1920.27">Entry point · async · ←1 · →8</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1771.94">TuiApp.runCommand</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="1796.32">private async</tspan><tspan x="756" y="1813.2">runCommand(name:string,rawInput:string):Pr</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="1830.07">why: Run a slash command: this app&apos;s</tspan><tspan x="756" y="1846.95">own first, then the Harness</tspan><tspan x="756" y="1863.82">registry.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="1886.27">Entry point · async · ←4 · →47</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="1988.94">TuiApp.selectSession</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="2013.32">private selectSession(index:number):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="2030.2">why: Switch the view to another</tspan><tspan x="48" y="2047.08">session.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="2070.27">Entry point · ←3 · →8</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="1988.94">TuiApp.setStatus</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="2013.32">private setStatus(text:string,isError =</tspan><tspan x="402" y="2030.2">false):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="2053.27">Entry point · ←73</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="1988.94">TuiApp.showOverlay</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="2013.32">private</tspan><tspan x="756" y="2030.2">showOverlay(markdown:string,status:string)</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="2047.07">why: Show a document in the</tspan><tspan x="756" y="2063.95">transcript pane, positioned at its</tspan><tspan x="756" y="2080.82">first line.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="2103.27">Entry point · ←7 · →4</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="2171.94">TuiApp.showThemes</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="2196.32">private showThemes():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="2213.2">why: Open the palette picker. The</tspan><tspan x="48" y="2230.08">rows come straight from the theme</tspan><tspan x="48" y="2246.95">table, so a palette added there</tspan><tspan x="48" y="2263.83">shows up here with no further</tspan><tspan x="48" y="2280.7">wiring.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="2303.27">Entry point · ←3 · →6</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="2171.94">TuiApp.snapshot</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="2196.32">private snapshot():Snapshot</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="2221.27">Entry point · ←9 · →5</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="756" y="2171.94">TuiApp.start</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="756" y="2196.32">async start():Promise&lt;void&gt;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="756" y="2213.2">why: Boot the app: resolve the</tspan><tspan x="756" y="2230.08">agent, open the screen, and paint.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="756" y="2253.27">Entry point · async · ←3 · →25</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="48" y="2371.94">TuiApp.submitComposer</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="48" y="2396.32">private submitComposer():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="48" y="2413.2">why: Deliver the composer&apos;s draft</tspan><tspan x="48" y="2430.08">wherever it belongs.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="48" y="2453.27">Entry point · ←1 · →11</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#7a3d00" text-anchor="start" font-weight="600"><tspan x="402" y="2371.94">TuiApp.updateAtMenu</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="402" y="2396.32">private updateAtMenu():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="402" y="2413.2">why: Recompute the `@` file menu</tspan><tspan x="402" y="2430.08">from the composer and cursor.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="402" y="2453.27">Entry point · ←3 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1538" y="67.94">add</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1538" y="92.32">add(label:string,source:unknown,severity?:</tspan><tspan x="1538" y="109.2">string):void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1538" y="132.27">Domain / core · exported · ←13 · →4</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1892" y="67.94">bold</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1892" y="92.32">bold(text:string):string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1892" y="117.27">Domain / core · exported · ←9 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2246" y="67.94">composerPane</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2246" y="92.32">function</tspan><tspan x="2246" y="109.2">composerPane(snapshot:Snapshot,geometry:La</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2246" y="126.07">why: The bordered composer, plus the</tspan><tspan x="2246" y="142.95">cursor position inside it.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2246" y="166.27">Domain / core · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2600" y="67.94">displayWidth</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2600" y="92.32">function displayWidth(text:string):number</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2600" y="109.2">why: Printable width of a string in</tspan><tspan x="2600" y="126.07">terminal columns, ignoring escapes.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2600" y="149.27">Domain / core · exported · ←18 · →2</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1538" y="234.94">fleetPane</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1538" y="259.32">function</tspan><tspan x="1538" y="276.2">fleetPane(snapshot:Snapshot,geometry:Layou</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1538" y="293.07">why: The fleet overview pane, which</tspan><tspan x="1538" y="309.95">replaces the transcript while it is</tspan><tspan x="1538" y="326.82">open.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1538" y="349.27">Domain / core · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1892" y="234.94">footer</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1892" y="259.32">function</tspan><tspan x="1892" y="276.2">footer(snapshot:Snapshot,width:number):str</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1892" y="293.07">why: The status footer: model,</tspan><tspan x="1892" y="309.95">context budget, usage, and the</tspan><tspan x="1892" y="326.82">current status.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1892" y="349.27">Domain / core · ←1 · →11</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2246" y="234.94">muted</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2246" y="259.32">muted(text:string):string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2246" y="284.27">Domain / core · exported · ←22 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2600" y="234.94">padEnd</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2600" y="259.32">function</tspan><tspan x="2600" y="276.2">padEnd(text:string,width:number):string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2600" y="293.07">why: Pad a string on the right to</tspan><tspan x="2600" y="309.95">`width` columns.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2600" y="333.27">Domain / core · exported · ←9 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1538" y="417.94">pick</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1538" y="442.32">function</tspan><tspan x="1538" y="459.2">pick(record:Record&lt;string,unknown&gt;,...keys</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1538" y="476.07">why: Read the first key that is</tspan><tspan x="1538" y="492.95">present, so one parser tolerates the</tspan><tspan x="1538" y="509.82">two spellings an API may use for the</tspan><tspan x="1538" y="526.7">same field (`total_balance` /</tspan><tspan x="1538" y="543.57">`totalBalance`) without a separate</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1538" y="566.27">Domain / core · ←10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1892" y="417.94">render</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1892" y="442.32">function render(snapshot:Snapshot):{</tspan><tspan x="1892" y="459.2">lines:string[] cursor:{ row:number;</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1892" y="476.07">why: Build a full frame plus the</tspan><tspan x="1892" y="492.95">cursor position for the screen to</tspan><tspan x="1892" y="509.82">place.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1892" y="532.27">Domain / core · exported · ←1 · →15</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2246" y="417.94">renderFleet</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2246" y="442.32">function renderFleet(sessions:readonly</tspan><tspan x="2246" y="459.2">FleetSession[],options:FleetRenderOptions,</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2246" y="476.07">why: Render the overview to styled</tspan><tspan x="2246" y="492.95">lines.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2246" y="516.27">Domain / core · exported · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2600" y="417.94">renderMessageBody</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2600" y="442.32">function</tspan><tspan x="2600" y="459.2">renderMessageBody(message:Message,width:nu</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2600" y="476.07">why: One turn&apos;s lines, without</tspan><tspan x="2600" y="492.95">selection decoration.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2600" y="516.27">Domain / core · ←1 · →9</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1538" y="634.94">section</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1538" y="659.32">function</tspan><tspan x="1538" y="676.2">section(label:string,ledger:UsageLedger,or</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1538" y="693.07">why: One section&apos;s heading plus its</tspan><tspan x="1538" y="709.95">rows, busiest first within the</tspan><tspan x="1538" y="726.82">section.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1538" y="749.27">Domain / core · ←1 · →12</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1892" y="634.94">style</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1892" y="659.32">function</tspan><tspan x="1892" y="676.2">style(text:string,options:StyleOptions):st</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1892" y="693.07">why: Wrap text in a style. Each line</tspan><tspan x="1892" y="709.95">is styled independently so a styled</tspan><tspan x="1892" y="726.82">block survives being split, padded,</tspan><tspan x="1892" y="743.7">or placed beside other cells.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1892" y="766.27">Domain / core · exported · ←25 · →1</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2246" y="634.94">truncate</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2246" y="659.32">function</tspan><tspan x="2246" y="676.2">truncate(text:string,limit:number):string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="2246" y="693.07">why: Cut a string to `limit`</tspan><tspan x="2246" y="709.95">columns, appending an ellipsis when</tspan><tspan x="2246" y="726.82">it did not fit. Escape sequences</tspan><tspan x="2246" y="743.7">pass through so styling is never</tspan><tspan x="2246" y="760.57">severed mid-code, and a reset is</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2246" y="783.27">Domain / core · exported · ←17 · →3</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2612" y="666.94">AtMenu.close</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2612" y="691.32">close():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2612" y="716.27">Domain / core · exported · ←10</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1550" y="883.94">FleetView.show</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1550" y="908.32">show():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1550" y="933.27">Domain / core · exported · ←13</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1928" y="883.94">PeerList.has</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1928" y="908.32">has(host:string):boolean</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1928" y="933.27">Domain / core · exported · ←19</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="2306" y="883.94">Composer.value</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="2306" y="908.32">value():string</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="2306" y="933.27">Domain / core · exported · ←14</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#0b3d63" text-anchor="start" font-weight="600"><tspan x="1550" y="1045.94">Vim.handle</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1550" y="1070.32">handle(name:string,text:string,composer:Co</tspan><tspan x="1550" y="1087.2">mposer):VimOutcome</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1550" y="1104.07">why: Handle one key.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1550" y="1127.27">Domain / core · exported · ←1 · →14</tspan></text>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="17" fill="#3d4348" text-anchor="start" font-weight="600"><tspan x="1928" y="1045.94">Screen.invalidate</tspan></text>
+<text font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="13.5" fill="#343a40" text-anchor="start"><tspan x="1928" y="1070.32">invalidate():void</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="13.5" fill="#6c757d" text-anchor="start"><tspan x="1928" y="1087.2">why: Drop the cached frame so the</tspan><tspan x="1928" y="1104.08">next paint rewrites every line.</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#868e96" text-anchor="start"><tspan x="1928" y="1127.27">Utility · exported · ←10</tspan></text>
+<path d="M362,2025 L1479,2025 L1479,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M362,2025 L1137,2025 L1137,1082 L1912,1082" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1912,1082 1904.79,1085.47 1904.79,1078.53" fill="#495057"/>
+<path d="M716,1409 L1296,1409 L1296,470.5 L1876,470.5" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1876,470.5 1868.79,473.97 1868.79,467.03" fill="#495057"/>
+<path d="M1070,766.5 L1680,766.5 L1680,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M362,1450 L948,1450 L948,904 L1534,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1534,904 1526.79,907.47 1526.79,900.53" fill="#495057"/>
+<path d="M362,1450 L1479,1450 L1479,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M1070,909 L1680,909 L1680,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M716,909 L1125,909 L1125,1082 L1534,1082" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1534,1082 1526.79,1085.47 1526.79,1078.53" fill="#495057"/>
+<path d="M716,909 L1656,909 L1656,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M716,909 L1503,909 L1503,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M716,909 L1119,909 L1119,95.5 L1522,95.5" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1522,95.5 1514.79,98.97 1514.79,92.03" fill="#495057"/>
+<path d="M362,2408 L1326,2408 L1326,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M362,2408 L1479,2408 L1479,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M197,2344 L197,1247.5 L1687,1247.5 L1687,151" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1687,151 1690.47,158.21 1683.53,158.21" fill="#495057"/>
+<path d="M716,2408 L1503,2408 L1503,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M716,2408 L1656,2408 L1656,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M362,549.5 L1326,549.5 L1326,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M362,549.5 L1479,549.5 L1479,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M716,758 L1503,758 L1503,904 L2290,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2290,904 2282.79,907.47 2282.79,900.53" fill="#495057"/>
+<path d="M716,758 L1656,758 L1656,687 L2596,687" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="2596,687 2588.79,690.47 2588.79,683.53" fill="#495057"/>
+<path d="M905,1744 L905,1348 L1699,1348 L1699,952" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1699,952 1702.47,959.21 1695.53,959.21" fill="#495057"/>
+<path d="M1070,1824.5 L1491,1824.5 L1491,904 L1912,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1912,904 1904.79,907.47 1904.79,900.53" fill="#495057"/>
+<path d="M716,1258 L1314,1258 L1314,1082 L1912,1082" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1912,1082 1904.79,1085.47 1904.79,1078.53" fill="#495057"/>
+<path d="M362,941.5 L1137,941.5 L1137,1082 L1912,1082" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1912,1082 1904.79,1085.47 1904.79,1078.53" fill="#495057"/>
+<path d="M362,2233 L948,2233 L948,904 L1534,904" fill="none" stroke="#495057" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" marker-end="none"/><polygon points="1534,904 1526.79,907.47 1526.79,900.53" fill="#495057"/>
+<text font-family="DejaVu Sans, Verdana, Geneva, sans-serif" font-size="30" fill="#1e1e1e" text-anchor="start" font-weight="600"><tspan x="0" y="-183.4">src — function map</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#495057" text-anchor="start"><tspan x="2" y="-153.7">60 functions · 2 modules · 187 call edges · 46 files · typescript</tspan></text>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#868e96" text-anchor="start"><tspan x="2" y="-131.75">How to read: each box is a function · arrows are calls (dark = crosses modules) · clusters are modules · &quot;why&quot; is the recorded purpose  ·  documented: 75%</tspan></text>
+<rect x="2" y="-112" width="15" height="15" rx="3.75" fill="#d0ebff" stroke="#1971c2" stroke-width="1.2"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#495057" text-anchor="start"><tspan x="22" y="-101.25">Domain / core</tspan></text>
+<rect x="137" y="-112" width="15" height="15" rx="3.75" fill="#fff3bf" stroke="#e67700" stroke-width="1.2"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#495057" text-anchor="start"><tspan x="157" y="-101.25">Entry point</tspan></text>
+<rect x="258" y="-112" width="15" height="15" rx="3.75" fill="#e9ecef" stroke="#868e96" stroke-width="1.2"/>
+<text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="12.5" fill="#495057" text-anchor="start"><tspan x="278" y="-101.25">Utility</tspan></text>
+</svg>
