@@ -9,7 +9,7 @@
  */
 
 import { padEnd, truncate } from './text.ts'
-import { accent } from './theme.ts'
+import { muted, style, colAccent } from './theme.ts'
 
 /** A pane's rectangle inside the frame region, 0-indexed. */
 export interface Tile {
@@ -124,38 +124,49 @@ export function stackFrame(options: StackFrame): string[] {
 
   for (const [index, tile] of tiles(count, width, height).entries()) {
     const isFocused = index === focused
-    // A focused pane claims attention with its border, not with a title it
-    // already has: the accent is the only thing that changes between panes.
-    const top = isFocused ? '─' : '·'
-    const label = truncate(title(index), Math.max(tile.width - 4, 1))
-    // Top border: ` label ` fills the tile's width. Focus is legible without
-    // color too — a solid rule for the focused pane, dots for the rest — and
-    // the accent border colors it for eyes that have that channel.
-    const cells = padEnd(` ${label} `, tile.width).split('')
-    if (tile.width > 1) {
-      cells[0] = top
-      cells[tile.width - 1] = top
+    // Every pane sits in a full line box, so sessions read as separate
+    // surfaces; the focused pane's whole border is the accent in bold, the
+    // rest are dim. Bold survives NO_COLOR terminals, so focus stays legible
+    // even where color does not.
+    const styleBorder = (line: string): string =>
+      isFocused ? style(line, { fg: colAccent, bold: true }) : muted(line)
+    // A tile's line is written as one cell — styled text cannot be split into
+    // per-character cells without its escapes shifting everything after it —
+    // and the cells it covers are emptied, so the grid's indices stay honest
+    // for the tiles written after it.
+    const place = (row: number, line: string): void => {
+      const cells = canvas[row]
+      if (cells === undefined) return
+      cells.splice(tile.x, tile.width, line, ...Array<string>(tile.width - 1).fill(''))
     }
-    const border = cells.join('')
-    canvas[tile.y]?.splice(tile.x, tile.width, ...(isFocused ? accent(border) : border).split(''))
-    const innerHeight = Math.max(tile.height - 1, 0)
+
+    const label = truncate(title(index), Math.max(tile.width - 4, 1))
+    const top = padEnd(` ${label} `, Math.max(tile.width - 2, 0))
+    place(tile.y, styleBorder(tile.width > 2 ? `┌${top}┐` : top))
+
+    const innerHeight = Math.max(tile.height - 2, 0)
     // The tail of the body is what shows — a transcript reads from its bottom,
     // where the newest turn is — and a short one is top-padded so that bottom
-    // stays anchored to the tile's lower edge.
+    // stays anchored just above the pane's lower border.
     const rendered = renderBody(index, Math.max(tile.width - 2, 1), innerHeight)
     const body = [
       ...Array<string>(Math.max(innerHeight - rendered.length, 0)).fill(''),
       ...rendered,
     ].slice(-innerHeight)
+    // Only the walls take the border style: a body line carries its own
+    // colors, and an escape inside it would end a wrap-around style early.
     for (let row = 0; row < innerHeight; row += 1) {
       const line = body[row] ?? ''
-      canvas[tile.y + 1 + row]?.splice(
-        tile.x,
-        tile.width,
-        ' ',
-        ...padEnd(truncate(line, tile.width - 2), tile.width - 2).split(''),
-        ' ',
+      const inner = padEnd(truncate(line, Math.max(tile.width - 2, 1)), Math.max(tile.width - 2, 0))
+      place(
+        tile.y + 1 + row,
+        tile.width > 2 ? `${styleBorder('│')}${inner}${styleBorder('│')}` : inner,
       )
+    }
+
+    if (innerHeight >= 0 && tile.height >= 2) {
+      const bottom = '─'.repeat(Math.max(tile.width - 2, 0))
+      place(tile.y + tile.height - 1, styleBorder(tile.width > 2 ? `└${bottom}┘` : bottom))
     }
   }
   return canvas.map((row) => row.join(''))

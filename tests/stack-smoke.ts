@@ -75,6 +75,22 @@ check('up respects the top edge', focusNeighbor(3, 2, 'up') === 0 && focusNeighb
   check('left pane draws its body', (lines[1] ?? '').includes('s0'))
   check('right pane draws its body', (lines[1] ?? '').includes('s1'))
   check('each pane sizes its body to its tile', (lines[1] ?? '').includes('w18') && !(lines[1] ?? '').includes('w40'))
+  check('every pane is boxed on top and bottom', stripAnsi(lines[0] ?? '').includes('┌') && stripAnsi(lines[5] ?? '').includes('└'))
+  check('panes are walled on the sides', stripAnsi(lines[2] ?? '').includes('│'))
+  check(
+    'focus changes the border without changing the text',
+    (() => {
+      const frame = (at: number): string[] =>
+        stackFrame({ count: 2, width: 40, height: 6, focused: at, title: (index) => (index === 0 ? 'alpha' : 'beta'), renderBody: () => ['x'] })
+      const a = frame(0)
+      const b = frame(1)
+      return stripAnsi(a.join('\n')) === stripAnsi(b.join('\n')) && a.join('\n') !== b.join('\n')
+    })(),
+  )
+  check('the panes do not share a wall', (() => {
+    const row = stripAnsi(lines[2] ?? '')
+    return row.includes('││') || row.includes('│ │')
+  })())
 }
 
 {
@@ -98,7 +114,10 @@ check('up respects the top edge', focusNeighbor(3, 2, 'up') === 0 && focusNeighb
     title: () => 't',
     renderBody: () => ['only'],
   })
-  check('a short body sits at the bottom', (short[3] ?? '').includes('only') && (short[1] ?? '').trim() === '')
+  check(
+    'a short body sits above the lower border',
+    (short[2] ?? '').includes('only') && !(short[1] ?? '').includes('only') && stripAnsi(short[3] ?? '').startsWith('└'),
+  )
 }
 
 check('degenerate regions render nothing', stackFrame({ count: 0, width: 10, height: 5, focused: 0, title: () => '', renderBody: () => [] }).length === 0)
