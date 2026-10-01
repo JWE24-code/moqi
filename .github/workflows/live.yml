@@ -24,8 +24,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install -g @deepseek-ai/dsh
-      - run: npm ci
+      - run: npm install -g --ignore-scripts @deepseek-ai/dsh
+      - run: npm ci --ignore-scripts
       - run: npm run link-types
       - run: npm run build
       - run: node scripts/install-profile.mjs tui

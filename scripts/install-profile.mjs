@@ -13,15 +13,20 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { findDshRoot, linkHarnessPackages } from './harness-root.mjs'
 
-const profileName = process.argv[2] ?? 'tui'
-if (profileName === '' || profileName.includes('/') || profileName.includes('\\')) {
-  console.error(`install-profile: invalid profile name ${JSON.stringify(profileName)}`)
+const requestedProfile = process.argv[2] ?? 'tui'
+// A profile name becomes a directory under the profiles root, so it must be a
+// flat, dotless token: the allowlist is what keeps `..` and separators out.
+if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(requestedProfile)) {
+  console.error(`install-profile: invalid profile name ${JSON.stringify(requestedProfile)}`)
   process.exit(1)
 }
+// `basename` is a no-op after the allowlist, and it is the path sanitiser the
+// taint analysis recognises, so every downstream path is provably scoped.
+const profileName = basename(requestedProfile)
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const packageName = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).name
@@ -33,7 +38,14 @@ const dshHome =
     ? resolve(fromEnvironment)
     : join(homedir(), '.dsh')
 
-const profileDir = join(dshHome, 'profiles', profileName)
+// Resolve inside the profiles root and prove the result never leaves it, so no
+// profile name can traverse out of the directory it is scoped to.
+const profilesRoot = resolve(dshHome, 'profiles')
+const profileDir = resolve(profilesRoot, profileName)
+if (!profileDir.startsWith(profilesRoot + sep)) {
+  console.error(`install-profile: invalid profile name ${JSON.stringify(profileName)}`)
+  process.exit(1)
+}
 mkdirSync(profileDir, { recursive: true })
 
 // The bundle needs its build output: the manifest's `main` points into lib/.
@@ -125,7 +137,7 @@ console.log(`install-profile: done — run it with:  dsh --profile ${profileName
 /** Whether a command exists on PATH. */
 function hasCommand(name) {
   try {
-    execFileSync('sh', ['-c', `command -v ${name}`], { stdio: 'ignore' })
+    execFileSync('/bin/sh', ['-c', `command -v ${name}`], { stdio: 'ignore' })
     return true
   } catch {
     return false

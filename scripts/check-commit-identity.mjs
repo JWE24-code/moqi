@@ -54,7 +54,7 @@ function mask(email) {
 function commits(range) {
   const args = ['log', '--format=%H%x00%p%x00%an%x00%ae%x00%cn%x00%ce', '--no-color']
   if (range !== undefined && range !== '') args.push(range)
-  const out = execFileSync('git', args, { encoding: 'utf8' })
+  const out = execFileSync('/usr/bin/env', ['git', ...args], { encoding: 'utf8' })
   return out
     .split('\n')
     .filter((line) => line.trim() !== '')

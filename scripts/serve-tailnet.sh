@@ -58,10 +58,10 @@ warn_banner() {
 case "${1:-status}" in
   on)
     HOST="$(tailnet_name)"
-    [ -n "$HOST" ] || die 'serve-tailnet: could not read this machine'\''s tailnet name; is tailscaled up?'
+    [[ -n "$HOST" ]] || die 'serve-tailnet: could not read this machine'\''s tailnet name; is tailscaled up?'
 
     mkdir -p "$STATE_DIR"
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
       echo "serve-tailnet: web app already running (pid $(cat "$PID_FILE"))"
     else
       # Loopback bind is deliberate: the proxy is the only way in.
@@ -80,7 +80,7 @@ case "${1:-status}" in
 
     echo "Open this once, on the device you want to use:"
     echo
-    sed -n 's|.*http://127\.0\.0\.1:[0-9]*\(/?token=[A-Za-z0-9_-]*\).*|  https://'"$HOST"'\1|p' "$LOG_FILE" | tail -1
+    sed -n 's|.*http://127\.0\.0\.1:[0-9]*\(/?token=[A-Za-z0-9_-]*\).*|  https://'"$HOST"'\1|p' "$LOG_FILE" | tail -1 # NOSONAR — the http:// here is the loopback URL this script just matched in a log line, not a clear-text connection.
     echo
     echo "The token is a bootstrap credential — treat it like a password."
     echo "To invalidate every browser session, delete the"
@@ -91,7 +91,7 @@ case "${1:-status}" in
   off)
     tailscale serve --https=443 off >/dev/null 2>&1 || true
     echo 'serve-tailnet: tailnet proxy stopped'
-    if [ -f "$PID_FILE" ]; then
+    if [[ -f "$PID_FILE" ]]; then
       PID="$(cat "$PID_FILE")"
       if kill -0 "$PID" 2>/dev/null; then
         kill "$PID" 2>/dev/null || true
@@ -109,7 +109,7 @@ case "${1:-status}" in
     ss -ltn 2>/dev/null | grep ":$PORT" || echo "nothing listening on $PORT"
     echo
     HOST="$(tailnet_name)"
-    if [ -n "$HOST" ] && tailscale serve status 2>/dev/null | grep -q "$HOST"; then
+    if [[ -n "$HOST" ]] && tailscale serve status 2>/dev/null | grep -q "$HOST"; then
       warn_banner "$HOST"
     fi
     ;;

@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # No Harness is installed here on purpose: the suites are dependency-free,
       # so `@deepseek-ai/*` must not resolve, and a suite that reaches for it
       # fails to load at all. `tests/offline-imports-smoke.ts` enforces that
@@ -44,8 +44,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install -g @deepseek-ai/dsh@${{ matrix.dsh }}
-      - run: npm ci
+      - run: npm install -g --ignore-scripts @deepseek-ai/dsh@${{ matrix.dsh }}
+      - run: npm ci --ignore-scripts
       - run: npm run link-types
       - run: npm run typecheck
 

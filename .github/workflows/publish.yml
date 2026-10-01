@@ -39,18 +39,18 @@ jobs:
       # Trusted publishing needs npm >= 11.5.1; Node 24 ships a recent npm but
       # not necessarily that recent, and neither the registry nor provenance
       # works on an older CLI.
-      - run: npm install -g npm@latest
+      - run: npm install -g --ignore-scripts npm@latest
 
       # `prepublishOnly` below runs the typecheck, which compiles against the
       # real Harness packages — so they have to be present and linked here,
       # exactly as the typecheck job in ci.yml does it.
-      - run: npm install -g @deepseek-ai/dsh
+      - run: npm install -g --ignore-scripts @deepseek-ai/dsh
       # The profile installer inside `test:package` composes `link:` deps,
       # which npm rejects with EUNSUPPORTEDPROTOCOL — the same reason a dev
       # checkout needs pnpm. Without it the release gate fails on a machine
       # difference rather than a broken artifact.
-      - run: npm install -g pnpm
-      - run: npm ci
+      - run: npm install -g pnpm # NOSONAR — pnpm's own preinstall/postinstall places its platform binary; --ignore-scripts would break it.
+      - run: npm ci --ignore-scripts
       - run: npm run link-types
 
       # The release tag and the manifest must agree, or the registry ends up

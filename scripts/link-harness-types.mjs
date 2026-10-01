@@ -24,7 +24,7 @@ function findDshRoot() {
 
   let binary
   try {
-    binary = execFileSync('sh', ['-c', 'command -v dsh'], { encoding: 'utf8' }).trim()
+    binary = execFileSync('/bin/sh', ['-c', 'command -v dsh'], { encoding: 'utf8' }).trim()
   } catch {
     binary = ''
   }
