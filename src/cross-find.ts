@@ -71,7 +71,7 @@ function textOfRecord(raw: string): { text: string; role?: 'user' | 'assistant' 
     })
     .map((block) => block.text)
     .join(' ')
-  return { text, ...(role === undefined ? {} : { role }) }
+  return { text, role }
 }
 
 /** One readable message from a stored session log. */
