@@ -116,25 +116,17 @@ export function decodeLogBytes(bytes: Uint8Array): string | undefined {
 
 /** Read one log file, decompressing when it is zstd, bounded by `maxBytes`. */
 function readLog(path: string, maxBytes: number): string | undefined {
+  let raw: Buffer
   try {
-    const raw = readFileSync(path)
-    if (path.endsWith('.zstd')) {
-      if (!zstdAvailable()) return undefined
-      // A compressed frame cannot be decoded from a prefix, so the whole file
-      // is decoded — but a log beyond the byte ceiling is skipped rather than
-      // held in memory twice.
-      if (raw.byteLength > maxBytes) return undefined
-      try {
-        return zstdDecompressSync(raw).toString('utf8')
-      } catch {
-        return undefined
-      }
-    }
-    const slice = raw.byteLength > maxBytes ? raw.subarray(0, maxBytes) : raw
-    return slice.toString('utf8')
+    raw = readFileSync(path)
   } catch {
     return undefined
   }
+  // A compressed frame cannot be decoded from a prefix, so the whole file is
+  // decoded — but a log beyond the byte ceiling is skipped rather than held
+  // in memory twice. A plain log has no such constraint: it truncates.
+  if (path.endsWith('.zstd') && raw.byteLength > maxBytes) return undefined
+  return decodeLogBytes(raw.byteLength > maxBytes ? raw.subarray(0, maxBytes) : raw)
 }
 
 /** Session directories under the store root, most recently modified first. */
