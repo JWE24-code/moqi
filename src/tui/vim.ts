@@ -108,7 +108,8 @@ export class Vim {
       this.operator = undefined
       switch (pending) {
         case 'd':
-          return this.deleteMotion(name, composer)
+          this.deleteMotion(name, composer)
+          return 'handled'
         default:
           return 'handled'
       }
@@ -206,7 +207,7 @@ export class Vim {
   }
 
   /** `d` plus a motion, in terms of absolute buffers offsets. */
-  private deleteMotion(motion: string, composer: Composer): VimOutcome {
+  private deleteMotion(motion: string, composer: Composer): void {
     switch (motion) {
       case 'd': {
         this.snapshot(composer)
@@ -216,29 +217,29 @@ export class Vim {
         // last line has none, so it simply shortens.
         const trailing = composer.value()[end] === '\n' ? 1 : 0
         composer.deleteRange(start, end + trailing)
-        return 'handled'
+        break
       }
       case '$': {
         this.snapshot(composer)
         composer.deleteRange(composer.position(), composer.lineEndIndex())
-        return 'handled'
+        break
       }
       case '0':
       case '^': {
         this.snapshot(composer)
         composer.deleteRange(composer.lineStartIndex(), composer.position())
-        return 'handled'
+        break
       }
       case 'w': {
         this.snapshot(composer)
         const before = composer.position()
         this.wordForward(composer)
         composer.deleteRange(before, composer.position())
-        return 'handled'
+        break
       }
       default:
         // `d` followed by something unbound is cancelled, not guessed at.
-        return 'handled'
+        break
     }
   }
 }
