@@ -540,6 +540,54 @@ export function fuzzyMatch(query: string, text: string): boolean {
  * subtitle changes — so a model list reads provider by provider rather than as
  * one undifferentiated column.
  */
+
+/**
+ * A yes/no question asked in the composer before a destructive action. Any
+ * key but `y` cancels; the prompt sits in the composer box, where the next
+ * keystroke is guaranteed to land.
+ */
+export class Confirm {
+  private active = false
+  private text = ''
+  private action: (() => void) | undefined
+
+  /** Whether a question is waiting for its answer. */
+  get open(): boolean {
+    return this.active
+  }
+
+  /** The question as it was asked. */
+  get prompt(): string {
+    return this.text
+  }
+
+  ask(prompt: string, action: () => void): void {
+    this.active = true
+    this.text = prompt
+    this.action = action
+  }
+
+  /**
+   * Consume the answering key. Any key disarms the question; `y`/`Y` confirms
+   * it and hands the action back to run.
+   *
+   * @returns the outcome to phrase plus the action to run — the caller sets
+   *   its status *before* running the action, so an action's own status line
+   *   is the one that survives.
+   */
+  settle(
+    keyName: string,
+  ): { outcome: 'confirmed' | 'cancelled'; action?: () => void } | undefined {
+    if (!this.active) return undefined
+    const action = this.action
+    this.active = false
+    this.action = undefined
+    this.text = ''
+    if (keyName === 'y' || keyName === 'Y') return { outcome: 'confirmed', action }
+    return { outcome: 'cancelled' }
+  }
+}
+
 export class Picker {
   kind: PickerKind = 'none'
   title = ''
@@ -593,6 +641,51 @@ export class Picker {
   }
 
   /** Put the cursor on a given row of the unfiltered list, if it survives. */
+
+  /**
+   * Apply one key's navigation and query semantics — moving, paging, and
+   * narrowing the list.
+   *
+   * Returns `false` for keys the picker does not own: the caller's intents
+   * (quit, dismiss, select) run before anything here would.
+   */
+  key(key: { name: string; text: string }): boolean {
+    switch (key.name) {
+      case 'up':
+      case 'ctrl+p':
+        this.move(-1)
+        return true
+      case 'down':
+      case 'ctrl+n':
+        this.move(1)
+        return true
+      case 'pageup':
+        this.move(-10)
+        return true
+      case 'pagedown':
+        this.move(10)
+        return true
+      case 'home':
+        this.move(-this.items.length)
+        return true
+      case 'end':
+        this.move(this.items.length)
+        return true
+      case 'backspace':
+        this.setQuery(this.query.slice(0, -1))
+        return true
+      case 'ctrl+u':
+        this.setQuery('')
+        return true
+    }
+    // Anything printable narrows the list, the way a command palette does.
+    if (key.text !== '') {
+      this.setQuery(this.query + key.text)
+      return true
+    }
+    return false
+  }
+
   selectById(id: string): void {
     const index = this.matches().findIndex((item) => item.id === id)
     if (index !== -1) this.selected = index

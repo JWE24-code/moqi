@@ -269,6 +269,33 @@ export declare function fuzzyMatch(query: string, text: string): boolean;
  * subtitle changes — so a model list reads provider by provider rather than as
  * one undifferentiated column.
  */
+/**
+ * A yes/no question asked in the composer before a destructive action. Any
+ * key but `y` cancels; the prompt sits in the composer box, where the next
+ * keystroke is guaranteed to land.
+ */
+export declare class Confirm {
+    private active;
+    private text;
+    private action;
+    /** Whether a question is waiting for its answer. */
+    get open(): boolean;
+    /** The question as it was asked. */
+    get prompt(): string;
+    ask(prompt: string, action: () => void): void;
+    /**
+     * Consume the answering key. Any key disarms the question; `y`/`Y` confirms
+     * it and hands the action back to run.
+     *
+     * @returns the outcome to phrase plus the action to run — the caller sets
+     *   its status *before* running the action, so an action's own status line
+     *   is the one that survives.
+     */
+    settle(keyName: string): {
+        outcome: 'confirmed' | 'cancelled';
+        action?: () => void;
+    } | undefined;
+}
 export declare class Picker {
     kind: PickerKind;
     title: string;
@@ -287,6 +314,17 @@ export declare class Picker {
     setQuery(query: string): void;
     move(delta: number): void;
     /** Put the cursor on a given row of the unfiltered list, if it survives. */
+    /**
+     * Apply one key's navigation and query semantics — moving, paging, and
+     * narrowing the list.
+     *
+     * Returns `false` for keys the picker does not own: the caller's intents
+     * (quit, dismiss, select) run before anything here would.
+     */
+    key(key: {
+        name: string;
+        text: string;
+    }): boolean;
     selectById(id: string): void;
     current(): PickerItem | undefined;
 }

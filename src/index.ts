@@ -44,6 +44,7 @@ import type { Key } from './tui/keys.ts'
 import {
   Composer,
   InputHistory,
+  Confirm,
   Palette,
   Picker,
   findTool,
@@ -531,9 +532,7 @@ class TuiApp {
   private statusIsError = false
   private overlay = ''
   private showThinking: boolean
-  private confirming = false
-  private confirmPrompt = ''
-  private confirmAction: (() => void) | undefined
+  private readonly confirmState = new Confirm()
   /** Expanded by default: the transcript lists every tool call as it happens. */
   private expandTools = true
   private expandBackground = false
@@ -1507,8 +1506,8 @@ class TuiApp {
       tps: this.tab.tps,
       cacheReadTokens: this.tab.cacheReadTokens,
       contextLimit: this.tab.contextLimit,
-      confirming: this.confirming,
-      confirmText: this.confirming ? this.confirmPrompt : undefined,
+      confirming: this.confirmState.open,
+      confirmText: this.confirmState.open ? this.confirmState.prompt : undefined,
       searchActive: this.search !== undefined,
       fleet: this.fleet,
       usage: this.usageView,
@@ -2386,7 +2385,7 @@ class TuiApp {
         this.handlePickerKey(key)
         return
       }
-      if (this.confirming) {
+      if (this.confirmState.open) {
         this.handleConfirmKey(key)
         return
       }
@@ -2398,16 +2397,12 @@ class TuiApp {
   }
 
   private handleConfirmKey(key: Key): void {
-    const action = this.confirmAction
-    this.confirming = false
-    this.confirmAction = undefined
-    this.confirmPrompt = ''
-    if (key.name === 'y' || key.name === 'Y') {
-      this.setStatus('confirmed')
-      if (action !== undefined) action()
-    } else {
-      this.setStatus('cancelled')
-    }
+    const settled = this.confirmState.settle(key.name)
+    if (settled === undefined) return
+    // Status first, then the action: a destructive action phrases its own
+    // outcome, and that is the line that must survive.
+    this.setStatus(settled.outcome)
+    if (settled.action !== undefined) settled.action()
     this.paint()
   }
 
@@ -2417,9 +2412,7 @@ class TuiApp {
    * keystroke is guaranteed to land.
    */
   private confirm(prompt: string, action: () => void): void {
-    this.confirming = true
-    this.confirmPrompt = prompt
-    this.confirmAction = action
+    this.confirmState.ask(prompt, action)
     this.picker.hide()
     this.palette.close()
     this.setStatus('y to confirm · anything else cancels')
@@ -2435,32 +2428,6 @@ class TuiApp {
         if (this.picker.kind === 'setup') this.finishSetup()
         this.picker.hide()
         break
-      case 'up':
-      case 'ctrl+p':
-        this.picker.move(-1)
-        break
-      case 'down':
-      case 'ctrl+n':
-        this.picker.move(1)
-        break
-      case 'pageup':
-        this.picker.move(-10)
-        break
-      case 'pagedown':
-        this.picker.move(10)
-        break
-      case 'home':
-        this.picker.move(-this.picker.items.length)
-        break
-      case 'end':
-        this.picker.move(this.picker.items.length)
-        break
-      case 'backspace':
-        this.picker.setQuery(this.picker.query.slice(0, -1))
-        break
-      case 'ctrl+u':
-        this.picker.setQuery('')
-        break
       case 'x': {
         // Only the open-sessions list closes on this key; everywhere else "x"
         // is an ordinary character narrowing the query, same as any other key.
@@ -2475,9 +2442,11 @@ class TuiApp {
           }
           break
         }
-        if (key.text !== '') this.picker.setQuery(this.picker.query + key.text)
+        this.picker.key(key)
         break
       }
+      default:
+        this.picker.key(key)
       case 'enter': {
         const item = this.picker.current()
         const kind = this.picker.kind
@@ -2507,10 +2476,6 @@ class TuiApp {
         else void this.openSession(item.id, item.title)
         break
       }
-      default:
-        // Anything printable narrows the list, the way a command palette does.
-        if (key.text !== '') this.picker.setQuery(this.picker.query + key.text)
-        break
     }
     this.paint()
   }
