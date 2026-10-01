@@ -168,3 +168,32 @@ export interface PeakStatus {
 export declare function deepSeekPeakStatus(nowMs: number): PeakStatus;
 /** Whether a provider route id looks like it reaches DeepSeek. */
 export declare function looksLikeDeepSeek(provider: string): boolean;
+/**
+ * The app's own usage state: the ledger and the entry log behind `/usage`,
+ * persisted across restarts.
+ *
+ * The fold rules live in the functions above; this class owns the two pieces
+ * of state and the few things the app does to them — restore, record, window,
+ * clear.
+ */
+export declare class UsageStore {
+    private ledger;
+    private entries;
+    /** Load what the last run persisted. */
+    restore(ledger: UsageLedger, entries: UsageEntry[]): void;
+    /** Fold one turn's billed delta, attributed to the provider that answered. */
+    record(provider: string, delta: TokenBuckets, at?: number): void;
+    /** The ledger as it stands — read-only by convention. */
+    view(): UsageLedger;
+    /** The entry log as it stands — read-only by convention. */
+    entriesView(): UsageEntry[];
+    /** Every provider the ledger has already attributed a turn to. */
+    providers(): string[];
+    /** The rolling session (5h) and week (7d) windows, as of `now`. */
+    windows(now: number): {
+        session: UsageLedger;
+        week: UsageLedger;
+    };
+    /** `/usage reset`: forget everything. */
+    clear(): void;
+}

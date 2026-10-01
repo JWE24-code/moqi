@@ -462,3 +462,55 @@ export class FleetView {
     this.selected = last < 0 ? 0 : Math.min(Math.max(this.selected, 0), last)
   }
 }
+
+/**
+ * The fleet's device list. The peers given at launch and the ones adopted
+ * while running are one list once the app is up; the app remembers it across
+ * restarts by persisting what this list holds.
+ */
+export class PeerList {
+  private hosts: string[]
+
+  constructor(hosts: string[] = []) {
+    this.hosts = hosts
+  }
+
+  all(): string[] {
+    return this.hosts
+  }
+
+  has(host: string): boolean {
+    return this.hosts.includes(host)
+  }
+
+  /** Replace the whole list (the launch path, merging config and persisted). */
+  replaceAll(hosts: string[]): void {
+    this.hosts = hosts
+  }
+
+  /** The list as fleet-source configs, ready for a collection round. */
+  configs(): { host: string }[] {
+    return this.hosts.map((host) => ({ host }))
+  }
+
+  /**
+   * Adopt a device.
+   *
+   * Fails on an unusable host or one already present — the caller phrases the
+   * difference, since one is a typo and the other is not an error at all.
+   */
+  add(host: string): { ok: true } | { ok: false; reason: 'invalid' | 'duplicate' } {
+    const trimmed = host.trim()
+    if (!isValidPeer(trimmed)) return { ok: false, reason: 'invalid' }
+    if (this.has(trimmed)) return { ok: false, reason: 'duplicate' }
+    this.hosts = [...this.hosts, trimmed]
+    return { ok: true }
+  }
+
+  /** Forget a device. `false` when it was not in the fleet. */
+  remove(host: string): boolean {
+    if (!this.has(host)) return false
+    this.hosts = this.hosts.filter((entry) => entry !== host)
+    return true
+  }
+}

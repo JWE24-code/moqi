@@ -300,3 +300,57 @@ export function deepSeekPeakStatus(nowMs: number): PeakStatus {
 export function looksLikeDeepSeek(provider: string): boolean {
   return provider.toLowerCase().includes('deepseek')
 }
+
+/**
+ * The app's own usage state: the ledger and the entry log behind `/usage`,
+ * persisted across restarts.
+ *
+ * The fold rules live in the functions above; this class owns the two pieces
+ * of state and the few things the app does to them — restore, record, window,
+ * clear.
+ */
+export class UsageStore {
+  private ledger: UsageLedger = {}
+  private entries: UsageEntry[] = []
+
+  /** Load what the last run persisted. */
+  restore(ledger: UsageLedger, entries: UsageEntry[]): void {
+    this.ledger = ledger
+    this.entries = entries
+  }
+
+  /** Fold one turn's billed delta, attributed to the provider that answered. */
+  record(provider: string, delta: TokenBuckets, at = Date.now()): void {
+    this.ledger = recordUsage(this.ledger, provider, delta)
+    this.entries = recordUsageEntry(this.entries, provider, delta, at)
+  }
+
+  /** The ledger as it stands — read-only by convention. */
+  view(): UsageLedger {
+    return this.ledger
+  }
+
+  /** The entry log as it stands — read-only by convention. */
+  entriesView(): UsageEntry[] {
+    return this.entries
+  }
+
+  /** Every provider the ledger has already attributed a turn to. */
+  providers(): string[] {
+    return Object.keys(this.ledger)
+  }
+
+  /** The rolling session (5h) and week (7d) windows, as of `now`. */
+  windows(now: number): { session: UsageLedger; week: UsageLedger } {
+    return {
+      session: windowUsage(this.entries, SESSION_MS, now),
+      week: windowUsage(this.entries, WEEK_MS, now),
+    }
+  }
+
+  /** `/usage reset`: forget everything. */
+  clear(): void {
+    this.ledger = {}
+    this.entries = []
+  }
+}

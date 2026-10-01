@@ -158,9 +158,7 @@ import {
   bucketDelta,
   isEmptyBuckets,
   noBuckets,
-  recordUsage,
-  recordUsageEntry,
-  windowUsage,
+  UsageStore,
   type TokenBuckets,
   type UsageEntry,
   type UsageLedger,
@@ -171,6 +169,7 @@ import {
   FleetView,
   dispatchArgv,
   isValidPeer,
+  PeerList,
   jumpArgv,
   jumpCommand,
   mergeFleet,
@@ -559,10 +558,8 @@ class TuiApp {
     usageEntries: [],
   }
   private persistTimer: NodeJS.Timeout | undefined
-  /** Per-provider token totals across every session, restored on launch. */
-  private usageLedger: UsageLedger = {}
-  /** The rolling-window log `/usage`'s session and week views read from. */
-  private usageEntries: UsageEntry[] = []
+  /** Per-provider billed usage across every session, restored on launch. */
+  private readonly usage = new UsageStore()
   /** The `/usage` dashboard's own open/closed state and last-drawn data. */
   private readonly usageView = new UsageView()
   /** The last provider-plan reading, reused briefly so reopens do not re-probe. */
@@ -585,7 +582,7 @@ class TuiApp {
    * to it: needing a relaunch to see a machine you just remembered is the
    * whole reason this is editable.
    */
-  private peers: string[] = []
+  private peers: PeerList
   private readonly presence: PresencePublisher
   /** Signature of the last published set, so an unchanged paint writes nothing. */
   private presenceKey = ''
@@ -619,6 +616,8 @@ class TuiApp {
     this.config = config
     this.exit = exit
     this.tabStrip = new SessionTabs([newTab('pending')], { bell: config.bell !== false })
+    // Seeded empty; the launch path replaces this with config + persisted peers.
+    this.peers = new PeerList()
     this.loginFlow = new LoginFlow(
       () => this.ctx.get('authorization') as AuthorizationLike | undefined,
       {
@@ -683,8 +682,7 @@ class TuiApp {
     // Adopt whatever survived the last run before deciding what to show: the
     // composer history and the thinking preference, both best-effort.
     this.persisted = await loadState()
-    this.usageLedger = this.persisted.usage
-    this.usageEntries = this.persisted.usageEntries
+    this.usage.restore(this.persisted.usage, this.persisted.usageEntries)
     this.history.load(this.persisted.inputHistory)
     if (this.config.thinking === undefined) this.showThinking = this.persisted.thinking
     if (this.persisted.theme !== undefined) applyTheme(this.persisted.theme)
@@ -697,7 +695,7 @@ class TuiApp {
     if (this.persisted.expandTools !== undefined) this.expandTools = this.persisted.expandTools
     // Flags and remembered devices are one list from here on; a duplicate
     // between them should not make a peer appear twice in the overview.
-    this.peers = [...new Set([...(this.config.peers ?? []), ...this.persisted.peers])]
+    this.peers.replaceAll([...new Set([...(this.config.peers ?? []), ...this.persisted.peers])])
 
     const selection = defaultModel.currentSelection()
     this.tab.selection.current =
@@ -1759,25 +1757,22 @@ class TuiApp {
    * added here is indistinguishable from one passed on the command line.
    */
   private addPeer(host: string): boolean {
-    const trimmed = host.trim()
-    if (!isValidPeer(trimmed)) {
-      this.setStatus(`not a usable host: ${trimmed}`, true)
+    const result = this.peers.add(host)
+    if (!result.ok) {
+      this.setStatus(
+        result.reason === 'invalid' ? `not a usable host: ${host.trim()}` : `${host.trim()} is already in the fleet`,
+        result.reason === 'invalid',
+      )
       return false
     }
-    if (this.peers.includes(trimmed)) {
-      this.setStatus(`${trimmed} is already in the fleet`)
-      return false
-    }
-    this.peers = [...this.peers, trimmed]
     this.persistSoon()
     return true
   }
 
   private removePeer(host: string): boolean {
-    if (!this.peers.includes(host)) return false
-    this.peers = this.peers.filter((entry) => entry !== host)
-    this.persistSoon()
-    return true
+    const removed = this.peers.remove(host)
+    if (removed) this.persistSoon()
+    return removed
   }
 
   /** Open the overview and start a collection round. */
@@ -1858,8 +1853,7 @@ class TuiApp {
     const delta = bucketDelta(tab.billedAtLastFold, billed)
     tab.billedAtLastFold = billed
     if (isEmptyBuckets(delta)) return
-    this.usageLedger = recordUsage(this.usageLedger, provider, delta)
-    this.usageEntries = recordUsageEntry(this.usageEntries, provider, delta, Date.now())
+    this.usage.record(provider, delta)
   }
 
   /**
@@ -1873,9 +1867,8 @@ class TuiApp {
    */
   private openUsageView(): void {
     const now = Date.now()
-    const session = windowUsage(this.usageEntries, SESSION_MS, now)
-    const week = windowUsage(this.usageEntries, WEEK_MS, now)
-    this.usageView.setData(session, week, this.usageLedger, now)
+    const { session, week } = this.usage.windows(now)
+    this.usageView.setData(session, week, this.usage.view(), now)
     this.usageView.show()
     this.picker.hide()
     this.palette.close()
@@ -1908,7 +1901,7 @@ class TuiApp {
       // A provider list this app cannot read is not a reason to show no plans:
       // the ledger still names every provider that has answered a turn.
     }
-    for (const provider of Object.keys(this.usageLedger)) {
+    for (const provider of this.usage.providers()) {
       if (!names.has(provider)) names.set(provider, provider)
     }
     return [...names.entries()]
@@ -1974,7 +1967,7 @@ class TuiApp {
    * peer appears as a named error under the list instead of blocking the UI.
    */
   private async refreshFleet(): Promise<void> {
-    const peers: PeerConfig[] = this.peers.map((host) => ({ host }))
+    const peers: PeerConfig[] = this.peers.configs()
     try {
       const sources = await collectFleet(peers)
       // The overview may have been closed while SSH was still running.
@@ -3061,11 +3054,11 @@ class TuiApp {
       lang: currentLanguage(),
       setupDone: this.persisted.setupDone,
       expandTools: this.expandTools,
-      peers: this.peers,
+      peers: this.peers.all(),
       sessions: this.openSessions(),
       activeSession: this.activeSessionIndex(),
-      usage: this.usageLedger,
-      usageEntries: this.usageEntries,
+      usage: this.usage.view(),
+      usageEntries: this.usage.entriesView(),
     })
     // Synchronous on purpose: this runs on the quit path, where an async write
     // would be abandoned the moment `exit(0)` tears the process down.
@@ -3829,16 +3822,16 @@ class TuiApp {
         const host = rest.join(' ').trim()
         if (verb === '') {
           this.setStatus(
-            this.peers.length === 0
+            this.peers.all().length === 0
               ? 'no devices yet — /peer add <host>, or press a in the fleet'
-              : `fleet devices: ${this.peers.join(', ')}`,
+              : `fleet devices: ${this.peers.all().join(', ')}`,
           )
         } else if (verb === 'add') {
           if (this.addPeer(host)) this.setStatus(`added ${host} — ctrl+f to see it`)
         } else if (verb === 'rm' || verb === 'remove') {
           this.setStatus(
             this.removePeer(host) ? `removed ${host}` : `${host} is not in the fleet`,
-            !this.peers.includes(host) && host === '',
+            !this.peers.has(host) && host === '',
           )
         } else {
           this.setStatus('usage: /peer [add|rm <host>]', true)
@@ -3871,8 +3864,7 @@ class TuiApp {
 
       case 'usage': {
         if (rawInput.trim() === 'reset') {
-          this.usageLedger = {}
-          this.usageEntries = []
+          this.usage.clear()
           this.usageView.hide()
           this.persistSoon()
           this.setStatus('usage ledger reset')

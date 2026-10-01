@@ -217,3 +217,34 @@ export declare class FleetView {
     commitAdd(): string | undefined;
     private clamp;
 }
+/**
+ * The fleet's device list. The peers given at launch and the ones adopted
+ * while running are one list once the app is up; the app remembers it across
+ * restarts by persisting what this list holds.
+ */
+export declare class PeerList {
+    private hosts;
+    constructor(hosts?: string[]);
+    all(): string[];
+    has(host: string): boolean;
+    /** Replace the whole list (the launch path, merging config and persisted). */
+    replaceAll(hosts: string[]): void;
+    /** The list as fleet-source configs, ready for a collection round. */
+    configs(): {
+        host: string;
+    }[];
+    /**
+     * Adopt a device.
+     *
+     * Fails on an unusable host or one already present — the caller phrases the
+     * difference, since one is a typo and the other is not an error at all.
+     */
+    add(host: string): {
+        ok: true;
+    } | {
+        ok: false;
+        reason: 'invalid' | 'duplicate';
+    };
+    /** Forget a device. `false` when it was not in the fleet. */
+    remove(host: string): boolean;
+}
