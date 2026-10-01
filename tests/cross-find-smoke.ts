@@ -33,8 +33,8 @@ function record(type: string, text: string): string {
   })
 }
 
-function writeSession(id: string, lines: string[], zstd: boolean): string {
-  const dir = join(root, project, encodeSegment(id))
+function writeSession(store: string, id: string, lines: string[], zstd: boolean): string {
+  const dir = join(store, project, encodeSegment(id))
   mkdirSync(dir, { recursive: true })
   const body = `${lines.join('\n')}\n`
   const path = join(dir, zstd ? 'session.v3.jsonl.zstd' : 'session.v3.jsonl')
@@ -42,15 +42,16 @@ function writeSession(id: string, lines: string[], zstd: boolean): string {
   return dir
 }
 
-writeSession('session-aaa', [record('turn/start', ''), record('user/message', 'how do I tail a container log')], false)
+writeSession(root, 'session-aaa', [record('turn/start', ''), record('user/message', 'how do I tail a container log')], false)
 writeSession(
+  root,
   'session-bbb',
   [record('user/message', 'unrelated'), record('assistant/message', 'the container log needs --tail')],
   false,
 )
-writeSession('session-ccc', [record('user/message', 'compressed needle about containers')], true)
+writeSession(root, 'session-ccc', [record('user/message', 'compressed needle about containers')], true)
 // A log with no matching text, to prove false positives do not appear.
-writeSession('session-ddd', [record('user/message', 'nothing to see')], false)
+writeSession(root, 'session-ddd', [record('user/message', 'nothing to see')], false)
 // A stray file that is not a session directory.
 mkdirSync(join(root, project, 'session.lock'), { recursive: true })
 
@@ -79,6 +80,59 @@ check('the hit cap is respected', limited.hits.length === 1)
 const bySession = searchSessions(root, 'tail')
 check('a rarer word still matches', bySession.hits.length === 2)
 check('the matched text is present in the snippet', bySession.hits.every((hit) => hit.line.includes('tail')))
+
+// ------------------------------------------------------------ read limits
+//
+// The byte cap is what keeps a search bounded. These checks pin what a cap
+// actually does before the decode path is consolidated, so the consolidation
+// is provably behaviour-preserving. They use their own stores, so they cannot
+// disturb the counts above.
+
+// A plain log is cut at maxBytes: text before the cut is searchable, text
+// after it is not. The first record is ~92 bytes, so a 100-byte cap splits
+// the body with margin on both sides.
+const cutStore = mkdtempSync(join(tmpdir(), 'dsh-limits-'))
+writeSession(cutStore, 'session-cut', [
+  record('user/message', 'early-needle'),
+  'x'.repeat(500),
+  record('user/message', 'late-needle'),
+], false)
+check(
+  'text before the byte cut is found',
+  searchSessions(cutStore, 'early-needle', { maxSessions: 10, maxHits: 10, maxBytes: 100 }).hits.length === 1,
+)
+check(
+  'text after the byte cut is not found',
+  searchSessions(cutStore, 'late-needle', { maxSessions: 10, maxHits: 10, maxBytes: 100 }).hits.length === 0,
+)
+rmSync(cutStore, { recursive: true, force: true })
+
+// One store with a matching plain log, a non-matching plain log, and a
+// compressed log, so scan and skip counts have something real to count.
+const capStore = mkdtempSync(join(tmpdir(), 'dsh-limits-'))
+writeSession(capStore, 'session-plain-hit', [record('user/message', 'the countme line')], false)
+writeSession(capStore, 'session-plain-miss', [record('user/message', 'nothing here')], false)
+writeSession(capStore, 'session-zstd', [record('user/message', 'a compressed log body')], true)
+
+const generous = searchSessions(capStore, 'countme', { maxSessions: 10, maxHits: 10, maxBytes: 4_000_000 })
+check('a generous cap finds the hit', generous.hits.length === 1)
+if (zstdAvailable()) {
+  check('every readable log counts as scanned', generous.scanned === 3)
+  check('a readable compressed log is not counted as skipped', generous.skippedCompressed === 0)
+} else {
+  check('an undecodable compressed log is counted as skipped', generous.scanned === 2 && generous.skippedCompressed === 1)
+}
+
+// A 5-byte cap truncates both plain logs into unparseable prefixes and skips
+// the compressed log for being over the cap — and that over-cap skip is
+// silent: only an *undecodable* compressed log increments skippedCompressed.
+if (zstdAvailable()) {
+  const capped = searchSessions(capStore, 'countme', { maxSessions: 10, maxHits: 10, maxBytes: 5 })
+  check('a byte cap that truncates plain logs finds nothing', capped.hits.length === 0)
+  check('truncated logs still count as scanned', capped.scanned === 2)
+  check('a compressed log over the cap is skipped silently', capped.skippedCompressed === 0)
+}
+rmSync(capStore, { recursive: true, force: true })
 
 // ------------------------------------------------- parsing and decoding
 
