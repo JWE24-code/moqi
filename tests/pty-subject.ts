@@ -68,7 +68,7 @@ function snapshot(): Snapshot {
     streamingReasoning: '',
     streaming: false,
     spinner: '⠋',
-    status: notices.length === 0 ? '' : (notices[notices.length - 1] ?? ''),
+    status: notices.length === 0 ? '' : (notices.at(-1) ?? ''),
     statusIsError: false,
     overlay: '',
     showThinking: false,

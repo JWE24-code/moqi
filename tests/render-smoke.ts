@@ -217,9 +217,9 @@ function assertFrame(label: string, snap: Snapshot): string[] {
 
 const normal = assertFrame('normal', snapshot())
 check('header shows the mark', stripAnsi(normal[0] ?? '').includes('◆ moqi'))
-check('footer shows the model', stripAnsi(normal[normal.length - 1] ?? '').includes('deepseek-chat'))
-check('footer shows exact context', stripAnsi(normal[normal.length - 1] ?? '').includes('ctx 1.5K/65K'))
-check('footer shows usage arrows', stripAnsi(normal[normal.length - 1] ?? '').includes('↑1.2K'))
+check('footer shows the model', stripAnsi(normal.at(-1) ?? '').includes('deepseek-chat'))
+check('footer shows exact context', stripAnsi(normal.at(-1) ?? '').includes('ctx 1.5K/65K'))
+check('footer shows usage arrows', stripAnsi(normal.at(-1) ?? '').includes('↑1.2K'))
 check('composer shows the placeholder', normal.some((line) => stripAnsi(line).includes('Ask the harness')))
 check('composer is boxed', normal.some((line) => line.includes('╭')))
 check('user turn has the accent bar', normal.some((line) => stripAnsi(line).includes('▌')))
@@ -249,7 +249,7 @@ check('tool row is shown', normal.some((line) => stripAnsi(line).includes('read_
 // An empty transcript shows the welcome panel.
 const welcome = assertFrame('welcome', snapshot({ messages: [], haveUsage: false }))
 check('welcome names the app', welcome.some((line) => stripAnsi(line).includes('Moqi')))
-check('welcome estimates context', stripAnsi(welcome[welcome.length - 1] ?? '').includes('~'))
+check('welcome estimates context', stripAnsi(welcome.at(-1) ?? '').includes('~'))
 
 // Streaming: spinner on the left, partial text in the transcript.
 const streaming = assertFrame(
@@ -260,7 +260,7 @@ const streaming = assertFrame(
     messages: [],
   }),
 )
-check('streaming shows the spinner', stripAnsi(streaming[streaming.length - 1] ?? '').includes('⠋'))
+check('streaming shows the spinner', stripAnsi(streaming.at(-1) ?? '').includes('⠋'))
 check('streaming shows partial text', streaming.some((line) => stripAnsi(line).includes('partial answer')))
 
 // The palette must never push the frame off-screen, even with many commands.
@@ -891,7 +891,7 @@ check(
 )
 check(
   'the footer default hint says ctrl+c menu',
-  stripAnsi(normal[normal.length - 1] ?? '').includes('ctrl+c menu'),
+  stripAnsi(normal.at(-1) ?? '').includes('ctrl+c menu'),
 )
 const busyStatus = assertFrame('busy status', snapshot({ status: 'working on it' })).map((line) =>
   stripAnsi(line),

@@ -85,8 +85,8 @@ check('the key reference has the same number of lines in both languages', enLine
 check('the title lines line up', enLines[0] === '**Keys**' && zhLines[0] === '**按键**')
 check(
   'both languages end with the quit key',
-  (enLines[enLines.length - 1] ?? '').includes('ctrl+c') &&
-    (zhLines[zhLines.length - 1] ?? '').includes('ctrl+c'),
+  (enLines.at(-1) ?? '').includes('ctrl+c') &&
+    (zhLines.at(-1) ?? '').includes('ctrl+c'),
 )
 check(
   'both languages document the newly added surfaces',

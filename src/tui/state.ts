@@ -92,7 +92,7 @@ export function messageTools(message: Message): ToolActivity[] {
  */
 export function appendText(segments: Segment[], text: string): void {
   if (text === '') return
-  const last = segments[segments.length - 1]
+  const last = segments.at(-1)
   if (last !== undefined && last.kind === 'text') last.text += text
   else segments.push({ kind: 'text', text })
 }
@@ -389,7 +389,7 @@ export class Composer {
   /** The mirror of {@link atFirstRow} for `↓` and newer history entries. */
   atLastRow(width: number): boolean {
     const rows = this.layout(width)
-    const last = rows[rows.length - 1]
+    const last = rows.at(-1)
     return last === undefined || this.cursor >= last.start
   }
 }
@@ -413,7 +413,7 @@ export class InputHistory {
   add(text: string): void {
     const trimmed = text.trim()
     if (trimmed === '') return
-    if (this.entries[this.entries.length - 1] === trimmed) {
+    if (this.entries.at(-1) === trimmed) {
       this.reset()
       return
     }
