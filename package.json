@@ -3,6 +3,9 @@
   "version": "0.4.0",
   "description": "Moqi — the unspoken understanding between you and your harness. A terminal app for DeepSeek Harness: bordered composer, live token counter, slash palette, markdown transcript with syntax-highlighted code.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT",
   "author": "JWE24-code <292770342+JWE24-code@users.noreply.github.com>",
   "repository": {
