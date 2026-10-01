@@ -11,7 +11,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { homedir, tmpdir } from 'node:os'
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
@@ -84,6 +84,13 @@ import { groupMcpTools, renderMcp } from './tui/mcp.ts'
 import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i18n.ts'
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
+import {
+  copyWithLocalHelper,
+  describeError,
+  mediaTypeOf,
+  openUrlWithLocalHelper,
+  timestampForFile,
+} from './local-platform.ts'
 import {
   listSessions,
   listSessionsWithParents,
@@ -5153,83 +5160,6 @@ interface JobRegistryLike {
 }
 
 /**
- * Hand the text to the desktop's own clipboard helper, when there is one.
- *
- * This is the companion to OSC 52, not a replacement: the escape is what works
- * over SSH and inside tmux, where no local helper can reach the clipboard the
- * user is actually looking at. Locally the reverse holds — a Wayland
- * compositor grants clipboard ownership only against an input-focus serial, so
- * a terminal can accept the escape and still not own the selection.
- *
- * Best effort by design: a missing helper, a sandbox with no display, or a
- * helper that exits non-zero all leave OSC 52 as the result, and none of them
- * are worth interrupting a copy to report.
- */
-function copyWithLocalHelper(text: string): boolean {
-  const wayland = process.env['WAYLAND_DISPLAY'] !== undefined
-  const x11 = process.env['DISPLAY'] !== undefined
-  const candidates: [string, string[]][] = [
-    ...(wayland ? ([['wl-copy', []]] as [string, string[]][]) : []),
-    ...(x11
-      ? ([
-          ['xclip', ['-selection', 'clipboard']],
-          ['xsel', ['--clipboard', '--input']],
-        ] as [string, string[]][])
-      : []),
-    ['pbcopy', []],
-  ]
-
-  for (const [command, args] of candidates) {
-    try {
-      const run = spawnSync(command, args, {
-        input: text,
-        // The helper must never inherit the terminal: wl-copy stays resident to
-        // serve the selection, and a shared stdout would corrupt the frame.
-        stdio: ['pipe', 'ignore', 'ignore'],
-        timeout: 2000,
-      })
-      if (run.error === undefined && run.status === 0) return true
-    } catch {
-      // Try the next candidate.
-    }
-  }
-  return false
-}
-
-/**
- * Open a URL with whatever the platform's own launcher is.
- *
- * `xdg-open`/`open`/`start` all fork the real browser and return once the
- * request is handed off, not once the browser is actually up — a `spawnSync`
- * here does not stall the app waiting on one. Output is discarded the same
- * way the clipboard helper's is: the launcher must never inherit our
- * raw-mode stdio.
- */
-function openUrlWithLocalHelper(url: string): boolean {
-  const [command, args]: [string, string[]] =
-    process.platform === 'darwin'
-      ? ['open', [url]]
-      : process.platform === 'win32'
-        ? ['cmd', ['/c', 'start', '', url]]
-        : ['xdg-open', [url]]
-  try {
-    const run = spawnSync(command, args, { stdio: 'ignore', timeout: 3000 })
-    return run.error === undefined && run.status === 0
-  } catch {
-    return false
-  }
-}
-
-/** A filesystem-safe timestamp for export file names. */
-function timestampForFile(date = new Date()): string {
-  const pad = (value: number): string => String(value).padStart(2, '0')
-  return (
-    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
-    `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
-  )
-}
-
-/**
  * A short label for a background agent: the preset it was composed from when
  * there is one, else its origin, else a short form of the session id.
  */
@@ -5241,7 +5171,6 @@ function labelFor(agent: Agent): string {
   return String(header.id).replace(/^session-/, '').slice(0, 8)
 }
 
-/** A one-line, human-readable form of anything thrown. */
 /** Content blocks for one prompt: its text plus any staged image blocks. */
 function promptBlocks(prompt: PromptDraft): { type: 'text'; text: string }[] | ({ type: 'text'; text: string } | { type: 'image'; attachment: ImageAttachmentRef })[] {
   if (prompt.images.length === 0) return [{ type: 'text', text: prompt.text }]
@@ -5254,21 +5183,6 @@ function promptBlocks(prompt: PromptDraft): { type: 'text'; text: string }[] | (
       }),
     ),
   ]
-}
-
-/** Map a picked image path to the media type the attachment store expects. */
-function mediaTypeOf(path: string): 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | undefined {
-  const extension = path.slice(path.lastIndexOf('.')).toLowerCase()
-  if (extension === '.png') return 'image/png'
-  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
-  if (extension === '.webp') return 'image/webp'
-  if (extension === '.gif') return 'image/gif'
-  return undefined
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return String(error)
 }
 
 /**
