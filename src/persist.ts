@@ -51,6 +51,12 @@ export interface PersistedState {
    * ran; absent means the default, which is to list them.
    */
   expandTools?: boolean
+  /**
+   * Whether the stacked view was open when the app last ran; absent means the
+   * default. The profile's `view` config only fills a first run — the last
+   * view you switched to wins.
+   */
+  stackView?: boolean
   /** Devices to include in the fleet overview, as `ssh` destinations. */
   peers: string[]
   /** Sessions that were open at the last exit, in tab order. */
@@ -241,6 +247,7 @@ export function decodeState(raw: string): PersistedState {
     lang: typeof parsed.lang === 'string' ? parsed.lang : undefined,
     setupDone: parsed.setupDone === true ? true : undefined,
     expandTools: parsed.expandTools === false ? false : undefined,
+    stackView: parsed.stackView === true ? true : undefined,
     sessions,
     activeSession,
     usage: readUsage(parsed.usage),
@@ -264,6 +271,7 @@ export function assembleState(input: {
   lang: string
   setupDone: boolean | undefined
   expandTools: boolean | undefined
+  stackView: boolean | undefined
   peers: string[]
   sessions: PersistedSession[]
   activeSession: number
@@ -277,6 +285,7 @@ export function assembleState(input: {
     lang: input.lang,
     setupDone: input.setupDone,
     expandTools: input.expandTools,
+    stackView: input.stackView,
     peers: input.peers,
     sessions: input.sessions,
     activeSession: input.activeSession,

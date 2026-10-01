@@ -206,6 +206,13 @@ export interface Config {
   /** Modal vim editing for the composer; off by default. */
   vim?: boolean
   /**
+   * The view to open in: `stack` tiles every open session on screen at once;
+   * anything else — including absent — reads as `tabs`, the default. The view
+   * you switched to with `/stack` or `ctrl+s` is remembered across restarts
+   * and outranks this.
+   */
+  view?: string
+  /**
    * Devices to include in the fleet overview, as anything `ssh` accepts.
    * Empty means the overview shows only this machine.
    */
@@ -231,6 +238,7 @@ export const Config: z<Config> = z.object({
   mouse: z.boolean(),
   bell: z.boolean(),
   vim: z.boolean(),
+  view: z.string(),
   peers: z.array(z.string()),
   restore: z.boolean(),
   voiceModel: z.string(),
@@ -751,6 +759,9 @@ class TuiApp {
     this.tab.theme = activeTheme()
     if (this.persisted.lang !== undefined && isLang(this.persisted.lang)) setLanguage(this.persisted.lang)
     if (this.persisted.expandTools !== undefined) this.expandTools = this.persisted.expandTools
+    // The view returns as it was left; the profile's `view` only fills in the
+    // default for a first run, the way `thinking` and the theme do.
+    this.stackMode = this.persisted.stackView ?? this.config.view === 'stack'
     // Flags and remembered devices are one list from here on; a duplicate
     // between them should not make a peer appear twice in the overview.
     this.peers.replaceAll([...new Set([...(this.config.peers ?? []), ...this.persisted.peers])])
@@ -1498,6 +1509,27 @@ class TuiApp {
   }
 
   // ----------------------------------------------------------------- sessions
+
+  /**
+   * Switch between the stacked and tabbed views.
+   *
+   * One toggle for both entry points — `/stack` and `ctrl+s` — so the two can
+   * never disagree about what the current view is. The choice is remembered
+   * across restarts; the profile's `view` is only a first-run default.
+   */
+  private toggleStackView(): void {
+    this.stackMode = !this.stackMode
+    this.persistSoon()
+    this.screen.invalidate()
+    this.setStatus(
+      this.stackMode
+        ? this.tabs.length > 1
+          ? 'stacked view — alt+arrows move focus, alt+shift+arrows move a pane · ctrl+s for tabs'
+          : 'stacked view — /new opens a second session to tile · ctrl+s for tabs'
+        : 'tabbed view — ctrl+s for stacked',
+    )
+    this.paint()
+  }
 
   /**
    * Move focus to a neighboring pane in the stacked view. Off an edge is a
@@ -2967,6 +2999,12 @@ class TuiApp {
         this.expandBackground = !this.expandBackground
         break
 
+      case 'ctrl+s':
+        // Switch the view: one key between the stacked and tabbed layouts,
+        // the same toggle `/stack` runs.
+        this.toggleStackView()
+        break
+
       case 'ctrl+o':
         this.expandTools = !this.expandTools
         this.setStatus(this.expandTools ? 'showing every tool call' : 'tool calls collapsed')
@@ -3218,6 +3256,7 @@ class TuiApp {
       lang: currentLanguage(),
       setupDone: this.persisted.setupDone,
       expandTools: this.expandTools,
+      stackView: this.stackMode,
       peers: this.peers.all(),
       sessions: this.openSessions(),
       activeSession: this.activeSessionIndex(),
@@ -3707,19 +3746,9 @@ class TuiApp {
         this.paint()
         return
 
-      case 'stack': {
-        this.stackMode = !this.stackMode
-        this.screen.invalidate()
-        this.setStatus(
-          this.stackMode
-            ? this.tabs.length > 1
-              ? 'stacked view — alt+arrows move focus, alt+shift+arrows move a pane'
-              : 'stacked view — /new opens a second session to tile'
-            : 'tabbed view',
-        )
-        this.paint()
+      case 'stack':
+        this.toggleStackView()
         return
-      }
 
       case 'find': {
         const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')
