@@ -83,6 +83,7 @@ import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i1
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
+import { SearchState } from './search-state.ts'
 import { labelFor, promptBlocks, toLoginPrompt } from './tui-adapt.ts'
 import {
   copyWithLocalHelper,
@@ -542,8 +543,12 @@ class TuiApp {
 
   /** Sent prompts, recalled with ↑/↓ on the composer's outer rows. */
   private readonly history = new InputHistory()
-  /** The active transcript search, if `/find` has been run and not cleared. */
-  private search: { query: string; cursor: number } | undefined
+  /** The active transcript search: its query, cursor, and jump math. */
+  private readonly searchState = new SearchState()
+  /** Read-only view of the live search, for callers that only test it. */
+  private get search(): { query: string; cursor: number } | undefined {
+    return this.searchState.view()
+  }
   /** Persisted state as last loaded or saved, and a write debounce. */
   private persisted: PersistedState = {
     inputHistory: [],
@@ -3087,42 +3092,28 @@ class TuiApp {
     }
     // Searching means the conversation, not whatever help page is open.
     this.overlay = ''
-    this.search = { query: trimmed, cursor: 0 }
+    this.searchState.start(trimmed)
     this.jumpToMatch(0)
   }
 
   /** Clear the search and return the status bar to its idle hint. */
   private clearSearch(): void {
-    if (this.search === undefined) return
-    this.search = undefined
+    if (!this.searchState.active) return
+    this.searchState.clear()
     this.setStatus('')
   }
 
-  /**
-   * Move to another match. The hits are recomputed each jump, so a reply still
-   * streaming in simply adds lines to search rather than staleness. `delta`
-   * wraps around the list; `0` lands on the current match.
-   */
+  /** Move to another match, applying where the controller says the view lands. */
   private jumpToMatch(delta: number): void {
-    const search = this.search
-    if (search === undefined) return
-    const snapshot = this.snapshot()
-    const hits = findMatches(snapshot, search.query)
-    if (hits.length === 0) {
-      this.setStatus(`no matches for “${search.query}”`, true)
+    const jumped = this.searchState.jump(delta, this.snapshot())
+    if (jumped === undefined) return
+    if (jumped.kind === 'none') {
+      this.setStatus(jumped.status, true)
       this.paint()
       return
     }
-    search.cursor = ((search.cursor + delta) % hits.length + hits.length) % hits.length
-    const line = hits[search.cursor] ?? 0
-    const geometry = layout(snapshot)
-    const limit = maxScrollBack(snapshot)
-    // Center the hit vertically, clamped so the view cannot drift off the body.
-    const start = Math.min(Math.max(line - Math.floor(geometry.viewportRows / 2), 0), limit)
-    this.tab.scrollBack = limit - start
-    this.setStatus(
-      `match ${String(search.cursor + 1)}/${String(hits.length)}  ·  n next  ·  N prev  ·  esc clear`,
-    )
+    this.tab.scrollBack = jumped.scrollBack
+    this.setStatus(jumped.status)
   }
 
   // -------------------------------------------------------------- clipboard
