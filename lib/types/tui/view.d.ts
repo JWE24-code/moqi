@@ -97,6 +97,21 @@ export interface Snapshot {
     pluginLine?: string;
     /** The composer's vim mode, when modal editing is on. */
     vimMode?: 'insert' | 'normal';
+    /**
+     * The stacked view, while `/stack` has it open: every open session tiled
+     * into the transcript region at once, one per pane. The pane snapshots are
+     * whole ones so a pane draws with the exact renderer the full view uses.
+     * Optional so every existing snapshot builder renders exactly as before.
+     */
+    stack?: {
+        panes: readonly StackPane[];
+        focused: number;
+    };
+}
+/** One tiled pane in the stacked view: a session's snapshot and its label. */
+export interface StackPane {
+    title: string;
+    snapshot: Snapshot;
 }
 /** What push-to-talk is doing, for the footer indicator. */
 export type VoicePhase = 'recording' | 'transcribing';

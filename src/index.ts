@@ -81,6 +81,7 @@ import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i1
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
+import { focusNeighbor, type Direction } from './tui/stack.ts'
 import { SearchState } from './search-state.ts'
 import { TurnRunner } from './turn-runner.ts'
 import { labelFor, promptBlocks } from './tui-adapt.ts'
@@ -254,6 +255,7 @@ const QUIT_CONFIRM_MS = 1500
 const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
   { name: 'new', args: '', description: 'Open another session alongside this one' },
   { name: 'sessions', args: '', description: 'Switch between open sessions' },
+  { name: 'stack', args: '', description: 'Tile every open session in one view (alt+arrows)' },
   { name: 'close', args: '', description: 'Close this session' },
   { name: 'resume', args: '', description: 'Pick up an earlier session' },
   { name: 'delete', args: '', description: 'Delete a stored session for good' },
@@ -451,6 +453,14 @@ function newTab(id: string): SessionTab {
   }
 }
 
+/** The arrow named by a key chord like `alt+up` or `shift+alt+left`. */
+function arrowDirection(name: string): Direction {
+  if (name.endsWith('up')) return 'up'
+  if (name.endsWith('down')) return 'down'
+  if (name.endsWith('left')) return 'left'
+  return 'right'
+}
+
 /** The app: owns the screen, the sessions, and every piece of mutable state. */
 class TuiApp {
   /** The open-session strip: owns the tabs and the rules between them. */
@@ -492,6 +502,8 @@ class TuiApp {
   private readonly atMenu = new AtMenu()
   /** Index of the transcript turn under selection, if any. */
   private selectedTurn: number | undefined
+  /** Whether the stacked view is open: every session tiled on screen at once. */
+  private stackMode = false
   /** The trust-surface panel on screen, if any: it owns the keyboard. */
   private panel: ApprovalPanel | QuestionsPanel | LoginPanel | undefined
   /** The masked-prompt channel `askSecret` waits on, apart from any sign-in. */
@@ -562,6 +574,11 @@ class TuiApp {
     // narrow back to the app's own SessionTab shape.
     sessionStatus: (tab, status) => {
       this.tabStrip.setStatus(tab as SessionTab, status)
+      // In the stacked view a pane you can see is a reply you can read: mark
+      // it seen like the focused session's own status already does.
+      if (this.stackMode && this.isVisible(tab as SessionTab)) {
+        ;(tab as SessionTab).status = 'idle'
+      }
     },
     foldUsage: (tab, provider) => {
       this.foldBilledUsage(tab as SessionTab, provider)
@@ -1376,7 +1393,12 @@ class TuiApp {
     if (frame.type !== 'chunk') return
     projectStreamChunk(tab, frame.chunk)
     this.syncToolLog(tab)
-    if (tab === this.tabs[this.active]) this.paint()
+    if (this.isVisible(tab)) this.paint()
+  }
+
+  /** Whether a session is on screen: the focused one, or a pane in the stack. */
+  private isVisible(tab: SessionTab): boolean {
+    return tab === this.tabs[this.active] || (this.stackMode && this.tabs.includes(tab))
   }
 
   /**
@@ -1429,7 +1451,7 @@ class TuiApp {
       // An unreachable route must not blank the status bar.
       tab.contextLimit = tab.contextLimit === 0 ? fallback : tab.contextLimit
     }
-    if (tab === this.tabs[this.active]) this.paint()
+    if (this.isVisible(tab)) this.paint()
   }
 
   /** Every command the palette offers: this app's, plus the Harness registry's. */
@@ -1471,6 +1493,42 @@ class TuiApp {
 
   // ----------------------------------------------------------------- sessions
 
+  /**
+   * Move focus to a neighboring pane in the stacked view. Off an edge is a
+   * status line, not a wrap: the layout is spatial, and a wrap would make
+   * `left` and `right` unreliable pointers.
+   */
+  private moveStackFocus(direction: Direction): void {
+    const target = focusNeighbor(this.tabs.length, this.active, direction)
+    if (target === undefined) {
+      this.setStatus(`no session ${direction === 'up' ? 'above' : direction === 'down' ? 'below' : `to the ${direction}`}`)
+      this.paint()
+      return
+    }
+    this.selectSession(target)
+  }
+
+  /** Swap the focused pane with its neighbor; focus follows the pane. */
+  private moveStackTile(direction: Direction): void {
+    const target = focusNeighbor(this.tabs.length, this.active, direction)
+    if (target === undefined) {
+      this.setStatus(`no session ${direction === 'up' ? 'above' : direction === 'down' ? 'below' : `to the ${direction}`}`)
+      this.paint()
+      return
+    }
+    const tabs = [...this.tabs]
+    const focused = tabs[this.active]
+    const neighbor = tabs[target]
+    if (focused === undefined || neighbor === undefined) return
+    tabs[this.active] = neighbor
+    tabs[target] = focused
+    this.tabs = tabs
+    this.active = target
+    this.persistSoon()
+    this.screen.invalidate()
+    this.paint()
+  }
+
   /** Switch the view to another session. */
   private selectSession(index: number): void {
     const tab = this.tabStrip.select(index)
@@ -1507,17 +1565,31 @@ class TuiApp {
   // ---------------------------------------------------------------- rendering
 
   private snapshot(): Snapshot {
+    const base = this.snapshotFor(this.tab)
+    // The stacked view draws every open session, so each pane carries its
+    // session's own snapshot; the frame around them stays the focused one's.
+    if (this.stackMode && this.tabs.length > 1) {
+      base.stack = {
+        panes: this.tabs.map((tab) => ({ title: tab.title, snapshot: this.snapshotFor(tab) })),
+        focused: this.active,
+      }
+    }
+    return base
+  }
+
+  /** The snapshot of one session, as its pane or its full view would draw it. */
+  private snapshotFor(tab: SessionTab): Snapshot {
     const size = this.screen.size()
     return {
       columns: size.columns,
       rows: size.rows,
-      title: this.tab.title,
+      title: tab.title,
       host: hostLabel(process.env['DSH_HOST'] ?? 'local harness'),
-      modelName: this.tab.modelName,
-      messages: this.tab.messages,
-      streamingSegments: this.tab.streamingSegments,
-      streamingReasoning: this.tab.streamingReasoning,
-      streaming: this.tab.streaming,
+      modelName: tab.modelName,
+      messages: tab.messages,
+      streamingSegments: tab.streamingSegments,
+      streamingReasoning: tab.streamingReasoning,
+      streaming: tab.streaming,
       spinner: SPINNER[this.spinnerIndex % SPINNER.length] ?? '',
       status: this.status,
       statusIsError: this.statusIsError,
@@ -1527,21 +1599,21 @@ class TuiApp {
       palette: this.palette,
       atMenu: this.atMenu,
       picker: this.picker,
-      scrollBack: this.tab.scrollBack,
-      queued: this.tab.queued.map((prompt) => prompt.text),
+      scrollBack: tab.scrollBack,
+      queued: tab.queued.map((prompt) => prompt.text),
       sessions: this.tabStrip.summaries(),
       expandTools: this.expandTools,
-      background: [...this.tab.background.values()],
+      background: [...tab.background.values()],
       expandBackground: this.expandBackground,
       elapsedSeconds:
-        this.tab.streamStartedAt === 0 ? 0 : Math.floor((Date.now() - this.tab.streamStartedAt) / 1000),
-      promptTokens: this.tab.promptTokens,
-      completionTokens: this.tab.completionTokens,
-      totalTokens: this.tab.totalTokens,
-      haveUsage: this.tab.haveUsage,
-      tps: this.tab.tps,
-      cacheReadTokens: this.tab.cacheReadTokens,
-      contextLimit: this.tab.contextLimit,
+        tab.streamStartedAt === 0 ? 0 : Math.floor((Date.now() - tab.streamStartedAt) / 1000),
+      promptTokens: tab.promptTokens,
+      completionTokens: tab.completionTokens,
+      totalTokens: tab.totalTokens,
+      haveUsage: tab.haveUsage,
+      tps: tab.tps,
+      cacheReadTokens: tab.cacheReadTokens,
+      contextLimit: tab.contextLimit,
       confirming: this.confirmState.open,
       confirmText: this.confirmState.open ? this.confirmState.prompt : undefined,
       searchActive: this.search !== undefined,
@@ -2784,11 +2856,25 @@ class TuiApp {
         void this.editDraft()
         break
       case 'alt+up':
-        this.moveSelection(-1)
-        break
       case 'alt+down':
-        this.moveSelection(1)
+      case 'alt+left':
+      case 'alt+right':
+      case 'shift+alt+up':
+      case 'shift+alt+down':
+      case 'shift+alt+left':
+      case 'shift+alt+right': {
+        const direction = arrowDirection(key.name)
+        // Inside the stacked view the arrows are spatial: plain moves focus
+        // between panes, shift moves the focused pane itself.
+        if (this.stackMode && this.tabs.length > 1) {
+          if (key.name.startsWith('shift+')) this.moveStackTile(direction)
+          else this.moveStackFocus(direction)
+          break
+        }
+        if (key.name === 'alt+up') this.moveSelection(-1)
+        else if (key.name === 'alt+down') this.moveSelection(1)
         break
+      }
       case 'alt+c':
         this.copySelectedTurn()
         break
@@ -3546,6 +3632,20 @@ class TuiApp {
         this.setStatus(this.showThinking ? 'showing reasoner thinking' : 'hiding reasoner thinking')
         this.paint()
         return
+
+      case 'stack': {
+        this.stackMode = !this.stackMode
+        this.screen.invalidate()
+        this.setStatus(
+          this.stackMode
+            ? this.tabs.length > 1
+              ? 'stacked view — alt+arrows move focus, alt+shift+arrows move a pane'
+              : 'stacked view — /new opens a second session to tile'
+            : 'tabbed view',
+        )
+        this.paint()
+        return
+      }
 
       case 'find': {
         const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')

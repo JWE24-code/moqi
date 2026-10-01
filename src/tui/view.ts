@@ -50,6 +50,7 @@ import {
 } from './theme.ts'
 import { isImagePath, type AtMenu } from './atfile.ts'
 import { helpText, t, translate } from './i18n.ts'
+import { stackFrame } from './stack.ts'
 import type { PanelView } from './panels.ts'
 
 /** Most file-completion rows listed at once before the popup scrolls. */
@@ -160,6 +161,19 @@ export interface Snapshot {
   pluginLine?: string
   /** The composer's vim mode, when modal editing is on. */
   vimMode?: 'insert' | 'normal'
+  /**
+   * The stacked view, while `/stack` has it open: every open session tiled
+   * into the transcript region at once, one per pane. The pane snapshots are
+   * whole ones so a pane draws with the exact renderer the full view uses.
+   * Optional so every existing snapshot builder renders exactly as before.
+   */
+  stack?: { panes: readonly StackPane[]; focused: number }
+}
+
+/** One tiled pane in the stacked view: a session's snapshot and its label. */
+export interface StackPane {
+  title: string
+  snapshot: Snapshot
 }
 
 /** What push-to-talk is doing, for the footer indicator. */
@@ -228,8 +242,10 @@ export function layout(snapshot: Snapshot): Layout {
   }
   const atHeight = atRows > 0 ? atRows + POPUP_BORDER_ROWS : 0
 
-  // The tab bar earns its row only once there is more than one session.
-  let sessionRows = snapshot.sessions.length > 1 ? 1 : 0
+  // The tab bar earns its row only once there is more than one session, and
+  // yields it in the stacked view: the tiles already say which session is
+  // which, so the strip would spend a transcript row repeating them.
+  let sessionRows = snapshot.sessions.length > 1 && snapshot.stack === undefined ? 1 : 0
 
   // A plugin's status line is one row, surrendered first when space is short.
   let pluginRows = snapshot.pluginLine !== undefined && snapshot.pluginLine.trim() !== '' ? 1 : 0
@@ -600,19 +616,42 @@ export function findMatches(snapshot: Snapshot, query: string): number[] {
   return hits
 }
 
-function viewport(snapshot: Snapshot, geometry: Layout): string[] {
-  const width = geometry.contentWidth
-  const body = bodyLines(snapshot, width)
-
-  const height = geometry.viewportRows
-  if (body.length <= height) {
-    // Anchor short transcripts to the bottom so the conversation grows upward
-    // out of the composer rather than hanging from the top of the screen.
-    return [...Array<string>(height - body.length).fill(''), ...body]
-  }
+/**
+ * The window of `body` the screen shows: the tail, anchored to the bottom so
+ * the conversation grows upward out of the composer, pulled back by however
+ * far `scrollBack` has scrolled.
+ */
+function scrollWindow(body: string[], scrollBack: number, height: number): string[] {
+  if (body.length <= height) return [...Array<string>(height - body.length).fill(''), ...body]
   const maxStart = body.length - height
-  const start = Math.max(Math.min(maxStart - snapshot.scrollBack, maxStart), 0)
+  const start = Math.max(Math.min(maxStart - scrollBack, maxStart), 0)
   return body.slice(start, start + height)
+}
+
+function viewport(snapshot: Snapshot, geometry: Layout): string[] {
+  return scrollWindow(bodyLines(snapshot, geometry.contentWidth), snapshot.scrollBack, geometry.viewportRows)
+}
+
+/**
+ * The stacked view's region: every pane snapshot tiled into the transcript's
+ * rows. What a pane shows is the same renderer the full view uses, just at a
+ * tile's size, so a session never looks different for being tiled.
+ */
+function stackPane(snapshot: Snapshot, geometry: Layout): string[] {
+  const stack = snapshot.stack
+  if (stack === undefined || stack.panes.length === 0) return []
+  return stackFrame({
+    count: stack.panes.length,
+    width: geometry.contentWidth,
+    height: geometry.viewportRows,
+    focused: stack.focused,
+    title: (index) => stack.panes[index]?.title ?? '',
+    renderBody: (index, width, height) => {
+      const pane = stack.panes[index]
+      if (pane === undefined) return []
+      return scrollWindow(bodyLines(pane.snapshot, width), pane.snapshot.scrollBack, height)
+    },
+  })
 }
 
 /**
@@ -1119,9 +1158,11 @@ export function render(snapshot: Snapshot): {
           ? fleetPane(snapshot, geometry)
           : snapshot.usage?.open === true
             ? usagePane(snapshot, geometry)
-            : snapshot.picker.kind === 'none'
-              ? viewport(snapshot, geometry)
-              : pickerPane(snapshot, geometry)
+            : snapshot.stack !== undefined
+              ? stackPane(snapshot, geometry)
+              : snapshot.picker.kind === 'none'
+                ? viewport(snapshot, geometry)
+                : pickerPane(snapshot, geometry)
     rows.push(...body)
   }
   if (geometry.showGap) rows.push('')
