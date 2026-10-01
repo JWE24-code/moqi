@@ -13,6 +13,10 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
 - `npm test` — the full smoke suite (~35 suites; must pass before every commit).
 - `npm run test:pty` — the pty-driven suite (CI runs it too).
 - `npm run build` — emit to `lib/`.
+- `npm run sonar:sync` — reconcile open Sonar issues into GitHub issues (reads
+  the `SONAR_*`/`GITHUB_*` environment; `SONAR_SYNC_DRY_RUN=1` reports the plan
+  and writes nothing; `SONAR_SYNC_TYPES`/`SONAR_SYNC_SEVERITIES` narrow what is
+  synced).
 
 ## How this repo works
 
@@ -27,13 +31,16 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   (`scripts/link-harness-types.mjs`) after `npm ci` — it symlinks the installed
   `dsh`'s `@deepseek-ai/*` packages. A clean checkout without an installed dsh
   typechecks red and tests green; that is the known shape, not a regression.
-- CI: `ci.yml` (test matrix + pty), `live.yml` (round trip), `publish.yml`.
+- CI: `ci.yml` (test matrix + pty), `live.yml` (round trip), `publish.yml`,
+  `sonar-issues.yml` (weekly Sonar → GitHub issue sync).
 - Structure: `src/index.ts` is the composition root — the cordis plugin shape
   (`name`/`inject`/`Config`/`apply`) plus the `TuiApp` class. Everything that
   reads stored sessions lives in `src/session-list.ts`, desktop bridges in
   `src/local-platform.ts`, harness→surface adapters in `src/tui-adapt.ts`,
   cross-session search in `src/cross-find.ts`, the session store layout in
-  `src/sessions-store.ts`.
+  `src/sessions-store.ts`. Sonar issues are mirrored into GitHub issues by
+  `scripts/sync-sonar-issues.ts`; de-duplication is the `<!-- sonar-key:… -->`
+  marker each synced issue body carries.
 
 ## Conventions
 
