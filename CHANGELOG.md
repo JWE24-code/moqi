@@ -6,6 +6,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Changed
+
+- **`TuiApp`'s state now lives in focused controllers.** The turn lifecycle
+  moved to a `TurnRunner`, the open-session strip to `SessionTabs`, transcript
+  search to `SearchState`, sign-in to a `LoginFlow`, and usage plus the fleet's
+  peer list to `tui/state` and `tui/fleet`; confirmations and picker keys answer
+  to their own modules. Sessions are listed through a `session-list` module,
+  harness-to-surface adapters live in `tui-adapt`, and desktop bridges in
+  `local-platform`. `TuiApp` is reduced to its entry points over those seams,
+  and the decision is recorded in `docs/adr/0001-state-owning-controllers.md`.
+
+### Fixed
+
+- **Session logs are decoded through one path.** `readLog` duplicated the zstd
+  detect/decompress that `decodeLogBytes` already owned, so the two could
+  drift; `readLog` now keeps only the file concerns and delegates the decode, so
+  a misnamed log decodes by content rather than failing.
+- **An unnamed picker key no longer falls through into enter.** A refactor left
+  the picker's default navigation case directly above `case enter` with no
+  break, so an arrow key both moved the selection and activated the row it had
+  just focused — in `/JevLoop`, arrow keys toggled gates and enter looked inert.
+- Removed an unreachable `role` conditional in `textOfRecord`.
+
+### Added
+
+- Characterization tests pinning cross-session log-read limits: text before the
+  `maxBytes` cut is found and text after it is not, an over-cap compressed log
+  is skipped while truncated plain logs still count as scanned, and scan/skip
+  counts hold on a mixed store.
+- Repository contract docs: `AGENTS.md`, a seeded `CONTEXT.md` glossary, and the
+  whiteboard plus ADR map of the refactored shape.
+
 ## [0.4.0]
 
 ### Added
