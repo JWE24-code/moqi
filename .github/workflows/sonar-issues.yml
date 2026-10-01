@@ -35,6 +35,8 @@ jobs:
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ github.token }}
+      SONAR_SYNC_TYPES: ${{ vars.SONAR_SYNC_TYPES }}
+      SONAR_SYNC_SEVERITIES: ${{ vars.SONAR_SYNC_SEVERITIES }}
       # `inputs` is empty on a schedule, so `&&`/`||` lands on "0".
       SONAR_SYNC_DRY_RUN: ${{ inputs.dry-run && '1' || '0' }}
     steps:

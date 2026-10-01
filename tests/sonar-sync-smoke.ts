@@ -129,6 +129,23 @@ check('no token sends no authorization', sonarHeaders('https://sonarcloud.io', u
   check('pagination gathers every page', issues.length === 2)
 }
 
+// A type or severity filter reaches the Sonar query.
+{
+  const { fetchImpl, calls } = makeFetch({ sonar: [[newIssue]], tracked: [] })
+  await fetchSonarIssues(
+    {
+      host: baseConfig.host,
+      projectKey: baseConfig.projectKey,
+      types: 'BUG,VULNERABILITY',
+      severities: 'CRITICAL',
+    },
+    fetchImpl,
+  )
+  const query = calls[0]?.path ?? ''
+  check('the type filter reaches Sonar', query.includes('types=BUG%2CVULNERABILITY'))
+  check('the severity filter reaches Sonar', query.includes('severities=CRITICAL'))
+}
+
 // Existing markers are read back, and unmarked issues are ignored.
 {
   const { fetchImpl } = makeFetch({

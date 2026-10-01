@@ -22,6 +22,8 @@
  *   SONAR_SYNC_LABEL        label for synced issues, default `sonar`
  *   SONAR_SYNC_DRY_RUN      `1` reports the plan and writes nothing
  *   SONAR_SYNC_CLOSE_RESOLVED  `0` leaves resolved Sonar issues open on GitHub
+ *   SONAR_SYNC_TYPES        comma-separated Sonar types to sync, e.g. BUG,VULNERABILITY
+ *   SONAR_SYNC_SEVERITIES   comma-separated Sonar severities, e.g. BLOCKER,CRITICAL
  *
  * Run with: node --experimental-strip-types scripts/sync-sonar-issues.ts
  */
@@ -73,6 +75,8 @@ export interface SyncConfig {
   label: string
   dryRun: boolean
   closeResolved: boolean
+  types?: string
+  severities?: string
 }
 
 export interface SyncResult {
@@ -130,7 +134,7 @@ function githubHeaders(token: string): Record<string, string> {
 
 /** Every unresolved issue on the project, paged through the Sonar API. */
 export async function fetchSonarIssues(
-  options: { host: string; projectKey: string; token?: string },
+  options: { host: string; projectKey: string; token?: string; types?: string; severities?: string },
   fetchImpl: FetchLike = fetch,
 ): Promise<SonarIssue[]> {
   const base = options.host.replace(/\/+$/, '')
@@ -140,6 +144,10 @@ export async function fetchSonarIssues(
     const url = new URL(`${base}/api/issues/search`)
     url.searchParams.set('componentKeys', options.projectKey)
     url.searchParams.set('resolved', 'false')
+    if (options.types !== undefined && options.types !== '') url.searchParams.set('types', options.types)
+    if (options.severities !== undefined && options.severities !== '') {
+      url.searchParams.set('severities', options.severities)
+    }
     url.searchParams.set('ps', '100')
     url.searchParams.set('p', String(page))
     const response = await fetchImpl(url.toString(), { headers })
@@ -249,7 +257,13 @@ export async function sync(
   report: (line: string) => void = () => {},
 ): Promise<SyncResult> {
   const issues = await fetchSonarIssues(
-    { host: config.host, projectKey: config.projectKey, token: config.token },
+    {
+      host: config.host,
+      projectKey: config.projectKey,
+      token: config.token,
+      types: config.types,
+      severities: config.severities,
+    },
     fetchImpl,
   )
   const tracked = await listTrackedIssues(
@@ -331,6 +345,8 @@ async function main(): Promise<void> {
       label: process.env.SONAR_SYNC_LABEL ?? 'sonar',
       dryRun,
       closeResolved: process.env.SONAR_SYNC_CLOSE_RESOLVED !== '0',
+      types: process.env.SONAR_SYNC_TYPES,
+      severities: process.env.SONAR_SYNC_SEVERITIES,
     },
     fetch,
     (line) => { console.log(`sonar-issues: ${line}`) },

@@ -15,7 +15,8 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
 - `npm run build` — emit to `lib/`.
 - `npm run sonar:sync` — reconcile open Sonar issues into GitHub issues (reads
   the `SONAR_*`/`GITHUB_*` environment; `SONAR_SYNC_DRY_RUN=1` reports the plan
-  and writes nothing).
+  and writes nothing; `SONAR_SYNC_TYPES`/`SONAR_SYNC_SEVERITIES` narrow what is
+  synced).
 
 ## How this repo works
 
