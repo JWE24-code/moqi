@@ -51,6 +51,7 @@ import {
 import { isImagePath, type AtMenu } from './atfile.ts'
 import { helpText, t, translate } from './i18n.ts'
 import { stackFrame } from './stack.ts'
+import { highlighted, type Span } from './select.ts'
 import type { PanelView } from './panels.ts'
 
 /** Most file-completion rows listed at once before the popup scrolls. */
@@ -168,6 +169,12 @@ export interface Snapshot {
    * Optional so every existing snapshot builder renders exactly as before.
    */
   stack?: { panes: readonly StackPane[]; focused: number }
+  /**
+   * A mouse drag's selection, drawn as the highlight over the frame. Only a
+   * real drag sets it — a press that has not moved is still a pending click.
+   * Optional so every existing snapshot builder renders exactly as before.
+   */
+  selection?: Span
 }
 
 /** One tiled pane in the stacked view: a session's snapshot and its label. */
@@ -1242,6 +1249,7 @@ export function render(snapshot: Snapshot): {
   // with it: composerPane reports a column inside its own box, and every line
   // of that box is about to be shifted right by the gutter.
   const lines = rows.map((line) => gutter + line)
+  const painted = snapshot.selection === undefined ? lines : highlighted(lines, snapshot.selection)
   const cursor =
     snapshot.picker.kind === 'none' &&
     snapshot.fleet?.open !== true &&
@@ -1252,7 +1260,7 @@ export function render(snapshot: Snapshot): {
           column: composer.cursor.column + gutter.length,
         }
       : undefined
-  return { lines, cursor }
+  return { lines: painted, cursor }
 }
 
 /**

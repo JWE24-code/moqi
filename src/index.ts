@@ -82,6 +82,7 @@ import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } fro
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
 import { focusNeighbor, type Direction } from './tui/stack.ts'
+import { isDrag, spanText, type Span } from './tui/select.ts'
 import { SearchState } from './search-state.ts'
 import { TurnRunner } from './turn-runner.ts'
 import { labelFor, promptBlocks } from './tui-adapt.ts'
@@ -505,6 +506,10 @@ class TuiApp {
   private selectedTurn: number | undefined
   /** Whether the stacked view is open: every session tiled on screen at once. */
   private stackMode = false
+  /** The mouse drag in progress, if any; also the live selection highlight. */
+  private drag: Span | undefined
+  /** The last painted frame, so a release can copy exactly what was shown. */
+  private frame: string[] = []
   /** The trust-surface panel on screen, if any: it owns the keyboard. */
   private panel: ApprovalPanel | QuestionsPanel | LoginPanel | undefined
   /** The masked-prompt channel `askSecret` waits on, apart from any sign-in. */
@@ -1575,6 +1580,9 @@ class TuiApp {
         focused: this.active,
       }
     }
+    // Only a drag that has actually moved draws as a selection; a press still
+    // in place is a pending click and must not flash the highlight on.
+    if (this.drag !== undefined && isDrag(this.drag)) base.selection = this.drag
     return base
   }
 
@@ -1637,6 +1645,7 @@ class TuiApp {
     this.syncPickerPreview()
     this.publishPresence()
     const frame = render(this.snapshot())
+    this.frame = frame.lines
     this.screen.setCursor(frame.cursor)
     this.screen.paint(frame.lines)
   }
@@ -2614,6 +2623,10 @@ class TuiApp {
         // A live microphone outranks everything else esc can dismiss: it is
         // the most modal state the app has, and the one to get out of first.
         if (this.voicePhase !== undefined) this.cancelVoice()
+        else if (this.drag !== undefined) {
+          this.drag = undefined
+          this.setStatus('')
+        }
         else if (this.selectedTurn !== undefined) {
           this.selectedTurn = undefined
           this.setStatus('')
@@ -2836,12 +2849,56 @@ class TuiApp {
         this.scrollToBottom()
         break
       case 'click': {
-        // The tab bar is the one region whose contents have stable, meaningful
-        // extents; a click anywhere else is ignored rather than guessed at.
-        // Its row comes from the layout, not from an assumption: the header
-        // above it is conditional, so the bar moves.
+        // A left-button press starts a selection. Whether it ends as a drag
+        // (copy on release) or a click (select) is decided at release, by
+        // whether the pointer ever moved.
         const cell = key.mouse
         if (cell === undefined) break
+        this.drag = { anchor: cell, head: cell }
+        break
+      }
+
+      case 'drag': {
+        // Motion with the button down: extend the selection, repaint the
+        // highlight. The drag module skips the highlight until the pointer
+        // has actually left the anchor.
+        const cell = key.mouse
+        if (cell === undefined || this.drag === undefined) break
+        this.drag = { ...this.drag, head: cell }
+        this.paint()
+        break
+      }
+
+      case 'release': {
+        const cell = key.mouse
+        const drag = this.drag
+        this.drag = undefined
+        if (cell === undefined || drag === undefined) break
+        if (isDrag(drag)) {
+          // A real drag: the box the user drew is what gets copied, over the
+          // same OSC 52 path as every other copy command.
+          const text = spanText(this.frame, drag)
+          if (text.trim() === '') {
+            this.setStatus('nothing selected')
+            this.paint()
+            break
+          }
+          const lines = String(text.split('\n').length)
+          const result = this.writeClipboard(text)
+          this.setStatus(
+            result.ok
+              ? `copied ${text.length} characters over ${lines} line${text.includes('\n') ? 's' : ''}`
+              : `copy failed: ${result.error}`,
+            !result.ok,
+          )
+          this.paint()
+          break
+        }
+        // The pointer never moved: this was a click. The tab bar is the one
+        // region whose contents have stable, meaningful extents; a click
+        // anywhere else is ignored rather than guessed at. Its row comes from
+        // the layout, not from an assumption: the header above it is
+        // conditional, so the bar moves.
         const index = tabClickTarget(this.snapshot(), cell)
         if (index !== undefined) {
           this.selectSession(index)

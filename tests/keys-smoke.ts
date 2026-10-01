@@ -157,7 +157,10 @@ check('a wheel-down report keeps its cell', (() => {
   const key = decode('\x1b[<65;1;9M').keys[0]
   return key?.name === 'wheeldown' && key?.mouse?.row === 8
 })())
-check('a release decodes to nothing', decode('\x1b[<0;12;1m').keys.length === 0)
+check('a release decodes, with its cell', (() => {
+  const key = decode('\x1b[<0;12;1m').keys[0]
+  return key?.name === 'release' && key?.mouse?.column === 11 && key?.mouse?.row === 0
+})())
 check('shift+click is left alone for the terminal to select', decode('\x1b[<4;12;1M').keys.length === 0)
 check('a right-click does not reach the app', decode('\x1b[<2;12;1M').keys.length === 0)
 check('a mouse report followed by a key decodes both', (() => {

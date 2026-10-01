@@ -125,6 +125,11 @@ export function decode(input: string): { keys: Key[]; rest: string } {
           if (button === 0) keys.push({ name: 'click', text: '', mouse: cell })
           else if (button === 64) keys.push({ name: 'wheelup', text: '', mouse: cell })
           else if (button === 65) keys.push({ name: 'wheeldown', text: '', mouse: cell })
+          else if (button === 32) keys.push({ name: 'drag', text: '', mouse: cell })
+        } else if (button === 0) {
+          // A left-button release: the end of a drag, or the back half of a
+          // click. The app tells the two apart by whether the pointer moved.
+          keys.push({ name: 'release', text: '', mouse: cell })
         }
         index += mouse[0].length
         continue

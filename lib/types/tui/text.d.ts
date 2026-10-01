@@ -20,6 +20,14 @@ export declare function truncate(text: string, limit: number): string;
 /** Pad a string on the right to `width` columns. */
 export declare function padEnd(text: string, width: number): string;
 /**
+ * The text occupying columns `[start, end)` of a display string.
+ *
+ * Selection copies what the eye saw, so the cut is by screen column: escapes
+ * carry no width and pass through untouched, and a wide character straddling
+ * an edge belongs to the span when its first half is inside it.
+ */
+export declare function sliceColumns(text: string, start: number, end: number): string;
+/**
  * Hard-wrap plain text to `width` columns, breaking on spaces where possible
  * and mid-word only when a single word cannot fit on a line of its own.
  */

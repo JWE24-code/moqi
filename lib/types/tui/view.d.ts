@@ -10,6 +10,7 @@ import { type FleetView } from './fleet.ts';
 import { type UsageView } from './usage-view.ts';
 import { Composer, type Message, type Palette, type BackgroundAgent, type Picker, type Segment, type SessionSummary } from './state.ts';
 import { type AtMenu } from './atfile.ts';
+import { type Span } from './select.ts';
 import type { PanelView } from './panels.ts';
 /** Everything the renderer needs to draw one frame. */
 export interface Snapshot {
@@ -107,6 +108,12 @@ export interface Snapshot {
         panes: readonly StackPane[];
         focused: number;
     };
+    /**
+     * A mouse drag's selection, drawn as the highlight over the frame. Only a
+     * real drag sets it — a press that has not moved is still a pending click.
+     * Optional so every existing snapshot builder renders exactly as before.
+     */
+    selection?: Span;
 }
 /** One tiled pane in the stacked view: a session's snapshot and its label. */
 export interface StackPane {

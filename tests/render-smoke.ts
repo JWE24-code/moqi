@@ -25,7 +25,8 @@ import {
   textMessage,
   type Message,
 } from '../src/tui/state.ts'
-import { displayWidth, truncate, wrap, stripAnsi, padEnd } from '../src/tui/text.ts'
+import { displayWidth, truncate, wrap, stripAnsi, padEnd, sliceColumns } from '../src/tui/text.ts'
+import { highlighted, spanText } from '../src/tui/select.ts'
 import { renderMarkdown } from '../src/tui/markdown.ts'
 import { decode } from '../src/tui/keys.ts'
 import {
@@ -675,6 +676,58 @@ check('clamping is a no-op past the top', JSON.stringify(atTop) !== JSON.stringi
   check(
     'a click while an overlay is open selects no turn',
     turnClickTarget(snapshot({ overlay: '# help' }), { row: top + 1 }) === undefined,
+  )
+}
+
+// ------------------------------------------------------- drag selection
+
+{
+  // Drag selection: press, motion, release — the release copies the box the
+  // user drew. The math is the select module's; these pin its edges.
+  check('a drag motion decodes', decode('\x1b[<32;10;5M').keys[0]?.name === 'drag')
+  check(
+    'a drag motion decodes with its cell',
+    (() => {
+      const k = decode('\x1b[<32;10;5M').keys[0]
+      return k?.name === 'drag' && k?.mouse?.column === 9 && k?.mouse?.row === 4
+    })(),
+  )
+  check('a left-button release decodes', decode('\x1b[<0;10;5m').keys[0]?.name === 'release')
+  check('a shift-click release is left to the terminal', decode('\x1b[<4;10;5m').keys.length === 0)
+
+  check('sliceColumns cuts by column', sliceColumns('你好 world', 2, 6) === '好 w')
+  check('sliceColumns keeps escapes whole', sliceColumns('a\x1b[31mred\x1b[0mb', 1, 4) === '\x1b[31mred\x1b[0m')
+
+  const lines = ['first row here', 'second row here', 'third row here']
+  check(
+    'one row of the span copies that row',
+    spanText(lines, { anchor: { row: 1, column: 0 }, head: { row: 1, column: 6 } }) === 'second',
+  )
+  check(
+    'a backwards drag copies the same box',
+    spanText(lines, { anchor: { row: 1, column: 6 }, head: { row: 1, column: 0 } }) === 'second',
+  )
+  check(
+    'a box across rows joins the rows',
+    spanText(lines, { anchor: { row: 0, column: 7 }, head: { row: 1, column: 6 } }) === 'ow here\nsecond',
+  )
+  check(
+    'a drag off the frame edge copies what exists',
+    spanText(lines, { anchor: { row: 2, column: 0 }, head: { row: 9, column: 99 } }).startsWith('third'),
+  )
+
+  const frame = ['plain row one', 'styled [32mrow[0m two']
+  const lit = highlighted(frame, { anchor: { row: 0, column: 0 }, head: { row: 1, column: 4 } })
+  check('highlighting keeps every row', lit.length === frame.length)
+  check('highlighting keeps the width', lit.every((line, i) => displayWidth(line) === displayWidth(frame[i] ?? '')))
+  check('rows outside the span are untouched', lit[1] !== undefined && lit[1].startsWith('styled ') === false ? stripAnsi(lit[1] ?? '') === stripAnsi(frame[1] ?? '') : true)
+  check('the span itself is restyled', lit[0] !== frame[0] && stripAnsi(lit[0] ?? '') === (frame[0] ?? ''))
+
+  const rendered = render(snapshot({ selection: { anchor: { row: 3, column: 2 }, head: { row: 5, column: 20 } } }))
+  check('a frame with a selection fits the window', rendered.lines.length <= 30)
+  check(
+    'a frame with a selection keeps line widths',
+    rendered.lines.every((line) => displayWidth(line) <= 100),
   )
 }
 
