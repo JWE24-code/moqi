@@ -1,0 +1,45 @@
+name: Sync Sonar issues
+
+# SonarQube deliberately does not open GitHub issues: its GitHub integration
+# decorates pull requests and, on the Enterprise plan, publishes security
+# findings as code-scanning alerts. This workflow runs the sync that turns
+# unresolved Sonar issues into tracked GitHub issues, and closes them again
+# when Sonar resolves them.
+#
+# It runs only on the default branch (`schedule`) or when someone with write
+# access dispatches it. It must never move to `pull_request_target`, which
+# would hand the Sonar token to fork code.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Report what would change without writing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sonar-issues
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      # `inputs` is empty on a schedule, so `&&`/`||` lands on "0".
+      SONAR_SYNC_DRY_RUN: ${{ inputs.dry-run && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --experimental-strip-types scripts/sync-sonar-issues.ts
