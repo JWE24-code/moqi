@@ -171,6 +171,19 @@ export declare function tabClickTarget(snapshot: Snapshot, cell: {
     row: number;
 }): number | undefined;
 /**
+ * Which transcript turn a mouse click landed on, if any.
+ *
+ * Click-to-copy needs the same guarantee the tab bar gets: the hit test is
+ * computed from the layout the frame was drawn with, not assumed. A click in
+ * the blank line between two turns selects the turn above it — a gap is not
+ * worth a miss. Returns `undefined` when the transcript pane is not on screen
+ * (an overlay, picker, panel, or the stacked view, whose per-pane mapping is
+ * its own later piece) or the click fell outside it.
+ */
+export declare function turnClickTarget(snapshot: Snapshot, cell: {
+    row: number;
+}): number | undefined;
+/**
  * Which session a click on the tab bar landed on, if any.
  *
  * The extents mirror {@link sessionBar}'s cell construction exactly — mark,

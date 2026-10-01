@@ -118,6 +118,7 @@ import {
   maxScrollBack,
   render,
   tabClickTarget,
+  turnClickTarget,
   type Snapshot,
   type VoicePhase,
 } from './tui/view.ts'
@@ -2842,7 +2843,23 @@ class TuiApp {
         const cell = key.mouse
         if (cell === undefined) break
         const index = tabClickTarget(this.snapshot(), cell)
-        if (index !== undefined) this.selectSession(index)
+        if (index !== undefined) {
+          this.selectSession(index)
+          break
+        }
+        // A click on a transcript turn selects it; clicking the already
+        // selected turn copies it — the mouse shape of alt+c.
+        const turn = turnClickTarget(this.snapshot(), cell)
+        if (turn === undefined) break
+        if (this.selectedTurn === turn) {
+          this.copySelectedTurn()
+          break
+        }
+        this.selectedTurn = turn
+        const message = this.tab.messages[turn]
+        const what = message?.role === 'user' ? 'your prompt' : 'the reply'
+        this.setStatus(`${String(turn + 1)}/${String(this.tab.messages.length)}: ${what} selected · click again to copy`)
+        this.paint()
         break
       }
 

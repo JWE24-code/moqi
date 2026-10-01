@@ -511,7 +511,8 @@ function cachedMessageLines(
   return lines
 }
 
-function transcript(snapshot: Snapshot, width: number): string[] {
+/** One rendered block and the message it belongs to, in body order. */
+function messageBlocks(snapshot: Snapshot, width: number): { message: number; lines: string[] }[] {
   // A settled turn never animates, so its spinner frame is irrelevant.
   const settled: ToolStyle = { expand: snapshot.expandTools, spinner: '', elapsed: 0 }
   const live: ToolStyle = {
@@ -520,7 +521,7 @@ function transcript(snapshot: Snapshot, width: number): string[] {
     elapsed: snapshot.elapsedSeconds,
   }
 
-  const blocks: string[][] = []
+  const blocks: { message: number; lines: string[] }[] = []
   snapshot.messages.forEach((message, index) => {
     const rendered = cachedMessageLines(
       message,
@@ -529,7 +530,9 @@ function transcript(snapshot: Snapshot, width: number): string[] {
       settled,
       snapshot.selectedTurn === index,
     )
-    if (rendered.length > 0) blocks.push(rendered)
+    // A message that renders no lines owns no rows, so no click can land on
+    // it; carrying the message index keeps the hit test honest about that.
+    if (rendered.length > 0) blocks.push({ message: index, lines: rendered })
   })
   if (snapshot.streaming) {
     const running = renderMessage(
@@ -542,7 +545,7 @@ function transcript(snapshot: Snapshot, width: number): string[] {
       snapshot.showThinking,
       live,
     )
-    if (running.length > 0) blocks.push(running)
+    if (running.length > 0) blocks.push({ message: -1, lines: running })
   }
   const queued = snapshot.queued ?? []
   if (queued.length > 0) {
@@ -557,12 +560,30 @@ function transcript(snapshot: Snapshot, width: number): string[] {
       }
     }
     block.push(muted('· queued — sends when the reply finishes'))
-    blocks.push(block)
+    blocks.push({ message: -1, lines: block })
   }
+  return blocks
+}
+
+/** Each rendered turn's body start row and the message it belongs to. */
+function turnStartRows(
+  snapshot: Snapshot,
+  width: number,
+): { message: number; start: number }[] {
+  if (snapshot.overlay !== '' || (snapshot.messages.length === 0 && !snapshot.streaming)) return []
+  let offset = 0
+  return messageBlocks(snapshot, width).map((block) => {
+    const start = offset
+    offset += block.lines.length + 1 // the blank separator between blocks
+    return { message: block.message, start }
+  })
+}
+
+function transcript(snapshot: Snapshot, width: number): string[] {
   const out: string[] = []
-  blocks.forEach((block, index) => {
+  messageBlocks(snapshot, width).forEach((block, index) => {
     if (index > 0) out.push('')
-    out.push(...block)
+    out.push(...block.lines)
   })
   return out
 }
@@ -840,6 +861,40 @@ export function tabClickTarget(
 ): number | undefined {
   if (cell.row !== sessionBarRow(snapshot)) return undefined
   return tabAtColumn(snapshot, cell.column)
+}
+
+/**
+ * Which transcript turn a mouse click landed on, if any.
+ *
+ * Click-to-copy needs the same guarantee the tab bar gets: the hit test is
+ * computed from the layout the frame was drawn with, not assumed. A click in
+ * the blank line between two turns selects the turn above it — a gap is not
+ * worth a miss. Returns `undefined` when the transcript pane is not on screen
+ * (an overlay, picker, panel, or the stacked view, whose per-pane mapping is
+ * its own later piece) or the click fell outside it.
+ */
+export function turnClickTarget(
+  snapshot: Snapshot,
+  cell: { row: number },
+): number | undefined {
+  if (snapshot.panel !== undefined) return undefined
+  if (snapshot.fleet?.open === true || snapshot.usage?.open === true) return undefined
+  if (snapshot.stack !== undefined || snapshot.picker.kind !== 'none') return undefined
+  const geometry = layout(snapshot)
+  const top = (geometry.showHeader ? 2 : 0) + geometry.sessionRows
+  const row = cell.row - top
+  if (row < 0 || row >= geometry.viewportRows) return undefined
+  const body = bodyLines(snapshot, geometry.contentWidth)
+  const maxStart = Math.max(body.length - geometry.viewportRows, 0)
+  const start = Math.max(Math.min(maxStart - snapshot.scrollBack, maxStart), 0)
+  const line = start + row
+  let hit: number | undefined
+  for (const turn of turnStartRows(snapshot, geometry.contentWidth)) {
+    // The streaming block and the queue are not selectable turns (-1): a
+    // click there keeps whatever selection exists rather than inventing one.
+    if (turn.message >= 0 && line >= turn.start) hit = turn.message
+  }
+  return hit
 }
 
 /**

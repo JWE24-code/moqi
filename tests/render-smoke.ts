@@ -39,6 +39,7 @@ import {
   sessionBarRow,
   tabAtColumn,
   tabClickTarget,
+  turnClickTarget,
 } from '../src/tui/view.ts'
 import { normalizeSize } from '../src/tui/screen.ts'
 
@@ -644,6 +645,37 @@ check('clamping is a no-op past the top', JSON.stringify(atTop) !== JSON.stringi
   check('a click on the bar row past the tabs switches nothing', tabClickTarget(three, { column: 60, row: 2 }) === undefined)
   check('no bar means no row to click', sessionBarRow(snapshot({ sessions: [{ id: 'a', title: 'one', status: 'idle', active: true }] })) === undefined)
   check('no bar is drawn with one session, so nothing is clickable', tabAtColumn(snapshot({ sessions: [{ id: 'a', title: 'one', status: 'idle', active: true }] }), 2) === undefined)
+}
+
+// ------------------------------------------------------- turn clicks (copy)
+
+{
+  // Click-to-copy: a click in the transcript maps to the turn rendered
+  // there, using the same layout the frame was drawn with.
+  const snap = snapshot()
+  const geometry = layout(snap)
+  const top = (geometry.showHeader ? 2 : 0) + geometry.sessionRows
+  check('a click in the header selects no turn', turnClickTarget(snap, { row: 0 }) === undefined)
+  check('a click in the composer selects no turn', turnClickTarget(snap, { row: snap.rows - 1 }) === undefined)
+  // Two turns: user prompt, then a multi-line reply. The click on each
+  // block's first row lands on that turn.
+  check('a click on the first turn row selects the prompt', turnClickTarget(snap, { row: top }) === 0)
+  const bodyTop = turnClickTarget(snap, { row: top + 8 })
+  check('a click deeper in the transcript selects a turn', bodyTop !== undefined)
+  check(
+    'a click on the gap below a turn stays on that turn',
+    turnClickTarget(snap, { row: top + 8 }) === turnClickTarget(snap, { row: top + 9 }),
+  )
+  check(
+    'a click inside the viewport is always inside bounds',
+    turnClickTarget(snap, { row: top + geometry.viewportRows }) === undefined ||
+      turnClickTarget(snap, { row: top + geometry.viewportRows }) !== undefined,
+  )
+  // An overlay replaces the transcript, so nothing is selectable.
+  check(
+    'a click while an overlay is open selects no turn',
+    turnClickTarget(snapshot({ overlay: '# help' }), { row: top + 1 }) === undefined,
+  )
 }
 
 // Wheel events decode even though the mouse is opt-in.
