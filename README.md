@@ -1124,3 +1124,5 @@ and still crashed on boot. It now fails the release instead.
 ## License
 
 MIT.
+
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=JWE24-code_moqi)
