@@ -84,7 +84,8 @@ import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } fro
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
 import { SearchState } from './search-state.ts'
-import { labelFor, promptBlocks, toLoginPrompt } from './tui-adapt.ts'
+import { labelFor, promptBlocks } from './tui-adapt.ts'
+import { LoginFlow, type AuthorizationLike } from './login-flow.ts'
 import {
   copyWithLocalHelper,
   describeError,
@@ -501,18 +502,16 @@ class TuiApp {
   private selectedTurn: number | undefined
   /** The trust-surface panel on screen, if any: it owns the keyboard. */
   private panel: ApprovalPanel | QuestionsPanel | LoginPanel | undefined
+  /** The masked-prompt channel `askSecret` waits on, apart from any sign-in. */
+  private secretPrompt: { resolve: (value: string) => void; reject: (error: unknown) => void } | undefined
   private readonly pendingApprovals: PendingApproval[] = []
   private readonly pendingQuestions: PendingQuestion[] = []
-  /** The running sign-in's own prompt, when a {@link LoginPanel} is asking one. */
-  private pendingLoginPrompt: { resolve: (value: string) => void; reject: (error: unknown) => void } | undefined
-  /** Withdraws the sign-in a {@link LoginPanel} is running, if one is. */
-  private loginAbort: AbortController | undefined
+  /** The running sign-in: its panel, prompt, and abort state. */
+  private readonly loginFlow: LoginFlow
   /** The host adapter for plugin-contributed panels. */
   private readonly panelHost: PanelHost
   /** What `/providers` last listed, indexed the same way its picker rows are. */
   private loginEntries: readonly AuthorizationEntry[] = []
-  /** The flow `/providers` is choosing a method for, between the two pickers. */
-  private loginPendingEntry: AuthorizationEntry | undefined
   /** Modal vim editing for the composer, off unless `--vim` asked for it at launch. */
   private readonly vim = new Vim()
   /** The extension seam other plugins register shortcuts and a status line into. */
@@ -620,6 +619,29 @@ class TuiApp {
     this.config = config
     this.exit = exit
     this.tabStrip = new SessionTabs([newTab('pending')], { bell: config.bell !== false })
+    this.loginFlow = new LoginFlow(
+      () => this.ctx.get('authorization') as AuthorizationLike | undefined,
+      {
+        mount: (panel) => {
+          this.panel = panel
+        },
+        status: (text, isError) => {
+          this.setStatus(text, isError)
+        },
+        repaint: () => {
+          this.paint()
+        },
+        clipboard: (url) => this.writeClipboard(url).ok,
+        offerMethods: (entry) => {
+          this.picker.show(
+            'login-method',
+            `Sign in — ${entry.label}`,
+            entry.methods.map((method) => ({ id: method.id, title: method.label, subtitle: '' })),
+          )
+          this.paint()
+        },
+      },
+    )
     this.showThinking = config.thinking === true
     this.vim.setEnabled(config.vim === true)
     this.tuiHost = new TuiHost(ctx)
@@ -898,11 +920,8 @@ class TuiApp {
           break
         case 'enter': {
           const value = panel.answer()
-          const pending = this.pendingLoginPrompt
-          if (value !== undefined && pending !== undefined) {
+          if (value !== undefined && (this.loginFlow.answer(value) || this.answerSecret(value))) {
             panel.setPrompt(undefined)
-            this.pendingLoginPrompt = undefined
-            pending.resolve(value)
             break
           }
           // No question waiting: enter on a notice with a page to open opens
@@ -915,19 +934,16 @@ class TuiApp {
         }
         case 'esc':
         case 'ctrl+c': {
-          const pending = this.pendingLoginPrompt
-          if (pending !== undefined) {
-            // A question the flow can recover from: decline just this one,
+          if (this.loginFlow.decline() || this.cancelSecret()) {
+            // A question the surface can recover from: decline just this one,
             // the same "no" a human gives to any single question.
             panel.setPrompt(undefined)
-            this.pendingLoginPrompt = undefined
-            pending.reject(new AuthorizationDeclinedError())
           } else {
             // Nothing waiting on an answer: esc/ctrl+c withdraws the whole
             // attempt instead. `begin()` still has to settle asynchronously,
             // so the panel closes once that promise resolves, not here.
             this.setStatus('cancelling…')
-            this.loginAbort?.abort()
+            this.loginFlow.withdraw()
           }
           this.paint()
           return
@@ -4202,115 +4218,14 @@ class TuiApp {
 
   // ------------------------------------------------------------------ login
 
-  /**
-   * `enter` on the `/providers` list: a single-method flow starts right away, one
-   * offering a choice of methods opens a second, small picker for it first.
-   */
+  /** `enter` on the `/providers` list: the flow picks the entry, then the method. */
   private chooseLoginEntry(id: string): void {
-    const entry = this.loginEntries[Number.parseInt(id, 10)]
-    if (entry === undefined) return
-    const [firstMethod] = entry.methods
-    if (entry.methods.length === 1 && firstMethod !== undefined) {
-      this.beginLogin(entry, firstMethod.id)
-      return
-    }
-    this.loginPendingEntry = entry
-    this.picker.show(
-      'login-method',
-      `Sign in — ${entry.label}`,
-      entry.methods.map((method) => ({ id: method.id, title: method.label, subtitle: '' })),
-    )
-    this.paint()
+    this.loginFlow.chooseEntry(this.loginEntries, id)
   }
 
   /** `enter` on the method picker a multi-method flow opened. */
   private beginLoginWithMethod(methodId: string): void {
-    const entry = this.loginPendingEntry
-    this.loginPendingEntry = undefined
-    if (entry !== undefined) this.beginLogin(entry, methodId)
-  }
-
-  /**
-   * Run one `ctx.authorization` attempt, surfacing it as a panel.
-   *
-   * The panel and this app's own pending-prompt bookkeeping are the split
-   * {@link ApprovalPanel} and {@link QuestionsPanel} already keep: the panel is
-   * pure view state, and answering a live question is this method's job,
-   * because that is the one part that actually talks to the Harness.
-   */
-  private beginLogin(entry: AuthorizationEntry, method: string): void {
-    const auth = this.ctx.get('authorization')
-    if (auth === undefined) return
-    const controller = new AbortController()
-    const login = new LoginPanel(entry.label)
-    this.panel = login
-    this.loginAbort = controller
-    this.setStatus('')
-    this.paint()
-
-    const interaction: AuthorizationInteraction = {
-      notify: (notice) => {
-        if (this.panel !== login) return
-        login.notice = notice
-        // The page is on the clipboard the moment it is known, not only once
-        // `enter` asks to open it — the browser to actually use it in may not
-        // be reachable from wherever this terminal is (an SSH session, say),
-        // and pasting it there is the fallback `enter` cannot offer.
-        if (notice.url !== undefined) {
-          const result = this.writeClipboard(notice.url)
-          this.setStatus(result.ok ? `page copied — ${notice.url}` : notice.url)
-        }
-        this.paint()
-      },
-      prompt: (prompt) =>
-        new Promise<string>((resolve, reject) => {
-          if (this.panel !== login) {
-            reject(new Error('the sign-in surface is gone'))
-            return
-          }
-          login.setPrompt(toLoginPrompt(prompt))
-          const pending = { resolve, reject }
-          this.pendingLoginPrompt = pending
-          this.paint()
-          // A flow racing a typed code against a browser callback withdraws
-          // only the losing prompt this way, leaving the attempt running —
-          // this is the browser callback winning, not a human saying no, and
-          // must not reject with AuthorizationDeclinedError: that class means
-          // specifically "the human declined," and a flow that reads it that
-          // way discards the credential it just got through the browser
-          // instead of finishing the commit. A plain rejection is what the
-          // contract asks for here.
-          prompt.signal?.addEventListener('abort', () => {
-            if (this.pendingLoginPrompt !== pending) return
-            this.pendingLoginPrompt = undefined
-            if (this.panel === login) login.setPrompt(undefined)
-            reject(new Error('prompt withdrawn — its own signal aborted'))
-            this.paint()
-          })
-        }),
-    }
-
-    auth
-      .begin({ key: entry.key, method, interaction, signal: controller.signal })
-      .then((outcome) => {
-        this.panel = undefined
-        this.loginAbort = undefined
-        this.pendingLoginPrompt = undefined
-        this.setStatus(
-          outcome.status === 'authorized'
-            ? `signed in — ${entry.label}`
-            : `sign-in cancelled — ${entry.label}`,
-          outcome.status !== 'authorized',
-        )
-        this.paint()
-      })
-      .catch((error: unknown) => {
-        this.panel = undefined
-        this.loginAbort = undefined
-        this.pendingLoginPrompt = undefined
-        this.setStatus(describeError(error), true)
-        this.paint()
-      })
+    this.loginFlow.beginWithMethod(methodId)
   }
 
   /**
@@ -4837,7 +4752,7 @@ class TuiApp {
     const login = new LoginPanel(title)
     this.panel = login
     const answer = new Promise<string>((resolve, reject) => {
-      this.pendingLoginPrompt = { resolve, reject }
+      this.secretPrompt = { resolve, reject }
     })
     login.setPrompt({ kind: 'secret', message, placeholder })
     this.setStatus('typing is masked · enter submits · esc cancels')
@@ -4847,13 +4762,31 @@ class TuiApp {
     try {
       value = await answer
     } catch {
-      this.pendingLoginPrompt = undefined
+      this.secretPrompt = undefined
       if (this.panel === login) this.panel = undefined
       return undefined
     }
-    this.pendingLoginPrompt = undefined
+    this.secretPrompt = undefined
     if (this.panel === login) this.panel = undefined
     return value.trim() === '' ? undefined : value
+  }
+
+  /** Answer a waiting {@link askSecret} prompt. `false` when none waits. */
+  private answerSecret(value: string): boolean {
+    const pending = this.secretPrompt
+    if (pending === undefined) return false
+    this.secretPrompt = undefined
+    pending.resolve(value)
+    return true
+  }
+
+  /** Cancel a waiting {@link askSecret} prompt. `false` when none waits. */
+  private cancelSecret(): boolean {
+    const pending = this.secretPrompt
+    if (pending === undefined) return false
+    this.secretPrompt = undefined
+    pending.reject(new AuthorizationDeclinedError())
+    return true
   }
 
   /** `/plugins add <pkg>` — install into the profile, then compose it. */
