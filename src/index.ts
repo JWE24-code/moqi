@@ -85,6 +85,14 @@ import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i1
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
 import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import {
+  listSessions,
+  listSessionsWithParents,
+  parentOf,
+  readHistory,
+  sessionEvents,
+  type SessionQueryLike,
+} from './session-list.ts'
+import {
   ApprovalPanel,
   LoginPanel,
   QuestionsPanel,
@@ -5144,39 +5152,6 @@ interface JobRegistryLike {
   kill: (id: string, caller?: unknown, reason?: string) => 'requested' | 'already-finished'
 }
 
-interface SessionQueryLike {
-  listSessions?: (options?: unknown) => Promise<unknown> | unknown
-  list?: (options?: unknown) => Promise<unknown> | unknown
-  querySessions?: (options?: unknown) => Promise<unknown> | unknown
-}
-
-/**
- * List sessions through whichever method this build of the query service
- * exposes. The service is documented as providing "filtered lists"; probing
- * keeps the app working across the rc releases rather than pinning one name.
- */
-async function listSessions(query: SessionQueryLike): Promise<PickerItem[]> {
-  const method = query.listSessions ?? query.list ?? query.querySessions
-  if (method === undefined) return []
-  const raw = await method.call(query, undefined)
-  const rows = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as { items?: unknown[] })?.items)
-      ? ((raw as { items: unknown[] }).items)
-      : []
-  return rows.slice(0, 200).map((row) => {
-    const record = row as Record<string, unknown>
-    // The corpus rows are `{ header, live, persisted }` with id and createdAt
-    // nested inside `header`; search-shaped rows carry them flat. Read both.
-    const header = (record['header'] ?? {}) as Record<string, unknown>
-    const id = String(record['sessionId'] ?? record['id'] ?? header['id'] ?? '')
-    const title = String(record['title'] ?? record['summary'] ?? '') || id
-    const when = record['updatedAt'] ?? record['createdAt'] ?? header['createdAt']
-    const subtitle = typeof when === 'number' ? relativeTime(when) : ''
-    return { id, title, subtitle }
-  }).filter((item) => item.id !== '')
-}
-
 /**
  * Hand the text to the desktop's own clipboard helper, when there is one.
  *
@@ -5245,15 +5220,6 @@ function openUrlWithLocalHelper(url: string): boolean {
   }
 }
 
-/** A compact "3h ago" label for the picker's right column. */
-function relativeTime(epochMillis: number): string {
-  const seconds = Math.max(Math.floor((Date.now() - epochMillis) / 1000), 0)
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return `${Math.floor(seconds / 86400)}d ago`
-}
-
 /** A filesystem-safe timestamp for export file names. */
 function timestampForFile(date = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
@@ -5261,80 +5227,6 @@ function timestampForFile(date = new Date()): string {
     `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
     `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
   )
-}
-
-/**
- * Rebuild the transcript from a session's durable log. Only user and assistant
- * text is projected; everything else the log carries belongs to other surfaces.
- */
-function readHistory(session: Session): Message[] {
-  const out: Message[] = []
-  const length = session.seq
-  for (let seq = 0; seq < length; seq += 1) {
-    const event = session.eventAt(SessionSeq(seq)) as
-      | { type?: string; data?: Record<string, unknown> }
-      | undefined
-    if (event === undefined) continue
-    const message = (event.data as { message?: { content?: unknown[] } } | undefined)?.message
-    const blocks = Array.isArray(message?.content) ? message.content : []
-    const text = blocks
-      .filter((block): block is { type: string; text: string } => {
-        const candidate = block as { type?: unknown; text?: unknown }
-        return candidate.type === 'text' && typeof candidate.text === 'string'
-      })
-      .map((block) => block.text)
-      .join('')
-    if (text === '') continue
-    if (event.type === 'assistant/message') out.push(textMessage('assistant', text))
-    else if (event.type === 'user/message') out.push(textMessage('user', text))
-  }
-  return out
-}
-
-/**
- * The session log as the rewind/fork rules want it: every event with the seq
- * that indexes it, since a log is contiguous from 0.
- */
-function sessionEvents(session: Session): { seq: number; type: string }[] {
-  return session
-    .snapshotEvents(SessionLogOffset(0), session.seq)
-    .map((event, seq) => ({ seq, type: String((event as { type?: unknown }).type ?? '') }))
-}
-
-/** A session's fork parent, when its header records one. */
-function parentOf(session: Session | undefined): string | undefined {
-  const parent = session?.header.parentSession
-  return parent === undefined ? undefined : String(parent)
-}
-
-/**
- * Session rows with their fork parent, for `/tree`.
- *
- * The query service's row shape is probed rather than assumed: an rc that
- * names the field differently still yields a tree, just without lineage.
- */
-async function listSessionsWithParents(
-  query: SessionQueryLike,
-): Promise<{ id: string; title?: string; parentSession?: string }[]> {
-  const method = query.listSessions ?? query.list ?? query.querySessions
-  if (method === undefined) return []
-  const raw = await method.call(query, undefined)
-  const rows = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as { items?: unknown[] })?.items)
-      ? (raw as { items: unknown[] }).items
-      : []
-  return rows.slice(0, 500).map((row) => {
-    const record = row as Record<string, unknown>
-    // Same nested `header` shape as listSessions above.
-    const header = (record['header'] ?? {}) as Record<string, unknown>
-    const parent = record['parentSession'] ?? record['parent'] ?? header['parentSession']
-    return {
-      id: String(record['sessionId'] ?? record['id'] ?? header['id'] ?? ''),
-      title: typeof record['title'] === 'string' ? record['title'] : undefined,
-      parentSession: parent === undefined || parent === null ? undefined : String(parent),
-    }
-  }).filter((row) => row.id !== '')
 }
 
 /**
