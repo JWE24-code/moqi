@@ -13,6 +13,7 @@ import {
   setLanguage,
   t,
   translate,
+  catalogKeys,
 } from '../src/tui/i18n.ts'
 import { render, HELP_TEXT } from '../src/tui/view.ts'
 import { Composer, Palette, Picker } from '../src/tui/state.ts'
@@ -59,7 +60,6 @@ check('every sampled key exists in both languages', ZH_KEYS.every((key) => trans
 // Full parity, not samples: a translation that lags a new English string is
 // invisible at runtime because the fallback silently renders English, so only
 // comparing the whole key sets catches it.
-import { catalogKeys } from '../src/tui/i18n.ts'
 const en = new Set(catalogKeys('en'))
 const zh = new Set(catalogKeys('zh-CN'))
 check('every english key has a translation', [...en].every((key) => zh.has(key)))

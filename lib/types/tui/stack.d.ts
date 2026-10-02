@@ -28,6 +28,8 @@ export declare function tileGrid(count: number): {
 };
 /** Every pane's rectangle, laid out row-major inside a `width`×`height` region. */
 export declare function tiles(count: number, width: number, height: number): Tile[];
+/** What a pane can want from the user; absent means it wants nothing. */
+type Attention = 'input' | 'done';
 /** Directional focus moves, named for the arrow keys that drive them. */
 export type Direction = 'up' | 'down' | 'left' | 'right';
 /**
@@ -60,9 +62,10 @@ export interface StackFrame {
      * carries the highlight color — warn for input, ok for done — instead of
      * the focus accent, and blinks while `blinkOn` alternates.
      */
-    attention?: (index: number) => 'input' | 'done' | undefined;
+    attention?: (index: number) => Attention | undefined;
     /** The blink phase, alternated by the app while any pane has attention. */
     blinkOn?: boolean;
 }
 /** Compose every pane's body into `height` lines of `width` columns. */
 export declare function stackFrame(options: StackFrame): string[];
+export {};

@@ -574,10 +574,8 @@ function windowLine(window: CreditWindow, now: number, labelWidth: number, width
  * one, a bar per enforced window, and any notes.
  */
 function planBlock(plan: ProviderPlan, now: number, labelWidth: number, width: number): string[] {
-  const heading =
-    plan.plan === undefined
-      ? style(plan.displayName, { bold: true })
-      : `${style(plan.displayName, { bold: true })} ${muted(`— ${plan.plan}`)}`
+  let heading = style(plan.displayName, { bold: true })
+  if (plan.plan !== undefined) heading += ` ${muted(`— ${plan.plan}`)}`
   const out: string[] = [`  ${truncate(heading, width - 2)}`]
 
   if (plan.problem !== undefined) {

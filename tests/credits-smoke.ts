@@ -278,16 +278,16 @@ check('an adapter label wins even for a known route', friendlyName('anthropic', 
 
 /** A lookup that has both keys and one grant. */
 const lookup: CredentialLookup = {
-  resolveKey: async (name) => (name === 'DEEPSEEK_API_KEY' ? 'ds-test' : undefined),
-  readGrantToken: async () => undefined,
+  resolveKey: (name) => Promise.resolve(name === 'DEEPSEEK_API_KEY' ? 'ds-test' : undefined),
+  readGrantToken: () => Promise.resolve(undefined),
 }
 
 /** A fetch that answers DeepSeek and refuses everything else. */
-const fetchImpl: FetchLike = async (url) => {
+const fetchImpl: FetchLike = (url) => {
   if (url === DEEPSEEK_BALANCE_URL) {
-    return { ok: true, status: 200, json: async () => deepSeekBody }
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(deepSeekBody) })
   }
-  return { ok: false, status: 500, json: async () => ({}) }
+  return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })
 }
 
 const collected = await collectPlans(
@@ -316,13 +316,13 @@ check('a provider with no sign-in points at /providers', claude?.problem?.includ
 
 // An HTTP failure becomes that provider's own line, not an exception.
 const failingLookup: CredentialLookup = {
-  resolveKey: async () => 'key',
-  readGrantToken: async () => 'token',
+  resolveKey: () => Promise.resolve('key'),
+  readGrantToken: () => Promise.resolve('token'),
 }
 const failing = await collectPlans(
   [{ provider: 'zai', displayName: 'z.ai' }],
   failingLookup,
-  async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  () => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
   () => 0,
 )
 check('an HTTP error is reported on the provider block', failing[0]?.problem?.includes('HTTP 500') === true)
@@ -331,7 +331,7 @@ check('an HTTP error is reported on the provider block', failing[0]?.problem?.in
 const expired = await collectPlans(
   [{ provider: 'anthropic', displayName: 'Claude' }],
   failingLookup,
-  async () => ({ ok: false, status: 401, json: async () => ({}) }),
+  () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }),
   () => 0,
 )
 check('a 401 is translated into what to do about it', expired[0]?.problem?.includes('/providers') === true)
@@ -354,11 +354,13 @@ const mixed = await collectPlans(
     { provider: 'deepseek', displayName: 'DeepSeek' },
     { provider: 'zai', displayName: 'z.ai' },
   ],
-  { resolveKey: async () => 'key', readGrantToken: async () => undefined },
-  async (url) =>
-    url === DEEPSEEK_BALANCE_URL
-      ? { ok: true, status: 200, json: async () => deepSeekBody }
-      : { ok: false, status: 503, json: async () => ({}) },
+  { resolveKey: () => Promise.resolve('key'), readGrantToken: () => Promise.resolve(undefined) },
+  (url) =>
+    Promise.resolve(
+      url === DEEPSEEK_BALANCE_URL
+        ? { ok: true, status: 200, json: () => Promise.resolve(deepSeekBody) }
+        : { ok: false, status: 503, json: () => Promise.resolve({}) },
+    ),
   () => 0,
 )
 check('a healthy provider still reports when another is down', mixed.find((p) => p.provider === 'deepseek')?.balance !== undefined)
@@ -367,11 +369,12 @@ check('the down provider is the only one carrying a problem', mixed.find((p) => 
 // z.ai that answers but reports no credit windows says so rather than drawing none.
 const emptyQuota = await collectPlans(
   [{ provider: 'zai', displayName: 'z.ai' }],
-  { resolveKey: async () => 'key', readGrantToken: async () => undefined },
-  async (url) => ({
+  { resolveKey: () => Promise.resolve('key'), readGrantToken: () => Promise.resolve(undefined) },
+  (url) =>
+    Promise.resolve({
     ok: true,
     status: 200,
-    json: async () => (url === ZAI_QUOTA_URL ? { data: [] } : { data: [{ planName: 'Lite' }] }),
+    json: () => Promise.resolve(url === ZAI_QUOTA_URL ? { data: [] } : { data: [{ planName: 'Lite' }] }),
   }),
   () => 0,
 )
@@ -463,11 +466,13 @@ check('a window with no utilization is not drawn', parseCodexUsage({ plan_type: 
 // containment every other route goes through.
 const codexCollected = await collectPlans(
   [{ provider: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT)' }],
-  { resolveKey: async () => undefined, readGrantToken: async () => 'token' },
-  async (url) =>
-    url === CODEX_USAGE_URL
-      ? { ok: true, status: 200, json: async () => codexBody }
-      : { ok: false, status: 500, json: async () => ({}) },
+  { resolveKey: () => Promise.resolve(undefined), readGrantToken: () => Promise.resolve('token') },
+  (url) =>
+    Promise.resolve(
+      url === CODEX_USAGE_URL
+        ? { ok: true, status: 200, json: () => Promise.resolve(codexBody) }
+        : { ok: false, status: 500, json: () => Promise.resolve({}) },
+    ),
   () => 1_738_000_000_000,
 )
 check('a Codex route has a probe', hasProbe('openai-codex'))
@@ -478,16 +483,16 @@ check('the Codex probe carries the credit balance', codexCollected[0]?.balance !
 
 const codexUnsigned = await collectPlans(
   [{ provider: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT)' }],
-  { resolveKey: async () => undefined, readGrantToken: async () => undefined },
-  async () => ({ ok: true, status: 200, json: async () => ({}) }),
+  { resolveKey: () => Promise.resolve(undefined), readGrantToken: () => Promise.resolve(undefined) },
+  () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }),
   () => 0,
 )
 check('a Codex route with no sign-in points at /providers', codexUnsigned[0]?.problem?.includes('/providers') === true)
 
 const codexUnreadable = await collectPlans(
   [{ provider: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT)' }],
-  { resolveKey: async () => undefined, readGrantToken: async () => 'token' },
-  async () => ({ ok: true, status: 200, json: async () => ({ nonsense: 1 }) }),
+  { resolveKey: () => Promise.resolve(undefined), readGrantToken: () => Promise.resolve('token') },
+  () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ nonsense: 1 }) }),
   () => 0,
 )
 check('a Codex response of unknown shape refuses rather than improvises', codexUnreadable[0]?.problem?.includes('could not be read') === true)

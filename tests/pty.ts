@@ -105,13 +105,10 @@ async function main(): Promise<void> {
 
   /** Wait until the accumulated output satisfies the predicate. */
   async function until(ready: (text: string) => boolean, ms = 5_000): Promise<boolean> {
-    const deadline = Date.now() + ms
-    while (Date.now() < deadline) {
-      if (ready(output)) return true
-      if (exitCode !== null) return ready(output)
-      await sleep(25)
-    }
-    return ready(output)
+    if (ready(output)) return true
+    if (exitCode !== null || ms <= 0) return ready(output)
+    await sleep(25)
+    return until(ready, ms - 25)
   }
 
   const alive = (): boolean => exitCode === null
@@ -289,7 +286,9 @@ async function main(): Promise<void> {
   console.log(`ok - ${String(checks)} checks passed`)
 }
 
-main().catch((error: unknown) => {
+try {
+  await main()
+} catch (error: unknown) {
   console.error(String(error))
   process.exit(1)
-})
+}

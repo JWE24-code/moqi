@@ -15,14 +15,16 @@ const hosts = process.argv.slice(2)
 const peers = hosts.length > 0 ? hosts : ['workstation', 'no-such-host-xyz']
 
 const sources = [collectLocal()]
-for (const host of peers) {
+// Sequential on purpose — the log reads host by host.
+await peers.reduce(async (walked, host) => {
+  await walked
   const source = await collectPeer({ host })
   // eslint-disable-next-line no-console
   console.log(
     `${host} -> records=${String(source.records.length)} error=${source.error ?? 'none'}`,
   )
   sources.push(source)
-}
+}, Promise.resolve())
 
 const rows = mergeFleet(sources, Date.now())
 // eslint-disable-next-line no-console

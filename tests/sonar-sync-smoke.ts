@@ -63,36 +63,36 @@ function makeResponse(status: number, payload: unknown): FetchResponse {
     ok: status >= 200 && status < 300,
     status,
     statusText: String(status),
-    json: async () => payload,
-    text: async () => JSON.stringify(payload),
+    json: () => Promise.resolve(payload),
+    text: () => Promise.resolve(JSON.stringify(payload)),
   }
 }
 
 function makeFetch(state: FakeState): { fetchImpl: FetchLike; calls: Call[] } {
   const calls: Call[] = []
   let nextNumber = 100
-  const fetchImpl: FetchLike = async (url, init) => {
+  const fetchImpl: FetchLike = (url, init) => {
     const parsed = new URL(url)
     const method = init?.method ?? 'GET'
     calls.push({ method, path: `${parsed.pathname}${parsed.search}`, body: init?.body })
     if (parsed.pathname.endsWith('/api/issues/search')) {
       const page = Number(parsed.searchParams.get('p')) - 1
-      return makeResponse(200, { total: state.sonar.flat().length, issues: state.sonar[page] ?? [] })
+      return Promise.resolve(makeResponse(200, { total: state.sonar.flat().length, issues: state.sonar[page] ?? [] }))
     }
     if (parsed.pathname.endsWith('/labels') && method === 'POST') {
-      return makeResponse(201, { name: 'sonar' })
+      return Promise.resolve(makeResponse(201, { name: 'sonar' }))
     }
     if (parsed.pathname.endsWith('/issues') && method === 'POST') {
       nextNumber += 1
-      return makeResponse(201, { number: nextNumber })
+      return Promise.resolve(makeResponse(201, { number: nextNumber }))
     }
     if (parsed.pathname.endsWith('/issues') && method === 'GET') {
-      return makeResponse(200, state.tracked)
+      return Promise.resolve(makeResponse(200, state.tracked))
     }
     if (/\/issues\/\d+$/.test(parsed.pathname) && method === 'PATCH') {
-      return makeResponse(200, { state: 'closed' })
+      return Promise.resolve(makeResponse(200, { state: 'closed' }))
     }
-    return makeResponse(404, { message: `unexpected ${method} ${parsed.pathname}` })
+    return Promise.resolve(makeResponse(404, { message: `unexpected ${method} ${parsed.pathname}` }))
   }
   return { fetchImpl, calls }
 }

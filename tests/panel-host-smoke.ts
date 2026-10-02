@@ -36,9 +36,9 @@ class RecordingSurface implements PanelSurface {
   showList(title: string, rows: readonly TuiPanelRow[], select?: string): void {
     this.lists.push({ title, rows, select })
   }
-  async askSecret(title: string, message: string, placeholder?: string): Promise<string | undefined> {
+  askSecret(title: string, message: string, placeholder?: string): Promise<string | undefined> {
     this.asked.push({ title, message, placeholder })
-    return this.answer
+    return Promise.resolve(this.answer)
   }
   report(text: string): void {
     this.reports.push(text)

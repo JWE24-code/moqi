@@ -118,9 +118,8 @@ export function labelsFor(issue: SonarIssue, label: string): string[] {
 /** Sonar Cloud takes a bearer token; a self-hosted server takes it as basic auth. */
 export function sonarHeaders(host: string, token: string | undefined): Record<string, string> {
   if (token === undefined || token === '') return { Accept: 'application/json' }
-  const authorization = host.includes('sonarcloud.io')
-    ? `Bearer ${token}`
-    : `Basic ${Buffer.from(`${token}:`).toString('base64')}`
+  const basic = Buffer.from(`${token}:`).toString('base64')
+  const authorization = host.includes('sonarcloud.io') ? `Bearer ${token}` : `Basic ${basic}`
   return { Accept: 'application/json', Authorization: authorization }
 }
 
@@ -294,11 +293,13 @@ async function openIssuesFor(
 ): Promise<number[]> {
   const ensured = new Set<string>()
   const created: number[] = []
-  for (const issue of issues) {
-    if (tracked.has(issue.key)) continue
-    if (config.dryRun) {
-      report(`would create: ${issue.key} — ${issueTitle(issue)}`)
-      continue
+  // Sequential on purpose — GitHub assigns numbers in call order — so the
+  // loop is a promise chain rather than an awaited `for`.
+  await issues.reduce(async (walked, issue) => {
+    await walked
+    if (tracked.has(issue.key) || config.dryRun) {
+      if (config.dryRun) report(`would create: ${issue.key} — ${issueTitle(issue)}`)
+      return
     }
     for (const label of labelsFor(issue, config.label)) {
       if (ensured.has(label)) continue
@@ -319,7 +320,7 @@ async function openIssuesFor(
     )
     created.push(number)
     report(`created #${String(number)} for ${issue.key}`)
-  }
+  }, Promise.resolve())
   return created
 }
 
@@ -333,16 +334,17 @@ async function closeResolved(
 ): Promise<number[]> {
   const openKeys = new Set(issues.map((issue) => issue.key))
   const closed: number[] = []
-  for (const [key, item] of tracked) {
-    if (openKeys.has(key) || item.state === 'closed') continue
+  await [...tracked].reduce(async (walked, [key, item]) => {
+    await walked
+    if (openKeys.has(key) || item.state === 'closed') return
     if (config.dryRun) {
       report(`would close #${String(item.number)} (${key} is resolved)`)
-      continue
+      return
     }
     await closeIssue(item, { api: config.api, repo: config.repo, token: config.githubToken }, fetchImpl)
     closed.push(item.number)
     report(`closed #${String(item.number)} (${key} was resolved)`)
-  }
+  }, Promise.resolve())
   return closed
 }
 
@@ -389,8 +391,10 @@ async function main(): Promise<void> {
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href
 if (invokedDirectly) {
-  main().catch((error: unknown) => {
+  try {
+    await main()
+  } catch (error: unknown) {
     console.error(`sonar-issues: ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 1
-  })
+  }
 }

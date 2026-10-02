@@ -31,6 +31,17 @@ function relativeTime(epochMillis: number): string {
  * exposes. The service is documented as providing "filtered lists"; probing
  * keeps the app working across the rc releases rather than pinning one name.
  */
+/**
+ * The record field as display text. A plain `String(unknown)` renders an
+ * object as "[object Object]", so anything richer than a primitive is
+ * simply absent.
+ */
+function textOf(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return ''
+}
+
 /** The rows a query answered with: an array, or wrapped in `{ items }`. */
 function rowsOf(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw
@@ -48,8 +59,8 @@ export async function listSessions(query: SessionQueryLike): Promise<PickerItem[
     // The corpus rows are `{ header, live, persisted }` with id and createdAt
     // nested inside `header`; search-shaped rows carry them flat. Read both.
     const header = (record['header'] ?? {}) as Record<string, unknown>
-    const id = String(record['sessionId'] ?? record['id'] ?? header['id'] ?? '')
-    const title = String(record['title'] ?? record['summary'] ?? '') || id
+    const id = textOf(record['sessionId'] ?? record['id'] ?? header['id'])
+    const title = textOf(record['title'] ?? record['summary']) || id
     const when = record['updatedAt'] ?? record['createdAt'] ?? header['createdAt']
     const subtitle = typeof when === 'number' ? relativeTime(when) : ''
     return { id, title, subtitle }
@@ -91,7 +102,7 @@ export function readHistory(session: Session): Message[] {
 export function sessionEvents(session: Session): { seq: number; type: string }[] {
   return session
     .snapshotEvents(SessionLogOffset(0), session.seq)
-    .map((event, seq) => ({ seq, type: String((event as { type?: unknown }).type ?? '') }))
+    .map((event, seq) => ({ seq, type: textOf((event as { type?: unknown }).type) }))
 }
 
 /** A session's fork parent, when its header records one. */
@@ -119,9 +130,9 @@ export async function listSessionsWithParents(
     const header = (record['header'] ?? {}) as Record<string, unknown>
     const parent = record['parentSession'] ?? record['parent'] ?? header['parentSession']
     return {
-      id: String(record['sessionId'] ?? record['id'] ?? header['id'] ?? ''),
+      id: textOf(record['sessionId'] ?? record['id'] ?? header['id']),
       title: typeof record['title'] === 'string' ? record['title'] : undefined,
-      parentSession: parent === undefined || parent === null ? undefined : String(parent),
+      parentSession: textOf(parent) === '' ? undefined : textOf(parent),
     }
   }).filter((row) => row.id !== '')
 }

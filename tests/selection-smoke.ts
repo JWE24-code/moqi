@@ -3,8 +3,7 @@
  * the renderer draws on the selected turn.
  */
 import assert from 'node:assert/strict'
-import { moveSelection } from '../src/tui/state.ts'
-import { Composer, Palette, Picker, textMessage } from '../src/tui/state.ts'
+import { Composer, moveSelection, Palette, Picker, textMessage } from '../src/tui/state.ts'
 import { displayWidth } from '../src/tui/text.ts'
 import { render, type Snapshot } from '../src/tui/view.ts'
 

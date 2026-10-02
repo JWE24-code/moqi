@@ -379,6 +379,11 @@ function sessionMark(status: string, spinner: string): string {
   return muted('·')
 }
 
+/** A palette row's `/name args` label, with one space before the args. */
+function commandLabel(command: { name: string; args: string }): string {
+  return command.args === '' ? '/' + command.name : `/${command.name} ${command.args}`
+}
+
 /** The empty-composer hint, shrinking as the terminal does. */
 function composerPlaceholder(question: string | undefined, inner: number): string {
   if (question !== undefined && inner >= 12) return truncate(question, inner)
@@ -418,12 +423,11 @@ function stripTrailingSlashes(value: string): string {
 /** The `dsh` header line: mark and title on the left, host on the right. */
 function header(snapshot: Snapshot, width: number): string {
   const title = snapshot.title === '' ? 'new conversation' : snapshot.title
-  const left = `${bold('◆ moqi')}${muted(`  ${title}`)}`
+  const mark = bold('◆ moqi')
+  const left = mark + muted(`  ${title}`)
   const right = muted(snapshot.host)
   const gap = width - displayWidth(left) - displayWidth(right)
-  if (gap < 2) {
-    return `${bold('◆ moqi')}${muted(`  ${truncate(title, Math.max(width - 8, 4))}`)}`
-  }
+  if (gap < 2) return mark + muted(`  ${truncate(title, Math.max(width - 8, 4))}`)
   return left + ' '.repeat(gap) + right
 }
 
@@ -881,13 +885,13 @@ function palettePane(snapshot: Snapshot, geometry: Layout): string[] {
 
   let nameColumn = 0
   for (const command of visible) {
-    const label = `/${command.name}${command.args === '' ? '' : ` ${command.args}`}`
+    const label = commandLabel(command)
     nameColumn = Math.max(nameColumn, label.length)
   }
   nameColumn += 2
 
   const body = visible.map((command, index) => {
-    const label = `/${command.name}${command.args === '' ? '' : ` ${command.args}`}`
+    const label = commandLabel(command)
     const pad = Math.max(nameColumn - label.length, 1)
     const row = truncate(`${label}${' '.repeat(pad)}${command.description}`, inner)
     const padded = padEnd(row, inner)
@@ -1073,7 +1077,9 @@ function backgroundPane(snapshot: Snapshot, geometry: Layout): string[] {
       .slice(0, 3)
       .map((agent) => agent.label)
       .join(', ')
-    const left = `${mark} ${style(count, { fg: colText })}${muted(`  ${state}`)}${muted(`  ·  ${names}`)}`
+    const statePart = muted(`  ${state}`)
+    const namesPart = muted(`  ·  ${names}`)
+    const left = `${mark} ${style(count, { fg: colText })}${statePart}${namesPart}`
     const right = muted('ctrl+b')
     const gap = width - displayWidth(left) - displayWidth(right)
     return [gap < 2 ? truncate(left, width) : left + ' '.repeat(gap) + right]

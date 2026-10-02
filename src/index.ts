@@ -80,7 +80,6 @@ import { renderJobs, type JobLike } from './tui/jobs.ts'
 import { groupMcpTools, renderMcp } from './tui/mcp.ts'
 import { LANGS, currentLanguage, isLang, setLanguage, type Lang } from './tui/i18n.ts'
 import { decodeLogBytes, parseLogMessages, searchSessions, type SessionHit } from './cross-find.ts'
-import { encodeSegment, projectKey, sessionsRoot } from './sessions-store.ts'
 import { SessionTabs } from './session-tabs.ts'
 import { focusNeighbor, type Direction } from './tui/stack.ts'
 import { isDrag, spanText, type Span } from './tui/select.ts'
@@ -130,7 +129,7 @@ import { DEFAULT_THEME, findTheme } from './tui/themes.ts'
 import { projectStreamChunk } from './tui/stream.ts'
 import { applyToolEvent } from './tui/tooldetail.ts'
 import { transcriptMarkdown } from './tui/export.ts'
-import { deleteStoredSessionDir, findStoredSessionDir } from './sessions-store.ts'
+import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
 import {
   activeProfileName,
@@ -1274,24 +1273,26 @@ class TuiApp {
     // error. Stopping once the cap is met bounds the scan for a state file
     // that has been hand-edited into something far longer than a tab bar.
     const present = new Set<string>()
-    for (const session of this.persisted.sessions) {
-      if (present.size >= MAX_RESTORED_SESSIONS) break
+    await this.persisted.sessions.reduce(async (walked, session) => {
+      await walked
+      if (present.size >= MAX_RESTORED_SESSIONS) return
       try {
         if ((await findStoredSessionDir(session.id)) !== undefined) present.add(session.id)
       } catch {
         // An unreadable store is indistinguishable from an absent session.
       }
-    }
+    }, Promise.resolve())
 
     const plan = restorePlan(this.persisted, (id) => present.has(id))
     // Track the active tab by id rather than by position, because the entries
     // that fail to adopt close the gaps up underneath the index.
     const wanted = plan.sessions[plan.active]?.id
     const restored: SessionTab[] = []
-    for (const session of plan.sessions) {
+    await plan.sessions.reduce(async (adopted, session) => {
+      await adopted
       const tab = await this.adoptSession(session, seed)
       if (tab !== undefined) restored.push(tab)
-    }
+    }, Promise.resolve())
     if (restored.length === 0) return false
 
     this.tabs = restored
@@ -3363,7 +3364,7 @@ class TuiApp {
       this.composer.reset()
       this.history.add(prompt.text)
       this.persistSoon()
-      void this.steer(prompt)
+      this.steer(prompt)
       return
     }
     const prompt = this.materializePrompt()
@@ -3810,7 +3811,7 @@ class TuiApp {
    * step boundary; nothing is queued and nothing waits. The transcript shows
    * it dimmed, marked as steered, so the interleaving reads honestly.
    */
-  private async steer(prompt: PromptDraft): Promise<void> {
+  private steer(prompt: PromptDraft): void {
     const agent = this.tab.agent
     if (agent === undefined) return
     this.tab.messages.push(
@@ -4216,16 +4217,11 @@ class TuiApp {
         let listed: string[] = []
         try {
           const raw = (tools as { list?: () => { name?: unknown }[] } | undefined)?.list?.() ?? []
-          listed = raw.map((tool) => String(tool.name ?? '')).filter((tool) => tool !== '')
+          listed = raw.map((tool) => nameOf(tool)).filter((tool) => tool !== '')
         } catch {
           listed = []
         }
-        this.showOverlay(
-          listed.length === 0
-            ? '**Tools**\n\nThis profile exposes no tool registry to the app.'
-            : `**Tools**\n\n${listed.map((tool) => `- \`${tool}\``).join('\n')}`,
-          'esc to close',
-        )
+        this.showOverlay(toolsOverlay(listed), 'esc to close')
         return true
       }
       case 'usage':
@@ -4600,7 +4596,7 @@ class TuiApp {
     const tools = this.ctx.get('tools') as { list?: () => { name?: unknown }[] } | undefined
     try {
       names = (tools?.list?.() ?? [])
-        .map((tool) => String(tool.name ?? ''))
+        .map((tool) => nameOf(tool))
         .filter((name) => name !== '')
     } catch {
       names = []
@@ -4826,12 +4822,13 @@ class TuiApp {
     const llm = this.ctx.get('llm')
     if (llm === undefined) return []
     const rows: PickerItem[] = []
-    for (const provider of llm.listProviders()) {
+    await llm.listProviders().reduce(async (walked, provider) => {
+      await walked
       let models: readonly { id: string; name: string; description?: string }[] = []
       try {
         models = await llm.listModels(provider.id)
       } catch {
-        continue
+        return // one broken route hides none of the working ones
       }
       for (const model of models) {
         rows.push({
@@ -4843,7 +4840,7 @@ class TuiApp {
           active: model.id === this.tab.modelName,
         })
       }
-    }
+    }, Promise.resolve())
     return rows
   }
 
@@ -5381,6 +5378,23 @@ function exportPathFor(requested: string, base: string): string {
   if (requested === '') return join(base, `dsh-transcript-${timestampForFile()}.md`)
   if (isAbsolute(requested)) return requested
   return resolve(base, requested)
+}
+
+/** The `/tools` overlay body: the registry's tool list, or the apology. */
+/**
+ * A tool registry entry's name. A plain `String(unknown)` renders an object
+ * as "[object Object]", so anything richer than a primitive is no name.
+ */
+function nameOf(tool: { name?: unknown }): string {
+  if (typeof tool.name === 'string') return tool.name
+  if (typeof tool.name === 'number' || typeof tool.name === 'boolean') return String(tool.name)
+  return ''
+}
+
+function toolsOverlay(listed: readonly string[]): string {
+  if (listed.length === 0) return '**Tools**\n\nThis profile exposes no tool registry to the app.'
+  const rows = listed.map((tool) => '- `' + tool + '`').join('\n')
+  return '**Tools**\n\n' + rows
 }
 
 /** The string without its trailing slashes, so joins never double one. */

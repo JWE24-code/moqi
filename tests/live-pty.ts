@@ -86,12 +86,10 @@ async function main(): Promise<void> {
   const watchdog = setTimeout(() => child.kill('SIGKILL'), TIMEOUT_MS + 30_000)
 
   async function until(ready: () => boolean, ms: number): Promise<boolean> {
-    const deadline = Date.now() + ms
-    while (Date.now() < deadline) {
-      if (ready()) return true
-      await sleep(100)
-    }
-    return ready()
+    if (ready()) return true
+    if (ms <= 0) return ready()
+    await sleep(100)
+    return until(ready, ms - 100)
   }
 
   try {
@@ -128,7 +126,10 @@ async function main(): Promise<void> {
       { command: '/tree', expect: 'Session tree' },
       { command: '/help', expect: 'Commands' },
     ]
-    for (const probe of probes) {
+    // Sequential on purpose — each probe types into the same app — so the
+    // walk is a promise chain rather than an awaited `for`.
+    await probes.reduce(async (walked, probe) => {
+      await walked
       const before = output.length
       child.stdin?.write(`${probe.command}\r`)
       const shown = await until(() => stripAnsi(output.slice(before)).includes(probe.expect), 20_000)
@@ -139,7 +140,7 @@ async function main(): Promise<void> {
       check(`${probe.command} opens its surface`, shown)
       child.stdin?.write('\x1b')
       await sleep(250)
-    }
+    }, Promise.resolve())
     check('the app is still alive after the command walk', exitCode === null)
 
     // Quit cleanly the way a person does.
@@ -157,7 +158,9 @@ async function main(): Promise<void> {
   console.log(`ok - ${String(checks)} live checks passed against ${PROFILE}`)
 }
 
-main().catch((error: unknown) => {
+try {
+  await main()
+} catch (error: unknown) {
   console.error(String(error))
   process.exit(1)
-})
+}

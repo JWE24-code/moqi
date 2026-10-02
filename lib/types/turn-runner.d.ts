@@ -27,10 +27,10 @@ export interface TurnTab {
     selection: {
         assembled?: {
             provider: string;
-        } | undefined;
+        };
         current?: {
             provider: string;
-        } | undefined;
+        };
     };
 }
 /** A prompt as the turn consumes it: the text plus any staged images. */
@@ -49,7 +49,8 @@ export interface TurnHost {
     rememberPrompt(text: string): void;
     status(text: string, isError?: boolean): void;
     repaint(): void;
-    spinner(on: boolean): void;
+    spinnerStart(): void;
+    spinnerStop(): void;
     /** Hand the app the abort controller for the running turn, or take it back. */
     setAbort(controller: AbortController | undefined): void;
     /** The tab's own running/ready transition (bell and seen rules included). */
