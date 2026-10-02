@@ -136,7 +136,10 @@ function handleApprovalKey(approval: ApprovalPanel, key: { name: string }): void
     repaint()
     return
   }
-  approval.move(key.name === 'up' ? -1 : key.name === 'down' ? 1 : 0)
+  let delta = 0
+  if (key.name === 'up') delta = -1
+  else if (key.name === 'down') delta = 1
+  approval.move(delta)
   repaint()
 }
 

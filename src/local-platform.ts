@@ -61,13 +61,15 @@ export function copyWithLocalHelper(text: string): boolean {
  * way the clipboard helper's is: the launcher must never inherit our
  * raw-mode stdio.
  */
+/** The launcher command for the platform this process runs on. */
+function openerFor(url: string): [string, string[]] {
+  if (process.platform === 'darwin') return ['open', [url]]
+  if (process.platform === 'win32') return ['cmd', ['/c', 'start', '', url]]
+  return ['xdg-open', [url]]
+}
+
 export function openUrlWithLocalHelper(url: string): boolean {
-  const [command, args]: [string, string[]] =
-    process.platform === 'darwin'
-      ? ['open', [url]]
-      : process.platform === 'win32'
-        ? ['cmd', ['/c', 'start', '', url]]
-        : ['xdg-open', [url]]
+  const [command, args] = openerFor(url)
   try {
     const run = spawnSync(command, args, { stdio: 'ignore', timeout: 3000 })
     return run.error === undefined && run.status === 0

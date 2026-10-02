@@ -483,6 +483,19 @@ function newTab(id: string): SessionTab {
 }
 
 
+/** A plugin row with no spec: installed silently, or shipped in the box. */
+function pluginFallback(entry: { installed: boolean }): string {
+  return entry.installed ? '' : 'in-box'
+}
+
+/** The one status word a session strip or list carries while not streaming. */
+function sessionStatusLabel(
+  tab: { streaming: boolean; status: 'idle' | 'running' | 'ready' },
+): 'running' | 'ready' | 'idle' {
+  if (tab.streaming) return 'running'
+  return tab.status === 'ready' ? 'ready' : 'idle'
+}
+
 /** The status an off-edge stack move reports. */
 function noNeighborMessage(direction: Direction): string {
   if (direction === 'up') return 'no session above'
@@ -2051,7 +2064,7 @@ class TuiApp {
       .map((tab) => ({
         sessionId: tab.id,
         title: tab.title,
-        status: tab.streaming ? 'running' : tab.status === 'ready' ? 'ready' : 'idle',
+        status: sessionStatusLabel(tab),
         model: tab.modelName === '' ? undefined : tab.modelName,
         cwd: this.cwd,
       }))
@@ -3704,12 +3717,7 @@ class TuiApp {
   private async exportTranscript(requested: string): Promise<void> {
     const fs = this.ctx.get('fs')
     const base = fs === undefined ? process.cwd() : fs.processPath(await fs.resolve('.'))
-    const file =
-      requested === ''
-        ? join(base, `dsh-transcript-${timestampForFile()}.md`)
-        : isAbsolute(requested)
-          ? requested
-          : resolve(base, requested)
+    const file = exportPathFor(requested, base)
     const markdown = transcriptMarkdown(this.tab.messages, this.tab.title)
     try {
       await writeFile(file, markdown, 'utf8')
@@ -4119,11 +4127,8 @@ class TuiApp {
       case 'unqueue': {
         const count = this.tab.queued.length
         this.tab.queued = []
-        this.setStatus(
-          count === 0
-            ? 'nothing queued'
-            : `cleared ${String(count)} queued message${count === 1 ? '' : 's'}`,
-        )
+        const cleared = count === 0 ? 'nothing queued' : `cleared ${String(count)} queued message${count === 1 ? '' : 's'}`
+        this.setStatus(cleared)
         this.paint()
         return true
       }
@@ -4279,9 +4284,10 @@ class TuiApp {
       }
       const result = execution.result ?? execution
       const okResult = String(result.kind ?? 'success') === 'success'
-      const text = String(result.text ?? '')
+      let text = String(result.text ?? '')
+      if (text === '') text = okResult ? 'done' : 'failed'
       this.tab.messages.push(
-        textMessage('assistant', text === '' ? (okResult ? 'done' : 'failed') : text, {
+        textMessage('assistant', text, {
           command: { name, ok: okResult },
         }),
       )
@@ -5048,7 +5054,7 @@ class TuiApp {
       id: entry.name,
       title: entry.name,
       // The dependency spec, or the fact that the layer came in the box.
-      subtitle: entry.spec !== '' ? entry.spec : entry.installed ? '' : 'in-box',
+      subtitle: entry.spec === '' ? pluginFallback(entry) : entry.spec,
       active: entry.enabled,
     }))
     if (rows.length === 0) {
@@ -5222,7 +5228,7 @@ class TuiApp {
     const rows: PickerItem[] = this.tabs.map((tab, index) => ({
       id: String(index),
       title: `${String(index + 1)}. ${tab.title === '' ? 'new session' : tab.title}`,
-      subtitle: tab.streaming ? 'running' : tab.status === 'ready' ? 'ready' : 'idle',
+      subtitle: sessionStatusLabel(tab),
       active: index === this.active,
     }))
     // Starting a conversation is the other thing you come to this list to do,
@@ -5367,6 +5373,13 @@ class TuiApp {
     this.setStatus('ctrl+c again to quit')
     this.paint()
   }
+}
+
+/** Where an exported transcript lands: default name, or the requested path. */
+function exportPathFor(requested: string, base: string): string {
+  if (requested === '') return join(base, `dsh-transcript-${timestampForFile()}.md`)
+  if (isAbsolute(requested)) return requested
+  return resolve(base, requested)
 }
 
 /** The string without its trailing slashes, so joins never double one. */

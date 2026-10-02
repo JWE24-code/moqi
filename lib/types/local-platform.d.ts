@@ -12,15 +12,6 @@
  * are worth interrupting a copy to report.
  */
 export declare function copyWithLocalHelper(text: string): boolean;
-/**
- * Open a URL with whatever the platform's own launcher is.
- *
- * `xdg-open`/`open`/`start` all fork the real browser and return once the
- * request is handed off, not once the browser is actually up — a `spawnSync`
- * here does not stall the app waiting on one. Output is discarded the same
- * way the clipboard helper's is: the launcher must never inherit our
- * raw-mode stdio.
- */
 export declare function openUrlWithLocalHelper(url: string): boolean;
 /** A filesystem-safe timestamp for export file names. */
 export declare function timestampForFile(date?: Date): string;
