@@ -504,11 +504,18 @@ function renderDiff(diff: readonly DiffLine[], width: number): string[] {
   )
   return diff.map((row) => {
     const number = row.line === undefined ? ' '.repeat(gutter) : String(row.line).padStart(gutter)
-    const sign = row.kind === 'remove' ? '-' : row.kind === 'add' ? '+' : ' '
+    const sign = diffSign(row.kind)
     const body = truncate(row.text, Math.max(width - gutter - 4, 8))
     const line = padEnd(`  ${number} ${sign} ${body}`, width)
     return diffPaint(row.kind, line)
   })
+}
+
+/** The sign in a diff row's gutter: out, in, or unchanged. */
+function diffSign(kind: DiffLine['kind']): string {
+  if (kind === 'remove') return '-'
+  if (kind === 'add') return '+'
+  return ' '
 }
 
 /** One diff row, tinted by whether it came or went. */
