@@ -110,7 +110,7 @@ export class PresencePublisher {
     }
 
     // Drop records for sessions this process has closed.
-    for (const path of [...this.owned]) {
+    for (const path of this.owned) {
       if (live.has(path)) continue
       this.owned.delete(path)
       try {

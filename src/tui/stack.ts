@@ -58,6 +58,9 @@ export function tiles(count: number, width: number, height: number): Tile[] {
   return out
 }
 
+/** What a pane can want from the user; absent means it wants nothing. */
+type Attention = 'input' | 'done'
+
 /** Directional focus moves, named for the arrow keys that drive them. */
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
@@ -132,7 +135,7 @@ export interface StackFrame {
    * carries the highlight color — warn for input, ok for done — instead of
    * the focus accent, and blinks while `blinkOn` alternates.
    */
-  attention?: (index: number) => 'input' | 'done' | undefined
+  attention?: (index: number) => Attention | undefined
   /** The blink phase, alternated by the app while any pane has attention. */
   blinkOn?: boolean
 }
@@ -146,7 +149,7 @@ function initCanvas(width: number, height: number): string[][] {
 
 /** How a pane's border line is styled, by its attention and focus. */
 function paneBorder(
-  mark: 'input' | 'done' | undefined,
+  mark: Attention | undefined,
   isFocused: boolean,
   blinkOn: boolean | undefined,
 ): (line: string) => string {
@@ -166,7 +169,7 @@ function paneBorder(
 }
 
 /** The label in a pane's top border, with its attention marker if any. */
-function paneTitle(title: string, mark: 'input' | 'done' | undefined, width: number): string {
+function paneTitle(title: string, mark: Attention | undefined, width: number): string {
   const label = truncate(title, Math.max(width - 6, 1))
   // The attention marker rides the title: `!` waits on you, `✓` finished
   // for you — one glyph, legible in every interface language.
@@ -187,7 +190,7 @@ function paneBody(
   // where the newest turn is — and a short one is top-padded so that bottom
   // stays anchored just above the pane's lower border.
   const body = [
-    ...Array<string>(Math.max(innerHeight - rendered.length, 0)).fill(''),
+    ...new Array<string>(Math.max(innerHeight - rendered.length, 0)).fill(''),
     ...rendered,
   ].slice(-innerHeight)
   // Only the walls take the border style: a body line carries its own
@@ -219,7 +222,7 @@ export function stackFrame(options: StackFrame): string[] {
     const place = (row: number, line: string): void => {
       const cells = canvas[row]
       if (cells === undefined) return
-      cells.splice(tile.x, tile.width, line, ...Array<string>(tile.width - 1).fill(''))
+      cells.splice(tile.x, tile.width, line, ...new Array<string>(tile.width - 1).fill(''))
     }
 
     const top = paneTitle(title(index), mark, tile.width)

@@ -471,7 +471,6 @@ function lastLine(output: string): string {
     .replace(/\[[0-9;]*[A-Za-z]/g, '')
     .split('\n')
     .map((candidate) => candidate.trim())
-    .filter((candidate) => candidate !== '')
-    .at(-1)
+    .findLast((candidate) => candidate !== '')
   return (line ?? '').slice(0, 160)
 }

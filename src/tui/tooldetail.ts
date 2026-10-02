@@ -137,7 +137,7 @@ function applyToolResult(tools: ToolActivity[], data: Record<string, unknown>): 
   row.status = block.isError === true || error !== undefined ? 'error' : 'ok'
   const summary = summarizeResult(
     Array.isArray(block.content) ? block.content : [],
-    error !== undefined ? error : undefined,
+    error ?? undefined,
   )
   if (summary !== undefined) row.result = summary
 }

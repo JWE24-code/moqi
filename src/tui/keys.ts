@@ -210,7 +210,7 @@ function plainKey(char: string): { key: Key; consumed: number } {
   }
   // Control characters map to ctrl+<letter>; ctrl+a is 0x01.
   if (code < 32) {
-    return { key: { name: `ctrl+${String.fromCharCode(code + 96)}`, text: '' }, consumed: 1 }
+    return { key: { name: `ctrl+${String.fromCodePoint(code + 96)}`, text: '' }, consumed: 1 }
   }
   const point = String.fromCodePoint(code)
   return { key: { name: point, text: point }, consumed: point.length }

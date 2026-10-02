@@ -29,13 +29,16 @@ import {
 
 let passed = 0
 let failed = 0
+function pass(): void {
+  passed += 1
+}
+function fail(name: string): void {
+  failed += 1
+  console.error(`FAIL: ${name}`)
+}
 function check(name: string, condition: boolean): void {
-  if (condition) {
-    passed += 1
-  } else {
-    failed += 1
-    console.error(`FAIL: ${name}`)
-  }
+  const settle = condition ? pass : fail
+  settle(name)
 }
 
 /** A bucket set, spelled positionally so a test row stays readable. */

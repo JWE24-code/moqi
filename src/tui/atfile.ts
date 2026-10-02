@@ -52,11 +52,11 @@ export function activeAtToken(
 ): { query: string; start: number } | undefined {
   // Walk back over the token the cursor sits in.
   let start = cursor
-  while (start > 0 && !/[\s]/.test(text[start - 1] ?? '')) start -= 1
+  while (start > 0 && !/\s/.test(text[start - 1] ?? '')) start -= 1
   if (text[start] !== '@') return undefined
   const query = text.slice(start + 1, cursor)
   // A space has been typed after the token: the user has moved on.
-  if (/[\n]/.test(query)) return undefined
+  if (/\n/.test(query)) return undefined
   return { query, start }
 }
 

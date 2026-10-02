@@ -42,7 +42,7 @@ export interface TurnTab {
   streamingReasoning: string
   logSyncedSeq: number
   status: SessionStatus
-  selection: { assembled?: { provider: string } | undefined; current?: { provider: string } | undefined }
+  selection: { assembled?: { provider: string }; current?: { provider: string } }
 }
 
 /** A prompt as the turn consumes it: the text plus any staged images. */
@@ -62,7 +62,8 @@ export interface TurnHost {
   rememberPrompt(text: string): void
   status(text: string, isError?: boolean): void
   repaint(): void
-  spinner(on: boolean): void
+  spinnerStart(): void
+  spinnerStop(): void
   /** Hand the app the abort controller for the running turn, or take it back. */
   setAbort(controller: AbortController | undefined): void
   /** The tab's own running/ready transition (bell and seen rules included). */
@@ -167,7 +168,7 @@ export class TurnRunner {
       // draining looks like prompts disappearing.
       this.host.status(`${String(tab.queued.length)} queued — sends when the reply finishes`)
     }
-    this.host.spinner(true)
+    this.host.spinnerStart()
     this.host.repaint()
   }
 
@@ -185,7 +186,7 @@ export class TurnRunner {
     this.host.persist()
     tab.streaming = false
     tab.streamStartedAt = 0
-    this.host.spinner(false)
+    this.host.spinnerStop()
     // One last log sync first: the final tool results may have landed after
     // the last frame, and the committed rows are what /export and a restart
     // will show.

@@ -136,7 +136,9 @@ function runPlan(plan, what) {
 }
 
 function report(state, text) {
-  const mark = state === 'ok' ? '✓' : state === 'skip' ? '·' : '✗'
+  let mark = '✗'
+  if (state === 'ok') mark = '✓'
+  else if (state === 'skip') mark = '·'
   console.log(`  ${mark} ${text}`)
 }
 

@@ -229,7 +229,7 @@ export function jumpArgv(session: FleetSession, profile = 'tui'): string[] {
  * quoted string has. Nothing here trusts the caller.
  */
 export function shellQuote(text: string): string {
-  return `'${text.replaceAll("'", "'\\''")}'`
+  return `'${text.replaceAll("'", String.raw`'\''`)}'`
 }
 
 /**

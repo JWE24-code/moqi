@@ -43,13 +43,16 @@ import { stripAnsi, displayWidth } from '../src/tui/text.ts'
 
 let passed = 0
 let failed = 0
+function pass(): void {
+  passed += 1
+}
+function fail(name: string): void {
+  failed += 1
+  console.error(`FAIL: ${name}`)
+}
 function check(name: string, condition: boolean): void {
-  if (condition) {
-    passed += 1
-  } else {
-    failed += 1
-    console.error(`FAIL: ${name}`)
-  }
+  const settle = condition ? pass : fail
+  settle(name)
 }
 
 /** Decimal-string parses are asserted with a tolerance, not exact `===`. */

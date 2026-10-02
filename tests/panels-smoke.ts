@@ -201,7 +201,6 @@ const drawn = frameWith(single.view())
 check('the panel is drawn', drawn.lines.some((line) => line.includes('Question')) || drawn.lines.some((line) => line.includes('Storage')))
 check('no line exceeds the window', drawn.lines.every((line) => displayWidth(line) <= 70))
 check('the cursor is hidden while a panel owns the keyboard', render({
-  ...{
     columns: 70, rows: 24, title: '', host: '', modelName: '', messages: [], streamingSegments: [],
     streamingReasoning: '', streaming: false, spinner: '', status: '',
     statusIsError: false, overlay: '', showThinking: false, composer: new Composer(),
@@ -209,7 +208,6 @@ check('the cursor is hidden while a panel owns the keyboard', render({
     sessions: [], background: [], expandBackground: false, elapsedSeconds: 0,
     promptTokens: 0, completionTokens: 0, totalTokens: 0, haveUsage: false, contextLimit: 0,
     confirming: false, panel: approval.view(),
-  },
 }).cursor === undefined)
 
 // -------------------------------------------------------------- LoginPanel

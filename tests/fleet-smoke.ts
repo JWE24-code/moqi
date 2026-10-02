@@ -537,7 +537,7 @@ check('the remote command names the profile', argv[3]?.includes('--profile headl
 check('the prompt travels quoted', argv[3]?.includes("'run the tests'") === true)
 check(
   'an injected prompt stays inside the quotes',
-  dispatchArgv('oma1', 'headless', "x'; touch /tmp/pwned; '").join(' ').includes("'\\''"),
+  dispatchArgv('oma1', 'headless', "x'; touch /tmp/pwned; '").join(' ').includes(String.raw`'\''`),
 )
 check('the ssh destination is not an option', argv[2]?.startsWith('-') === false)
 

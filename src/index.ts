@@ -632,9 +632,11 @@ class TuiApp {
     repaint: () => {
       this.paint()
     },
-    spinner: (on) => {
-      if (on) this.startSpinner()
-      else this.releaseSpinner()
+    spinnerStart: () => {
+      this.startSpinner()
+    },
+    spinnerStop: () => {
+      this.releaseSpinner()
     },
     setAbort: (controller) => {
       this.abort = controller
@@ -2888,8 +2890,10 @@ class TuiApp {
         this.submitComposer()
         return 'handled'
       case 'shift+enter':
-        // Shift+Enter is the composer's carriage return, so a draft can span
-        // several lines without submitting on the first one.
+      case 'ctrl+j':
+        // Shift+Enter is the composer's carriage return (ctrl+j is a line
+        // feed, for terminals that deliver it as its own control byte), so a
+        // draft can span several lines without submitting on the first one.
         this.history.reset()
         this.composer.insert('\n')
         return 'handled'
@@ -2907,12 +2911,6 @@ class TuiApp {
         this.interrupt()
         return 'handled'
       }
-      case 'ctrl+j':
-        // Ctrl+J is a line feed: the same newline as shift+enter, for
-        // terminals that deliver it as its own control byte.
-        this.history.reset()
-        this.composer.insert('\n')
-        return 'handled'
       case 'paste':
         // Bracketed paste arrives as one key: insert it whole, newlines and
         // all, without letting its contents trigger a menu or a submit.
@@ -3101,6 +3099,8 @@ class TuiApp {
         this.history.reset()
         return 'handled'
       case 'delete':
+      case 'ctrl+d':
+        // Delete forward — the readline pair to backspace.
         this.composer.deleteForward()
         this.history.reset()
         return 'handled'
@@ -3115,11 +3115,6 @@ class TuiApp {
       case 'ctrl+u':
         // Clear the line, as every shell does.
         this.composer.reset()
-        this.history.reset()
-        return 'handled'
-      case 'ctrl+d':
-        // Delete forward — the readline pair to backspace.
-        this.composer.deleteForward()
         this.history.reset()
         return 'handled'
       default:

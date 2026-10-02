@@ -763,7 +763,7 @@ export function findMatches(snapshot: Snapshot, query: string): number[] {
  * far `scrollBack` has scrolled.
  */
 function scrollWindow(body: string[], scrollBack: number, height: number): string[] {
-  if (body.length <= height) return [...Array<string>(height - body.length).fill(''), ...body]
+  if (body.length <= height) return [...new Array<string>(height - body.length).fill(''), ...body]
   const maxStart = body.length - height
   const start = Math.max(Math.min(maxStart - scrollBack, maxStart), 0)
   return body.slice(start, start + height)
@@ -837,7 +837,7 @@ function pickerPane(snapshot: Snapshot, geometry: Layout): string[] {
     const right = picker.grouped ? '' : item.subtitle
     const rightWidth = displayWidth(right)
     const titleWidth = Math.max(width - rightWidth - displayWidth(marker) - 3, 8)
-    const label = truncate(item.title.replace(/\n/g, ' '), titleWidth)
+    const label = truncate(item.title.replaceAll('\n', ' '), titleWidth)
     const pad = Math.max(width - displayWidth(label) - rightWidth - displayWidth(marker) - 1, 1)
     const row = ` ${marker}${label}${' '.repeat(pad)}${right}`
     if (index === picker.selected) selectedLine = body.length

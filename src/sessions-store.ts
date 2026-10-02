@@ -32,11 +32,13 @@ export function encodeSegment(raw: string): string {
   if (raw === '.') return '~002E'
   if (raw === '..') return '~002E~002E'
   let out = ''
-  for (let index = 0; index < raw.length; index += 1) {
-    const code = raw.charCodeAt(index)
-    const char = String.fromCharCode(code)
+  let index = 0
+  while (index < raw.length) {
+    const code = raw.codePointAt(index) ?? 0
+    const char = String.fromCodePoint(code)
     if (char !== '~' && /^[A-Za-z0-9._-]$/.test(char)) out += char
     else out += `~${code.toString(16).toUpperCase().padStart(4, '0')}`
+    index += char.length
   }
   return out
 }
@@ -50,9 +52,10 @@ export function projectKey(cwd: string): string {
   if (cwd.length === 0) throw new Error('cannot encode an empty project path')
   let readable = ''
   let separatorRun = false
-  for (let index = 0; index < cwd.length; index += 1) {
-    const code = cwd.charCodeAt(index)
-    const char = String.fromCharCode(code)
+  let index = 0
+  while (index < cwd.length) {
+    const code = cwd.codePointAt(index) ?? 0
+    const char = String.fromCodePoint(code)
     if (char === '/' || char === '\\' || char === ':') {
       if (!separatorRun) readable += '-'
       separatorRun = true
@@ -63,6 +66,7 @@ export function projectKey(cwd: string): string {
       readable += `~${code.toString(16).toUpperCase().padStart(4, '0')}`
       separatorRun = false
     }
+    index += char.length
   }
   return `--${(readable.replace(/^-+/, '') || 'root').slice(0, 251)}--`
 }

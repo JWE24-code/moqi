@@ -12,7 +12,7 @@ const ESC = ''
 const BEL = ''
 
 /** Matches an ANSI escape sequence (CSI or OSC), which occupies no columns. */
-const ANSI_PATTERN = `${ESC}\\[[0-9;?]*[ -/]*[@-~]|${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`
+const ANSI_PATTERN = String.raw`${ESC}\[[0-9;?]*[ -/]*[@-~]|${ESC}\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\)`
 
 function ansiRegex(): RegExp {
   return new RegExp(ANSI_PATTERN, 'g')
@@ -181,10 +181,7 @@ function wrapParagraph(paragraph: string, width: number, out: string[]): void {
       line = candidate
       continue
     }
-    if (line !== '') {
-      out.push(line)
-      line = ''
-    }
+    if (line !== '') out.push(line)
     let rest = word
     while (displayWidth(rest) > width) {
       const head = cut(rest, width)

@@ -206,7 +206,7 @@ export function catalogKeys(lang: Lang): readonly string[] {
 export function fill(template: string, params: Record<string, string | number> | undefined): string {
   if (params === undefined) return template
   return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
-    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : whole,
+    Object.hasOwn(params, key) ? String(params[key]) : whole,
   )
 }
 

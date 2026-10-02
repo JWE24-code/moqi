@@ -6,7 +6,7 @@
  * no build step).
  */
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync, symlinkSync, existsSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { findDshRoot, harnessPackageDir, linkHarnessPackages } from '../scripts/harness-root.mjs'

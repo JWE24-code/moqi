@@ -209,7 +209,7 @@ type Block =
 /** Split a document into blocks, tolerating an unterminated code fence. */
 function parse(source: string): Block[] {
   const blocks: Block[] = []
-  const rows = source.replace(/\r\n/g, '\n').split('\n')
+  const rows = source.replaceAll('\r\n', '\n').split('\n')
   let index = 0
 
   while (index < rows.length) {

@@ -201,7 +201,7 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   check('a waiting tile is marked in its border', onText.includes('! beta session'))
   check('the blinking tile changes between phases', JSON.stringify(on) !== JSON.stringify(off))
   const styled = on.filter((line) => line.includes('! beta session'))
-  check('the on phase styles the waiting border', styled.length > 0 && styled.some((line) => line !== stripAnsi(line)))
+  check('the on phase styles the waiting border', styled.some((line) => line !== stripAnsi(line)))
   const done = render(
     snapshot({ stack: { panes: panes.map((pane, index) => (index === 1 ? { ...pane, attention: 'done' as const } : pane)), focused: 0, blinkOn: true } }),
   ).lines

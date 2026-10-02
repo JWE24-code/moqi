@@ -32,7 +32,7 @@ check(
 )
 check(
   'whitespace folds to one line',
-  describeToolCall('bash', '{"command":"a\\n  b\\t\\tc"}') === 'a b c',
+  describeToolCall('bash', String.raw`{"command":"a\n  b\t\tc"}`) === 'a b c',
 )
 check('unparsable arguments pass through as one line', describeToolCall('bash', 'docker ps') === 'docker ps')
 check('empty arguments say nothing', describeToolCall('bash', '{}') === '')
