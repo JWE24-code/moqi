@@ -488,6 +488,13 @@ function pluginFallback(entry: { installed: boolean }): string {
   return entry.installed ? '' : 'in-box'
 }
 
+/** What `/unqueue` says, by how much was waiting. */
+function unqueueStatus(count: number): string {
+  if (count === 0) return 'nothing queued'
+  const plural = count === 1 ? '' : 's'
+  return `cleared ${String(count)} queued message${plural}`
+}
+
 /** The one status word a session strip or list carries while not streaming. */
 function sessionStatusLabel(
   tab: { streaming: boolean; status: 'idle' | 'running' | 'ready' },
@@ -4127,8 +4134,7 @@ class TuiApp {
       case 'unqueue': {
         const count = this.tab.queued.length
         this.tab.queued = []
-        const cleared = count === 0 ? 'nothing queued' : `cleared ${String(count)} queued message${count === 1 ? '' : 's'}`
-        this.setStatus(cleared)
+        this.setStatus(unqueueStatus(count))
         this.paint()
         return true
       }
