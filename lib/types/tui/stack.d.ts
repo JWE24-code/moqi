@@ -54,6 +54,15 @@ export interface StackFrame {
      * the bottom of their tile.
      */
     renderBody: (index: number, innerWidth: number, innerHeight: number) => string[];
+    /**
+     * A pane asking for the user: `input` waits on an approval or question,
+     * `done` finished a reply nobody has read yet. An attention pane's border
+     * carries the highlight color — warn for input, ok for done — instead of
+     * the focus accent, and blinks while `blinkOn` alternates.
+     */
+    attention?: (index: number) => 'input' | 'done' | undefined;
+    /** The blink phase, alternated by the app while any pane has attention. */
+    blinkOn?: boolean;
 }
 /** Compose every pane's body into `height` lines of `width` columns. */
 export declare function stackFrame(options: StackFrame): string[];

@@ -9,7 +9,7 @@
  */
 
 import { padEnd, truncate } from './text.ts'
-import { muted, style, colAccent } from './theme.ts'
+import { muted, style, colAccent, colWarn, colOK } from './theme.ts'
 
 /** A pane's rectangle inside the frame region, 0-indexed. */
 export interface Tile {
@@ -111,11 +111,20 @@ export interface StackFrame {
    * the bottom of their tile.
    */
   renderBody: (index: number, innerWidth: number, innerHeight: number) => string[]
+  /**
+   * A pane asking for the user: `input` waits on an approval or question,
+   * `done` finished a reply nobody has read yet. An attention pane's border
+   * carries the highlight color — warn for input, ok for done — instead of
+   * the focus accent, and blinks while `blinkOn` alternates.
+   */
+  attention?: (index: number) => 'input' | 'done' | undefined
+  /** The blink phase, alternated by the app while any pane has attention. */
+  blinkOn?: boolean
 }
 
 /** Compose every pane's body into `height` lines of `width` columns. */
 export function stackFrame(options: StackFrame): string[] {
-  const { count, width, height, focused, title, renderBody } = options
+  const { count, width, height, focused, title, renderBody, attention, blinkOn } = options
   if (count < 1 || width < 1 || height < 1) return []
 
   // The canvas is plain text plus styled slices, so cells join with spaces.
@@ -124,12 +133,20 @@ export function stackFrame(options: StackFrame): string[] {
 
   for (const [index, tile] of tiles(count, width, height).entries()) {
     const isFocused = index === focused
+    const mark = attention?.(index)
     // Every pane sits in a full line box, so sessions read as separate
     // surfaces; the focused pane's whole border is the accent in bold, the
     // rest are dim. Bold survives NO_COLOR terminals, so focus stays legible
-    // even where color does not.
-    const styleBorder = (line: string): string =>
-      isFocused ? style(line, { fg: colAccent, bold: true }) : muted(line)
+    // even where color does not. An attention pane outranks focus with the
+    // highlight color — warn for input, ok for done — and blinks by falling
+    // back to dim on the off phase, so the eye catches it without focus.
+    const styleBorder = (line: string): string => {
+      if (mark !== undefined && (blinkOn === true || isFocused)) {
+        return style(line, { fg: mark === 'input' ? colWarn : colOK, bold: true })
+      }
+      if (mark !== undefined) return muted(line)
+      return isFocused ? style(line, { fg: colAccent, bold: true }) : muted(line)
+    }
     // A tile's line is written as one cell — styled text cannot be split into
     // per-character cells without its escapes shifting everything after it —
     // and the cells it covers are emptied, so the grid's indices stay honest
@@ -140,8 +157,12 @@ export function stackFrame(options: StackFrame): string[] {
       cells.splice(tile.x, tile.width, line, ...Array<string>(tile.width - 1).fill(''))
     }
 
-    const label = truncate(title(index), Math.max(tile.width - 4, 1))
-    const top = padEnd(` ${label} `, Math.max(tile.width - 2, 0))
+    const label = truncate(title(index), Math.max(tile.width - 6, 1))
+    // The attention marker rides the title: `!` waits on you, `✓` finished
+    // for you — one glyph, legible in every interface language.
+    const marked =
+      mark === 'input' ? `! ${label}` : mark === 'done' ? `✓ ${label}` : label
+    const top = padEnd(` ${marked} `, Math.max(tile.width - 2, 0))
     place(tile.y, styleBorder(tile.width > 2 ? `┌${top}┐` : top))
 
     const innerHeight = Math.max(tile.height - 2, 0)

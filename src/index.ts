@@ -108,6 +108,7 @@ import {
   QuestionsPanel,
   interpretApproval,
   type ApprovalDecision,
+  type PanelView,
 } from './tui/panels.ts'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
@@ -343,6 +344,8 @@ interface PromptDraft {
 interface PendingApproval {
   request: { toolName: string; reason?: string; callId?: string; signal?: AbortSignal }
   resolve: (decision: ApprovalDecision) => void
+  /** The session that asked, so its tile can blink and host the panel. */
+  tab: SessionTab | undefined
 }
 
 /** A question set waiting for the user, and the promise that answers it. */
@@ -350,6 +353,8 @@ interface PendingQuestion {
   request: AskUserQuestionRequest
   resolve: (answer: AskUserQuestionAnswer) => void
   reject: (error: Error) => void
+  /** The session that asked, so its tile can blink and host the panel. */
+  tab: SessionTab | undefined
 }
 
 interface SessionTab {
@@ -397,6 +402,12 @@ interface SessionTab {
    * hand control to the queue instead of freezing it like a plain `esc`.
    */
   drainQueue: boolean
+  /**
+   * While the stacked view tiles this session, what it wants from the user:
+   * `input` waits on an approval or question, `done` finished a reply nobody
+   * has read. An attention tile blinks until it is focused or answered.
+   */
+  attention?: 'input' | 'done'
   /** `ready` means a turn finished and you have not looked since. */
   status: SessionStatus
   /**
@@ -520,6 +531,15 @@ class TuiApp {
   private frame: string[] = []
   /** The trust-surface panel on screen, if any: it owns the keyboard. */
   private panel: ApprovalPanel | QuestionsPanel | LoginPanel | undefined
+  /**
+   * The session the on-screen panel belongs to, so the stacked view can draw
+   * the panel inside that session's tile; undefined when the panel is app-wide.
+   */
+  private panelTab: SessionTab | undefined
+  /** The blink phase attention tiles alternate on, while any tile blinks. */
+  private blinkPhase = false
+  /** The blink interval; exists only while the stacked view has attention. */
+  private attentionTimer: NodeJS.Timeout | undefined
   /** The masked-prompt channel `askSecret` waits on, apart from any sign-in. */
   private secretPrompt: { resolve: (value: string) => void; reject: (error: unknown) => void } | undefined
   private readonly pendingApprovals: PendingApproval[] = []
@@ -588,10 +608,17 @@ class TuiApp {
     // narrow back to the app's own SessionTab shape.
     sessionStatus: (tab, status) => {
       this.tabStrip.setStatus(tab as SessionTab, status)
+      const settled = tab as SessionTab
       // In the stacked view a pane you can see is a reply you can read: mark
-      // it seen like the focused session's own status already does.
-      if (this.stackMode && this.isVisible(tab as SessionTab)) {
-        ;(tab as SessionTab).status = 'idle'
+      // it seen like the focused session's own status already does — but a
+      // finished reply still blinks its tile until you focus it, since done
+      // is exactly what the stacked view exists to surface.
+      if (this.stackMode && this.isVisible(settled)) {
+        settled.status = 'idle'
+        if (status === 'ready' && settled.attention === undefined && this.tabs[this.active] !== settled) {
+          settled.attention = 'done'
+          this.syncAttentionTimer()
+        }
       }
     },
     foldUsage: (tab, provider) => {
@@ -689,6 +716,7 @@ class TuiApp {
       {
         mount: (panel) => {
           this.panel = panel
+          this.panelTab = undefined
         },
         status: (text, isError) => {
           this.setStatus(text, isError)
@@ -842,8 +870,12 @@ class TuiApp {
       this.ctx.on('approval/request', async (request, next) => {
         if (!this.ownsRequest(request.agent)) return await next()
         return await new Promise((resolve) => {
-          const pending = { request, resolve }
+          const tab = this.tabForAgent(request.agent)
+          const pending = { request, resolve, tab }
           this.pendingApprovals.push(pending)
+          // The session that asked blinks in the stack until it is answered,
+          // whether or not its panel is the one on screen.
+          this.raiseAttention(tab)
           if (request.signal !== undefined) {
             request.signal.addEventListener(
               'abort',
@@ -863,8 +895,10 @@ class TuiApp {
       this.ctx.on('user-questions/request', async (request, next) => {
         if (request.agent !== undefined && !this.ownsRequest(request.agent)) return await next()
         return await new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-          const pending = { request, resolve, reject }
+          const tab = this.tabForAgent(request.agent)
+          const pending = { request, resolve, reject, tab }
           this.pendingQuestions.push(pending)
+          this.raiseAttention(tab)
           if (request.signal !== undefined) {
             request.signal.addEventListener(
               'abort',
@@ -891,6 +925,51 @@ class TuiApp {
     return false
   }
 
+  /** The session an ask belongs to, by its agent; none when app-wide. */
+  private tabForAgent(agent: Agent | undefined): SessionTab | undefined {
+    if (agent === undefined) return undefined
+    return this.tabs.find((tab) => tab.agent === agent)
+  }
+
+  /**
+   * Mark a session's tile as wanting the user. An unfinished turn (`done`)
+   * is outranked by one now waiting on an answer (`input`), never the other
+   * way around: a question may arrive in a pane you have not looked at yet.
+   */
+  private raiseAttention(tab: SessionTab | undefined): void {
+    if (tab === undefined) return
+    tab.attention = 'input'
+    this.syncAttentionTimer()
+  }
+
+  /** Drop a session's attention mark and stop blinking when nobody wants you. */
+  private clearAttention(tab: SessionTab | undefined): void {
+    if (tab === undefined || tab.attention === undefined) return
+    tab.attention = undefined
+    this.syncAttentionTimer()
+  }
+
+  /**
+   * Run the blink interval exactly while the stacked view has an attention
+   * tile: the phase alternates and repaints, and a wart on the timer can
+   * never outlive the attention that asked for it.
+   */
+  private syncAttentionTimer(): void {
+    const wanted = this.stackMode && this.tabs.some((tab) => tab.attention !== undefined)
+    if (wanted && this.attentionTimer === undefined) {
+      this.attentionTimer = setInterval(() => {
+        this.blinkPhase = !this.blinkPhase
+        this.paint()
+      }, 600)
+      this.attentionTimer.unref?.()
+    } else if (!wanted && this.attentionTimer !== undefined) {
+      clearInterval(this.attentionTimer)
+      this.attentionTimer = undefined
+      this.blinkPhase = false
+      this.paint()
+    }
+  }
+
   /** Show the oldest waiting panel, if no panel is up. */
   private activateNextPanel(): void {
     if (this.panel !== undefined) return
@@ -901,11 +980,13 @@ class TuiApp {
         approval.request.reason,
         this.commandForCall(approval.request.callId),
       )
+      this.panelTab = approval.tab
       return
     }
     const question = this.pendingQuestions[0]
     if (question !== undefined) {
       this.panel = new QuestionsPanel([...question.request.questions])
+      this.panelTab = question.tab
     }
   }
 
@@ -927,11 +1008,27 @@ class TuiApp {
   private dropApproval(pending: PendingApproval): void {
     const at = this.pendingApprovals.indexOf(pending)
     if (at !== -1) this.pendingApprovals.splice(at, 1)
+    this.clearAttentionIfUnwatched(pending.tab)
   }
 
   private dropQuestion(pending: PendingQuestion): void {
     const at = this.pendingQuestions.indexOf(pending)
     if (at !== -1) this.pendingQuestions.splice(at, 1)
+    this.clearAttentionIfUnwatched(pending.tab)
+  }
+
+  /**
+   * Clear an aborted ask's attention mark, but only when nothing else for
+   * that session still waits — a second approval queued behind the aborted
+   * one must keep its tile blinking.
+   */
+  private clearAttentionIfUnwatched(tab: SessionTab | undefined): void {
+    if (tab === undefined) return
+    const stillWaiting =
+      this.pendingApprovals.some((pending) => pending.tab === tab) ||
+      this.pendingQuestions.some((pending) => pending.tab === tab) ||
+      (this.panel !== undefined && this.panelTab === tab)
+    if (!stillWaiting) this.clearAttention(tab)
   }
 
   /**
@@ -940,8 +1037,10 @@ class TuiApp {
   private settleApproval(panel: ApprovalPanel, decision: ApprovalDecision): void {
     const pending = this.pendingApprovals.shift()
     this.panel = undefined
+    this.panelTab = undefined
     this.activateNextPanel()
     if (pending !== undefined) {
+      this.clearAttention(pending.tab)
       this.setStatus(decision === 'allowed-once' ? `allowed ${panel.toolName} once` : `denied ${panel.toolName}`)
       pending.resolve(decision)
     }
@@ -951,8 +1050,10 @@ class TuiApp {
   private settleQuestion(panel: QuestionsPanel, cancel: boolean): void {
     const pending = this.pendingQuestions.shift()
     this.panel = undefined
+    this.panelTab = undefined
     this.activateNextPanel()
     if (pending !== undefined) {
+      this.clearAttention(pending.tab)
       if (cancel) pending.reject(new UserQuestionError('the user cancelled the question', 'ASK_CANCELLED'))
       else pending.resolve({ answers: panel.answers() })
     }
@@ -1222,6 +1323,10 @@ class TuiApp {
     if (this.stopped) return
     this.stopped = true
     this.stopSpinner()
+    if (this.attentionTimer !== undefined) {
+      clearInterval(this.attentionTimer)
+      this.attentionTimer = undefined
+    }
     if (this.jobsTimer !== undefined) {
       clearInterval(this.jobsTimer)
       this.jobsTimer = undefined
@@ -1519,6 +1624,19 @@ class TuiApp {
    */
   private toggleStackView(): void {
     this.stackMode = !this.stackMode
+    // Attention is a stacked-view signal: leaving the tiles ends every blink,
+    // and entering them promotes the unread replies the strip was carrying —
+    // a session that finished while tabbed starts blinking in its new tile.
+    if (!this.stackMode) {
+      for (const tab of this.tabs) tab.attention = undefined
+    } else {
+      for (const tab of this.tabs) {
+        if (tab.status === 'ready' && tab.attention === undefined && tab !== this.tabs[this.active]) {
+          tab.attention = 'done'
+        }
+      }
+    }
+    this.syncAttentionTimer()
     this.persistSoon()
     this.screen.invalidate()
     this.setStatus(
@@ -1571,6 +1689,9 @@ class TuiApp {
   private selectSession(index: number): void {
     const tab = this.tabStrip.select(index)
     if (tab === undefined) return
+    // Focusing a tile is reading it: a finished-unseen blink ends here. A
+    // waiting approval keeps blinking — focus is not an answer.
+    if (tab.attention === 'done') this.clearAttention(tab)
     // Each session can be on its own palette; switching to one repaints in
     // its color, not whichever tab last called /theme.
     applyTheme(tab.theme)
@@ -1592,6 +1713,8 @@ class TuiApp {
       return
     }
     if (removed.closed.streaming === true) this.setStatus('closed a session that was still replying')
+    if (removed.closed === this.panelTab) this.panelTab = undefined
+    if (removed.closed.attention !== undefined) this.clearAttention(removed.closed)
     // Closing a tab can leave a different one active, on its own palette.
     applyTheme(this.tab.theme)
     // A closed session must not come back on the next launch.
@@ -1607,9 +1730,22 @@ class TuiApp {
     // The stacked view draws every open session, so each pane carries its
     // session's own snapshot; the frame around them stays the focused one's.
     if (this.stackMode && this.tabs.length > 1) {
+      // A panel belongs to the session that raised it: inside its tile, not
+      // over the whole stack. A panel whose session closed falls back to the
+      // focused pane, so the keyboard owner is always somewhere on screen.
+      const owner = this.panelTab !== undefined && this.tabs.includes(this.panelTab)
+        ? this.panelTab
+        : this.tab
+      const panelView = this.panel?.view()
+      base.panel = undefined
       base.stack = {
-        panes: this.tabs.map((tab) => ({ title: tab.title, snapshot: this.snapshotFor(tab) })),
+        panes: this.tabs.map((tab) => ({
+          title: tab.title,
+          attention: tab.attention,
+          snapshot: this.snapshotFor(tab, tab === owner ? panelView : undefined),
+        })),
         focused: this.active,
+        blinkOn: this.blinkPhase,
       }
     }
     // Only a drag that has actually moved draws as a selection; a press still
@@ -1618,8 +1754,12 @@ class TuiApp {
     return base
   }
 
-  /** The snapshot of one session, as its pane or its full view would draw it. */
-  private snapshotFor(tab: SessionTab): Snapshot {
+  /**
+   * The snapshot of one session, as its pane or its full view would draw it.
+   * `panel` overrides the app-wide one: the stacked view passes a view only
+   * for the tile hosting the panel, so the rest keep their transcripts.
+   */
+  private snapshotFor(tab: SessionTab, panel?: PanelView): Snapshot {
     const size = this.screen.size()
     return {
       columns: size.columns,
@@ -1660,7 +1800,7 @@ class TuiApp {
       searchActive: this.search !== undefined,
       fleet: this.fleet,
       usage: this.usageView,
-      panel: this.panel?.view(),
+      panel: panel ?? (this.stackMode ? undefined : this.panel?.view()),
       selectedTurn: this.selectedTurn,
       pluginLine: this.tuiHost.statusLine(),
       vimMode: this.vim.enabled ? this.vim.mode : undefined,
@@ -4817,6 +4957,7 @@ class TuiApp {
   ): Promise<string | undefined> {
     const login = new LoginPanel(title)
     this.panel = login
+    this.panelTab = undefined
     const answer = new Promise<string>((resolve, reject) => {
       this.secretPrompt = { resolve, reject }
     })

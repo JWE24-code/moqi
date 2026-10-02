@@ -165,7 +165,7 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     title,
     snapshot: snapshot({ title }),
   }))
-  const snap = snapshot({ stack: { panes, focused: 1 } })
+  const snap = snapshot({ stack: { panes, focused: 1, blinkOn: false } })
   const frame = render(snap)
   const text = stripAnsi(frame.lines.join('\n'))
   check('stacked frame fits the window', frame.lines.length <= snap.rows)
@@ -182,9 +182,50 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   const panes = ['alpha session', 'beta session'].map((title) => ({ title, snapshot: snapshot({ title }) }))
   const picker = new Picker()
   picker.show('models', 'Models', [{ id: 'deepseek-chat', title: 'deepseek-chat', subtitle: '' }])
-  const snap = snapshot({ stack: { panes, focused: 0 }, picker })
+  const snap = snapshot({ stack: { panes, focused: 0, blinkOn: false }, picker })
   const text = stripAnsi(render(snap).lines.join('\n'))
   check('an open picker paints over the stacked tiles', text.includes('Models') && !text.includes('alpha session'))
+}
+
+{
+  // A tile whose session wants the user carries the highlight border and the
+  // marker glyph, and blinks: the border trades the highlight for dim on the
+  // off phase while the focused pane's own border never dims.
+  const panes = ['alpha session', 'beta session'].map((title) => ({ title, snapshot: snapshot({ title }) }))
+  // The waiting pane is the unfocused one: a focused tile keeps a steady
+  // highlight (you are already looking at it), so the blink needs distance.
+  const base = { panes: panes.map((pane, index) => (index === 1 ? { ...pane, attention: 'input' as const } : pane)), focused: 0 }
+  const on = render(snapshot({ stack: { ...base, blinkOn: true } })).lines
+  const off = render(snapshot({ stack: { ...base, blinkOn: false } })).lines
+  const onText = stripAnsi(on.join('\n'))
+  check('a waiting tile is marked in its border', onText.includes('! beta session'))
+  check('the blinking tile changes between phases', JSON.stringify(on) !== JSON.stringify(off))
+  const styled = on.filter((line) => line.includes('! beta session'))
+  check('the on phase styles the waiting border', styled.length > 0 && styled.some((line) => line !== stripAnsi(line)))
+  const done = render(
+    snapshot({ stack: { panes: panes.map((pane, index) => (index === 1 ? { ...pane, attention: 'done' as const } : pane)), focused: 0, blinkOn: true } }),
+  ).lines
+  check('a finished tile is marked done', stripAnsi(done.join('\n')).includes('✓ beta session'))
+}
+
+{
+  // A panel a pane's own session raised draws inside that tile only: the
+  // permission window names its session, the other panes keep their feed.
+  const approvalPane = snapshot({ title: 'alpha session' })
+  approvalPane.panel = {
+    kind: 'approval',
+    title: 'Allow bash?',
+    detail: 'rm -rf /tmp/x',
+    rows: [{ label: 'Allow once', selected: true }, { label: 'Deny', selected: false }],
+    hint: 'enter choose',
+  }
+  const panes = [
+    { title: 'alpha session', snapshot: approvalPane },
+    { title: 'beta session', snapshot: snapshot({ title: 'beta session' }) },
+  ]
+  const text = stripAnsi(render(snapshot({ stack: { panes, focused: 1, blinkOn: false } })).lines.join('\n'))
+  check('the approval paints inside its own tile', text.includes('Allow bash?') && text.includes('rm -rf /tmp/x'))
+  check('the other pane keeps its transcript', text.includes('hello from a pane'))
 }
 
 console.log(`stack-smoke: ${checks} checks passed`)

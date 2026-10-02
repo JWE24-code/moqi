@@ -107,6 +107,8 @@ export interface Snapshot {
     stack?: {
         panes: readonly StackPane[];
         focused: number;
+        /** The blink phase for attention panes, alternated by the app. */
+        blinkOn: boolean;
     };
     /**
      * A mouse drag's selection, drawn as the highlight over the frame. Only a
@@ -115,10 +117,15 @@ export interface Snapshot {
      */
     selection?: Span;
 }
-/** One tiled pane in the stacked view: a session's snapshot and its label. */
+/**
+ * One tiled pane in the stacked view: a session's snapshot, its label, and —
+ * while the session wants the user — what it wants them for.
+ */
 export interface StackPane {
     title: string;
     snapshot: Snapshot;
+    /** `input` waits on an approval or question; `done` finished unseen. */
+    attention?: 'input' | 'done';
 }
 /** What push-to-talk is doing, for the footer indicator. */
 export type VoicePhase = 'recording' | 'transcribing';

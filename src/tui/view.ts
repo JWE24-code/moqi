@@ -168,7 +168,12 @@ export interface Snapshot {
    * whole ones so a pane draws with the exact renderer the full view uses.
    * Optional so every existing snapshot builder renders exactly as before.
    */
-  stack?: { panes: readonly StackPane[]; focused: number }
+  stack?: {
+    panes: readonly StackPane[]
+    focused: number
+    /** The blink phase for attention panes, alternated by the app. */
+    blinkOn: boolean
+  }
   /**
    * A mouse drag's selection, drawn as the highlight over the frame. Only a
    * real drag sets it — a press that has not moved is still a pending click.
@@ -177,10 +182,15 @@ export interface Snapshot {
   selection?: Span
 }
 
-/** One tiled pane in the stacked view: a session's snapshot and its label. */
+/**
+ * One tiled pane in the stacked view: a session's snapshot, its label, and —
+ * while the session wants the user — what it wants them for.
+ */
 export interface StackPane {
   title: string
   snapshot: Snapshot
+  /** `input` waits on an approval or question; `done` finished unseen. */
+  attention?: 'input' | 'done'
 }
 
 /** What push-to-talk is doing, for the footer indicator. */
@@ -674,9 +684,17 @@ function stackPane(snapshot: Snapshot, geometry: Layout): string[] {
     height: geometry.viewportRows,
     focused: stack.focused,
     title: (index) => stack.panes[index]?.title ?? '',
+    attention: (index) => stack.panes[index]?.attention,
+    blinkOn: stack.blinkOn,
     renderBody: (index, width, height) => {
       const pane = stack.panes[index]
       if (pane === undefined) return []
+      // A panel the pane's own session raised draws inside its tile, not
+      // over the whole stack: the permission window belongs to the session
+      // that asked for it, which is the one the tile names.
+      if (pane.snapshot.panel !== undefined) {
+        return panelPane(pane.snapshot, { ...geometry, contentWidth: width, viewportRows: height })
+      }
       return scrollWindow(bodyLines(pane.snapshot, width), pane.snapshot.scrollBack, height)
     },
   })
