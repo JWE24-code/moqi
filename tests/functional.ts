@@ -113,7 +113,6 @@ async function main(): Promise<void> {
   try {
     // ------------------------------------------------------------ boot
     check('alternate screen is entered', await until((t) => t.includes(ALT_ON)))
-    const paintedFrom = output.indexOf(ALT_ON)
     check('the frame paints the host line', await sees('local harness'))
     check('the model name is on screen', await sees('deepseek-chat'))
     check('the footer hints at the composer', await sees('/ for commands'))
@@ -208,7 +207,6 @@ async function main(): Promise<void> {
     await sleep(150)
     write(' ') // and toggle that one on too
     await sleep(150)
-    const beforeAnswer = output.length
     write('\r')
     await sleep(300)
     check('the multi-select answer arrives', await sees('answered'))
@@ -250,7 +248,6 @@ async function main(): Promise<void> {
       .split(/\x1b\[\d+;1H/)
       .filter((segment) => segment.startsWith('\x1b[K'))
       .map((segment) => displayWidth(stripAnsi(segment).replace(/[\r\n]/g, '')))
-    const tooWide = rows.filter((width) => width > 80)
     check(
       'painted lines stayed inside 80 columns for the whole run',
       rows.every((width) => width <= 80),
@@ -263,7 +260,9 @@ async function main(): Promise<void> {
   console.log(`ok - ${String(checks)} functional checks passed`)
 }
 
-main().catch((error: unknown) => {
+try {
+  await main()
+} catch (error: unknown) {
   console.error(String(error))
   process.exit(1)
-})
+}

@@ -20,7 +20,6 @@
  * Run with: node --experimental-strip-types tests/pty-subject.ts
  */
 
-import { appendFileSync } from 'node:fs'
 import { Screen } from '../src/tui/screen.ts'
 import { Composer, Palette, Picker, textMessage, type Message } from '../src/tui/state.ts'
 import { render, type Snapshot } from '../src/tui/view.ts'
@@ -306,9 +305,6 @@ function submitCommand(text: string): boolean {
     },
   }
   const run = commands[text]
-  if (process.env['SUBJECT_KEYLOG'] !== undefined) {
-    appendFileSync('/tmp/subject-submit', 'command ' + JSON.stringify(text) + ' matched=' + String(run !== undefined) + '\n')
-  }
   if (run === undefined) return false
   run()
   return true
@@ -353,8 +349,9 @@ function handleKeyLogged(key: { name: string; text: string }): void {
     }
     if (handleAppKey(key)) return
     handleEditingKey(key)
-  } catch (error) {
-    appendFileSync('/tmp/subject-error', String(error))
+  } catch {
+    // A driver bug must not wedge the subject's raw-mode terminal; the
+    // driver's own assertions will say what stopped answering.
   }
 }
 
