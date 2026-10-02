@@ -524,7 +524,7 @@ check('surrounding space is tolerated', isValidPeer('  oma1  '))
 
 check('a plain word is quoted', shellQuote('hello') === "'hello'")
 check('spaces survive quoting', shellQuote('run the tests') === "'run the tests'")
-check("a single quote is escaped", shellQuote("it's fine") === "'it'\\''s fine'")
+check("a single quote is escaped", shellQuote("it's fine") === String.raw`'it'\''s fine'`)
 check('an empty prompt is still a word', shellQuote('') === "''")
 check(
   'a semicolon cannot end the command',

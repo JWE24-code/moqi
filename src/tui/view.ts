@@ -1261,8 +1261,8 @@ function fleetPane(snapshot: Snapshot, geometry: Layout): string[] {
     fleet.loading && fleet.sessions.length === 0
       ? muted('collecting from every device…')
       : muted(fleetSummary(fleet.sessions)),
+    '',
   )
-  head.push('')
 
   const body = renderFleet(fleet.sessions, {
     width,

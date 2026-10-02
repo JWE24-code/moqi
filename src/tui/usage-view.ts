@@ -161,9 +161,11 @@ export function renderUsagePane(view: UsageView, width: number): string[] {
   const order = sortedRows(view.lifetime).map(([provider]) => provider)
   const nameWidth = Math.max(8, ...order.map((provider) => displayWidth(provider)))
 
-  out.push(...section('Token spend — session (5h)', view.session, order, nameWidth, width), '')
-  out.push(...section('Token spend — week (7d)', view.week, order, nameWidth, width), '')
-  out.push(...section('Token spend — lifetime', view.lifetime, order, nameWidth, width))
+  out.push(
+    ...section('Token spend — session (5h)', view.session, order, nameWidth, width), '',
+    ...section('Token spend — week (7d)', view.week, order, nameWidth, width), '',
+    ...section('Token spend — lifetime', view.lifetime, order, nameWidth, width),
+  )
 
   return out
 }
