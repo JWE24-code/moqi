@@ -143,7 +143,7 @@ function projectBlockEnd(
   surface: StreamingSurface,
   block: { type: string; id?: string | number; name?: string; arguments?: string } | undefined,
 ): void {
-  if (block === undefined || block.type !== 'tool-call') return
+  if (block?.type !== 'tool-call') return
   const row =
     findTool(surface.streamingSegments, (tool) => tool.id === String(block.id)) ??
     findTool(surface.streamingSegments, (tool) => tool.name === block.name)

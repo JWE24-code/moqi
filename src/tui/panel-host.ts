@@ -126,7 +126,7 @@ export class PanelHost {
       return
     }
 
-    if (result !== undefined && result.kind === 'secret') {
+    if (result?.kind === 'secret') {
       const value = await this.surface.askSecret(
         panel.title ?? panel.name,
         result.message,

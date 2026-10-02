@@ -2,9 +2,9 @@ import type { Session } from '@deepseek-ai/dsh-session';
 import { type Message, type PickerItem } from './tui/state.ts';
 /** The shape of the harness session-query service this build can rely on. */
 export interface SessionQueryLike {
-    listSessions?: (options?: unknown) => Promise<unknown> | unknown;
-    list?: (options?: unknown) => Promise<unknown> | unknown;
-    querySessions?: (options?: unknown) => Promise<unknown> | unknown;
+    listSessions?: (options?: unknown) => unknown;
+    list?: (options?: unknown) => unknown;
+    querySessions?: (options?: unknown) => unknown;
 }
 /**
  * List sessions through whichever method this build of the query service

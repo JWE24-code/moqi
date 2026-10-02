@@ -12,9 +12,9 @@ import { textMessage, type Message, type PickerItem } from './tui/state.ts'
 
 /** The shape of the harness session-query service this build can rely on. */
 export interface SessionQueryLike {
-  listSessions?: (options?: unknown) => Promise<unknown> | unknown
-  list?: (options?: unknown) => Promise<unknown> | unknown
-  querySessions?: (options?: unknown) => Promise<unknown> | unknown
+  listSessions?: (options?: unknown) => unknown
+  list?: (options?: unknown) => unknown
+  querySessions?: (options?: unknown) => unknown
 }
 
 /** A compact "3h ago" label for the picker's right column. */

@@ -63,7 +63,7 @@ export function textMessage(
  */
 export function segmentsText(segments: readonly Segment[]): string {
   return segments
-    .flatMap((segment) => (segment.kind === 'text' ? [segment.text.replace(/\s+$/, '')] : []))
+    .flatMap((segment) => (segment.kind === 'text' ? [segment.text.trimEnd()] : []))
     .filter((text) => text !== '')
     .join('\n\n')
 }
@@ -93,7 +93,7 @@ export function messageTools(message: Message): ToolActivity[] {
 export function appendText(segments: Segment[], text: string): void {
   if (text === '') return
   const last = segments.at(-1)
-  if (last !== undefined && last.kind === 'text') last.text += text
+  if (last?.kind === 'text') last.text += text
   else segments.push({ kind: 'text', text })
 }
 

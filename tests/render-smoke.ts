@@ -720,7 +720,7 @@ check('clamping is a no-op past the top', JSON.stringify(atTop) !== JSON.stringi
   const lit = highlighted(frame, { anchor: { row: 0, column: 0 }, head: { row: 1, column: 4 } })
   check('highlighting keeps every row', lit.length === frame.length)
   check('highlighting keeps the width', lit.every((line, i) => displayWidth(line) === displayWidth(frame[i] ?? '')))
-  check('rows outside the span are untouched', lit[1] !== undefined && lit[1].startsWith('styled ') === false ? stripAnsi(lit[1] ?? '') === stripAnsi(frame[1] ?? '') : true)
+  check('rows outside the span are untouched', lit[1]?.startsWith('styled ') === false ? stripAnsi(lit[1] ?? '') === stripAnsi(frame[1] ?? '') : true)
   check('the span itself is restyled', lit[0] !== frame[0] && stripAnsi(lit[0] ?? '') === (frame[0] ?? ''))
 
   const rendered = render(snapshot({ selection: { anchor: { row: 3, column: 2 }, head: { row: 5, column: 20 } } }))

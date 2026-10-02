@@ -10,7 +10,7 @@ export interface JobLike {
     id: string;
     kind: string;
     label: string;
-    status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed' | string;
+    status: string;
     detail?: string;
     startedAt: number;
     finishedAt?: number;

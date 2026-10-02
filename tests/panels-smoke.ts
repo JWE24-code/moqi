@@ -125,7 +125,7 @@ check('the first question cannot', back.back() === false)
 back.toggle()
 check('going back preserves the earlier answer', (() => {
   const [first] = back.answers()
-  return first !== undefined && first.selected.length === 1
+  return first?.selected.length === 1
 })())
 
 // ------------------------------------------------------------- plan review

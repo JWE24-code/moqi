@@ -96,7 +96,7 @@ export class SessionTabs<T extends TabLike> {
     this.active = index
     const tab = this.tabs[index]
     // Looking at it counts as reading it.
-    if (tab !== undefined && tab.status === 'ready') tab.status = 'idle'
+    if (tab?.status === 'ready') tab.status = 'idle'
     return tab
   }
 

@@ -133,11 +133,18 @@ function githubHeaders(token: string): Record<string, string> {
 }
 
 /** Every unresolved issue on the project, paged through the Sonar API. */
+/** The host without its trailing slashes, so joins never double one. */
+function stripTrailingSlashes(host: string): string {
+  let end = host.length
+  while (end > 0 && host[end - 1] === '/') end -= 1
+  return host.slice(0, end)
+}
+
 export async function fetchSonarIssues(
   options: { host: string; projectKey: string; token?: string; types?: string; severities?: string },
   fetchImpl: FetchLike = fetch,
 ): Promise<SonarIssue[]> {
-  const base = options.host.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(options.host)
   const headers = sonarHeaders(base, options.token)
   const issues: SonarIssue[] = []
   for (let page = 1; ; page += 1) {

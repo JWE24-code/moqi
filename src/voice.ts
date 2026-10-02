@@ -334,8 +334,8 @@ export function parseWhisperText(stdout: string): string {
 
 /** The spoken text a timestamped subtitle line carries, empty when non-speech. */
 function timestampText(line: string): string {
-  const segment = /^\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]\s*(.*)$/.exec(line)
-  const text = (segment?.[1] ?? '').trim()
+  const segment = /^\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\][ \t]*/.exec(line)
+  const text = segment === null ? '' : line.slice(segment[0].length).trim()
   return NON_SPEECH.test(text) ? '' : text
 }
 

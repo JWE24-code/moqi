@@ -952,7 +952,7 @@ class TuiApp {
 
   /** Drop a session's attention mark and stop blinking when nobody wants you. */
   private clearAttention(tab: SessionTab | undefined): void {
-    if (tab === undefined || tab.attention === undefined) return
+    if (tab?.attention === undefined) return
     tab.attention = undefined
     this.syncAttentionTimer()
   }
@@ -3594,7 +3594,7 @@ class TuiApp {
   private lastReply(): Message | undefined {
     for (let index = this.tab.messages.length - 1; index >= 0; index -= 1) {
       const message = this.tab.messages[index]
-      if (message !== undefined && message.role === 'assistant' && messageText(message).trim() !== '') {
+      if (message?.role === 'assistant' && messageText(message).trim() !== '') {
         return message
       }
     }
@@ -3727,7 +3727,7 @@ class TuiApp {
     this.paint()
     let latest: string
     try {
-      const response = await fetch(`${registry.replace(/\/+$/, '')}/${packageName}`)
+      const response = await fetch(`${stripTrailingSlashes(registry)}/${packageName}`)
       if (!response.ok) throw new Error(`registry answered ${String(response.status)}`)
       const body = (await response.json()) as { 'dist-tags'?: { latest?: unknown } }
       if (typeof body['dist-tags']?.latest !== 'string') throw new Error('no latest tag')
@@ -5361,10 +5361,17 @@ class TuiApp {
   }
 }
 
+/** The string without its trailing slashes, so joins never double one. */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end -= 1
+  return value.slice(0, end)
+}
+
 /** The subset of `ctx.sessionTitle` that `/rename` uses, probed defensively. */
 interface SessionTitleLike {
   rename?: (session: Session, title: string) => unknown
-  refresh?: (session: Session, signal?: AbortSignal) => Promise<unknown> | unknown
+  refresh?: (session: Session, signal?: AbortSignal) => unknown
 }
 
 /**

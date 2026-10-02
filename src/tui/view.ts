@@ -363,7 +363,14 @@ export function layout(snapshot: Snapshot): Layout {
 
 /** Strip the scheme and trailing slash from a base URL for the header. */
 export function hostLabel(base: string): string {
-  return base.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  return stripTrailingSlashes(base.replace(/^https?:\/\//, ''))
+}
+
+/** The string without its trailing slashes, so joins never double one. */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end -= 1
+  return value.slice(0, end)
 }
 
 /** The `dsh` header line: mark and title on the left, host on the right. */
@@ -581,12 +588,7 @@ function cachedMessageLines(
     return renderMessage(message, width, showThinking, toolStyle, selected)
   }
   const hit = messageLineCache.get(message)
-  if (
-    hit !== undefined &&
-    hit.width === width &&
-    hit.expand === toolStyle.expand &&
-    hit.showThinking === showThinking
-  ) {
+  if (hit?.width === width && hit.expand === toolStyle.expand && hit.showThinking === showThinking) {
     return hit.lines
   }
   const lines = renderMessage(message, width, showThinking, toolStyle)
@@ -638,7 +640,7 @@ function messageBlocks(snapshot: Snapshot, width: number): { message: number; li
     const bar = muted('▌')
     const block: string[] = []
     for (const text of queued) {
-      for (const line of wrap(text.replace(/\s+$/, ''), width - 2)) {
+      for (const line of wrap(text.trimEnd(), width - 2)) {
         block.push(`${bar} ${style(line, { fg: colMuted, dim: true })}`)
       }
     }

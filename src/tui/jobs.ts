@@ -11,7 +11,8 @@ export interface JobLike {
   id: string
   kind: string
   label: string
-  status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed' | string
+  // Free-form string: the registry may report statuses this build never named.
+  status: string
   detail?: string
   startedAt: number
   finishedAt?: number

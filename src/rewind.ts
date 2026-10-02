@@ -77,7 +77,7 @@ export function rewindTarget(
   chosenIndex: number,
 ): { cutSeq: number; text: string } | undefined {
   const turn = turns[chosenIndex]
-  if (turn === undefined || turn.turnStartSeq === undefined) return undefined
+  if (turn?.turnStartSeq === undefined) return undefined
   if (turn.turnStartSeq <= 0) return undefined
   return { cutSeq: turn.turnStartSeq, text: turn.text }
 }

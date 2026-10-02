@@ -79,7 +79,7 @@ function escapeAt(text: string, index: number): string | undefined {
   const regex = ansiRegex()
   regex.lastIndex = index
   const match = regex.exec(text)
-  if (match === null || match.index !== index) return undefined
+  if (match?.index !== index) return undefined
   return match[0]
 }
 
