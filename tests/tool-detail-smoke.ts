@@ -112,7 +112,7 @@ const FILE = [
 const EDITED = FILE.replace('five', 'cinq')
 const replaced = editDiff(
   'str_replace_editor',
-  JSON.stringify({ command: 'str_replace', path: '/tmp/f', old_str: 'five\nsix', new_str: 'cinq\nsix' }),
+  JSON.stringify({ command: 'str_replace', path: 'src/tui/view.ts', old_str: 'five\nsix', new_str: 'cinq\nsix' }),
   EDITED,
 )
 check('a str_replace diff is built from the call arguments', replaced !== undefined)
@@ -135,7 +135,7 @@ check(
 
 const inserted = editDiff(
   'str_replace_editor',
-  JSON.stringify({ command: 'insert', path: '/tmp/f', insert_line: 4, new_str: 'inserted' }),
+  JSON.stringify({ command: 'insert', path: 'src/tui/view.ts', insert_line: 4, new_str: 'inserted' }),
   ['one', 'two', 'three', 'four', 'NEW', 'five'].join('\n'),
 )
 check(
@@ -145,7 +145,7 @@ check(
 
 const created = editDiff(
   'str_replace_editor',
-  JSON.stringify({ command: 'create', path: '/tmp/new', file_text: 'first\nsecond' }),
+  JSON.stringify({ command: 'create', path: 'src/tui/edited.ts', file_text: 'first\nsecond' }),
 )
 check(
   'a create numbers its lines from one',
@@ -154,16 +154,16 @@ check(
 
 const unplaced = editDiff(
   'str_replace_editor',
-  JSON.stringify({ command: 'str_replace', path: '/tmp/f', old_str: 'gone', new_str: '' }),
+  JSON.stringify({ command: 'str_replace', path: 'src/tui/view.ts', old_str: 'gone', new_str: '' }),
   FILE,
 )
 check('a deletion the file cannot place still shows red', unplaced?.some((row) => row.kind === 'remove' && row.text === 'gone') === true)
 check('an unplaced hunk carries no row numbers', (unplaced ?? []).every((row) => row.line === undefined))
 
-check('a view call is not a diff', editDiff('str_replace_editor', JSON.stringify({ command: 'view', path: '/tmp/f' }), FILE) === undefined)
+check('a view call is not a diff', editDiff('str_replace_editor', JSON.stringify({ command: 'view', path: 'src/tui/view.ts' }), FILE) === undefined)
 check('another tool is not a diff', editDiff('bash', JSON.stringify({ command: 'ls' }), FILE) === undefined)
 check('unparsable arguments are not a diff', editDiff('str_replace_editor', 'not json', FILE) === undefined)
-check('the edited path comes off the arguments', editPath(JSON.stringify({ path: '/tmp/f' })) === '/tmp/f')
+check('the edited path comes off the arguments', editPath(JSON.stringify({ path: 'src/tui/view.ts' })) === 'src/tui/view.ts')
 check('arguments without a path name none', editPath(JSON.stringify({ command: 'view' })) === undefined)
 
 console.log(`ok - ${checks} tool-detail checks passed`)

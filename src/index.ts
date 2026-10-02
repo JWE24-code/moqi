@@ -60,6 +60,7 @@ import {
   type PickerKind,
   type Segment,
   type SessionStatus,
+  type ToolActivity,
 } from './tui/state.ts'
 import {
   AtMenu,
@@ -1601,23 +1602,30 @@ class TuiApp {
       ...tab.messages.flatMap((message) => [...messageTools(message)]),
       ...segmentTools(tab.streamingSegments),
     ]
+    // Sequential on purpose — one file read at a time — so the walk is a
+    // promise chain rather than an awaited loop.
     let painted = false
-    for (const tool of rows) {
-      if (tool.name !== EDIT_TOOL || tool.diff !== undefined || tool.status === 'running') continue
-      const path = editPath(tool.args)
-      if (path === undefined) continue
-      // Claim the row before the read: a second sync arriving while the file
-      // is being read must not start a second one. An empty diff means
-      // "attempted, nothing to show", which renders as the plain result.
-      tool.diff = []
-      const text = await this.readWorkspaceFile(path)
-      const diff = editDiff(tool.name, tool.args, text)
-      if (diff !== undefined) {
-        tool.diff = diff
-        painted = true
-      }
-    }
+    await rows.reduce(async (walked, tool) => {
+      await walked
+      if (await this.annotateEdit(tool)) painted = true
+    }, Promise.resolve())
     if (painted) this.paint()
+  }
+
+  /** Attach one edit's diff, returning whether the row gained anything. */
+  private async annotateEdit(tool: ToolActivity): Promise<boolean> {
+    if (tool.name !== EDIT_TOOL || tool.diff !== undefined || tool.status === 'running') return false
+    const path = editPath(tool.args)
+    if (path === undefined) return false
+    // Claim the row before the read: a second sync arriving while the file is
+    // being read must not start a second one. An empty diff means "attempted,
+    // nothing to show", which renders as the plain result.
+    tool.diff = []
+    const text = await this.readWorkspaceFile(path)
+    const diff = editDiff(tool.name, tool.args, text)
+    if (diff === undefined) return false
+    tool.diff = diff
+    return true
   }
 
   /** A workspace file's text, or undefined when it cannot be read. */
