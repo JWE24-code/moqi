@@ -175,4 +175,16 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   check('the tab strip yields its row to the tiles', !frame.lines.some((line) => line.includes('● alpha session ●')))
 }
 
+{
+  // A picker opened from the stacked view (`/model`, `/theme`, `/resume`, …)
+  // must paint over the tiles: its keys already go to the picker, so a stack
+  // that still draws makes every picker command look dead.
+  const panes = ['alpha session', 'beta session'].map((title) => ({ title, snapshot: snapshot({ title }) }))
+  const picker = new Picker()
+  picker.show('models', 'Models', [{ id: 'deepseek-chat', title: 'deepseek-chat', subtitle: '' }])
+  const snap = snapshot({ stack: { panes, focused: 0 }, picker })
+  const text = stripAnsi(render(snap).lines.join('\n'))
+  check('an open picker paints over the stacked tiles', text.includes('Models') && !text.includes('alpha session'))
+}
+
 console.log(`stack-smoke: ${checks} checks passed`)

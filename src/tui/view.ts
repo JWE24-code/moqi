@@ -1220,11 +1220,14 @@ export function render(snapshot: Snapshot): {
           ? fleetPane(snapshot, geometry)
           : snapshot.usage?.open === true
             ? usagePane(snapshot, geometry)
-            : snapshot.stack !== undefined
-              ? stackPane(snapshot, geometry)
-              : snapshot.picker.kind === 'none'
-                ? viewport(snapshot, geometry)
-                : pickerPane(snapshot, geometry)
+            : snapshot.picker.kind !== 'none'
+              ? // An open picker outranks the stacked view: the keys already
+                // go to the picker, so the stack tiling must not paint over
+                // it and make every picker command look dead in the stack.
+                pickerPane(snapshot, geometry)
+              : snapshot.stack !== undefined
+                ? stackPane(snapshot, geometry)
+                : viewport(snapshot, geometry)
     rows.push(...body)
   }
   if (geometry.showGap) rows.push('')
