@@ -501,26 +501,13 @@ function renderAssistantTurn(
   showThinking: boolean,
   toolStyle: ToolStyle,
 ): string[] {
-  const out: string[] = []
-
-  if (showThinking && (message.reasoning ?? '').trim() !== '') {
-    const bar = style('┆', { fg: colMuted })
-    for (const line of wrap((message.reasoning ?? '').trim(), width - 2)) {
-      out.push(`${bar} ${style(line, { fg: colMuted, italic: true })}`)
-    }
-    if (out.length > 0) out.push('')
-  }
+  const out = reasoningLines(message, width, showThinking)
 
   // The turn in the order it happened: what the agent said, the call it made,
   // what it said next. Each piece is rendered as itself and separated by a
   // blank line, so neither the prose nor the calls run together.
   for (const segment of message.segments) {
-    const lines =
-      segment.kind === 'tool'
-        ? renderTool(segment.tool, width, toolStyle)
-        : segment.text.trim() === ''
-          ? []
-          : renderMarkdown(segment.text.trim(), width).split('\n')
+    const lines = segmentLines(segment, width, toolStyle)
     if (lines.length === 0) continue
     if (out.length > 0) out.push('')
     out.push(...lines)
@@ -535,6 +522,27 @@ function renderAssistantTurn(
     messageTools(message).some((tool) => tool.result !== undefined && tool.result !== '')
   if (hidden) out.push(muted('  ctrl+o for detail'))
   return out
+}
+
+/** The turn's hidden reasoning, drawn dim and italic under its own bar. */
+function reasoningLines(message: Message, width: number, showThinking: boolean): string[] {
+  const reasoning = (message.reasoning ?? '').trim()
+  if (!showThinking || reasoning === '') return []
+  const bar = style('┆', { fg: colMuted })
+  const out: string[] = []
+  for (const line of wrap(reasoning, width - 2)) {
+    out.push(`${bar} ${style(line, { fg: colMuted, italic: true })}`)
+  }
+  out.push('')
+  return out
+}
+
+/** One segment's lines: a tool call's checklist row, or the prose it carried. */
+function segmentLines(segment: Segment, width: number, toolStyle: ToolStyle): string[] {
+  if (segment.kind === 'tool') return renderTool(segment.tool, width, toolStyle)
+  const text = segment.text.trim()
+  if (text === '') return []
+  return renderMarkdown(text, width).split('\n')
 }
 
 /** The whole transcript, including the reply currently streaming in. */
@@ -1161,38 +1169,43 @@ function footerRight(snapshot: Snapshot, width: number): string {
   // a match jump leaves the view scrolled, which is exactly when the "no
   // matches" error and the `match i/n` counter matter most.
   const outranksScroll = snapshot.statusIsError || snapshot.searchActive === true
-  if (snapshot.voice !== undefined) {
-    // An open microphone outranks all of it. Nothing else the footer says is
-    // worth a person not knowing the room is being recorded, so this line
-    // holds the slot for as long as the take lasts.
-    return snapshot.voice === 'recording'
-      ? style(t('footer.recording', { spinner: snapshot.spinner }), { fg: colRose })
-      : style(t('footer.transcribing', { spinner: snapshot.spinner }), { fg: colGold })
-  }
-  if (snapshot.scrollBack > 0 && !outranksScroll) {
-    // Scrolled away from the newest output: say so, and say how to get back.
-    return style(
-      t('footer.scrolled', {
-        lines: snapshot.scrollBack,
-        s: snapshot.scrollBack === 1 ? '' : 's',
-      }),
-      { fg: colGold },
-    )
-  }
+  if (snapshot.voice !== undefined) return voiceFooter(snapshot)
+  if (snapshot.scrollBack > 0 && !outranksScroll) return scrolledFooter(snapshot)
   if (snapshot.status !== '') {
     const clipped = truncate(snapshot.status, Math.max(Math.floor(width / 2), 10))
     return snapshot.statusIsError ? warn(clipped) : ok(clipped)
   }
-  if (snapshot.picker.kind === 'none' && !snapshot.palette.open) {
-    return snapshot.vimMode === undefined
-      ? muted(t('footer.hint'))
-      : style(snapshot.vimMode === 'normal' ? ' NORMAL ' : ' INSERT ', {
-          fg: colText,
-          bg: snapshot.vimMode === 'normal' ? colAccent : colBorder,
-          bold: true,
-        })
-  }
+  if (snapshot.picker.kind === 'none' && !snapshot.palette.open) return hintFooter(snapshot)
   return ''
+}
+
+/** An open microphone holds the slot: nothing matters more than knowing the room is being recorded. */
+function voiceFooter(snapshot: Snapshot): string {
+  return snapshot.voice === 'recording'
+    ? style(t('footer.recording', { spinner: snapshot.spinner }), { fg: colRose })
+    : style(t('footer.transcribing', { spinner: snapshot.spinner }), { fg: colGold })
+}
+
+/** Scrolled away from the newest output: say so, and say how to get back. */
+function scrolledFooter(snapshot: Snapshot): string {
+  return style(
+    t('footer.scrolled', {
+      lines: snapshot.scrollBack,
+      s: snapshot.scrollBack === 1 ? '' : 's',
+    }),
+    { fg: colGold },
+  )
+}
+
+/** The idle footer: the key hint, or vim's mode badge. */
+function hintFooter(snapshot: Snapshot): string {
+  return snapshot.vimMode === undefined
+    ? muted(t('footer.hint'))
+    : style(snapshot.vimMode === 'normal' ? ' NORMAL ' : ' INSERT ', {
+        fg: colText,
+        bg: snapshot.vimMode === 'normal' ? colAccent : colBorder,
+        bold: true,
+      })
 }
 
 /** The status footer: model, context budget, usage, and the current status. */

@@ -2768,57 +2768,32 @@ class TuiApp {
 
   /** Run what the chosen picker row stands for, by the picker that showed it. */
   private activatePickerItem(kind: PickerKind, item: PickerItem): void {
-    if (kind === 'none') return
-    if (kind === 'models') {
-      void this.switchModel(item)
-      return
+    // One handler per picker, keyed by the picker that showed the row; a
+    // picker with no handler (or none at all) opens what the row names.
+    const run = this.pickerActions()[kind]
+    if (run === undefined) void this.openSession(item.id, item.title)
+    else run(item)
+  }
+
+  /** What choosing a row in each picker does. */
+  private pickerActions(): Partial<Record<PickerKind, (item: PickerItem) => void>> {
+    return {
+      models: (item) => void this.switchModel(item),
+      themes: (item) => this.selectTheme(item.id),
+      open: (item) => {
+        if (item.id === NEW_SESSION_ROW) void this.newSession()
+        else this.selectSession(Number.parseInt(item.id, 10))
+      },
+      plugins: (item) => this.togglePlugin(item.id),
+      panel: (item) => void this.panelHost.activate(item.id),
+      delete: (item) => this.confirmDelete(item.id, item.title),
+      rewind: (item) => void this.performRewind(Number.parseInt(item.id, 10)),
+      stored: (item) => void this.openStoredHit(item),
+      lang: (item) => this.selectLanguage(isLang(item.id) ? item.id : 'en'),
+      setup: (item) => this.activateSetupItem(item.id),
+      login: (item) => this.chooseLoginEntry(item.id),
+      'login-method': (item) => this.beginLoginWithMethod(item.id),
     }
-    if (kind === 'themes') {
-      this.selectTheme(item.id)
-      return
-    }
-    if (kind === 'open') {
-      if (item.id === NEW_SESSION_ROW) void this.newSession()
-      else this.selectSession(Number.parseInt(item.id, 10))
-      return
-    }
-    if (kind === 'plugins') {
-      this.togglePlugin(item.id)
-      return
-    }
-    if (kind === 'panel') {
-      void this.panelHost.activate(item.id)
-      return
-    }
-    if (kind === 'delete') {
-      this.confirmDelete(item.id, item.title)
-      return
-    }
-    if (kind === 'rewind') {
-      void this.performRewind(Number.parseInt(item.id, 10))
-      return
-    }
-    if (kind === 'stored') {
-      void this.openStoredHit(item)
-      return
-    }
-    if (kind === 'lang') {
-      this.selectLanguage(isLang(item.id) ? item.id : 'en')
-      return
-    }
-    if (kind === 'setup') {
-      this.activateSetupItem(item.id)
-      return
-    }
-    if (kind === 'login') {
-      this.chooseLoginEntry(item.id)
-      return
-    }
-    if (kind === 'login-method') {
-      this.beginLoginWithMethod(item.id)
-      return
-    }
-    void this.openSession(item.id, item.title)
   }
 
   /** Run what a chosen setup-wizard row opens next. */
@@ -2962,56 +2937,20 @@ class TuiApp {
   /** The composer's menus and command chords: palette, @-file, and shortcuts. */
   private chatMenuKey(key: Key): ChatKeyOutcome {
     switch (key.name) {
-      case 'esc': {
-        // A live microphone outranks everything else esc can dismiss: it is
-        // the most modal state the app has, and the one to get out of first.
-        if (this.voicePhase !== undefined) this.cancelVoice()
-        else if (this.drag !== undefined) {
-          this.drag = undefined
-          this.setStatus('')
-        }
-        else if (this.selectedTurn !== undefined) {
-          this.selectedTurn = undefined
-          this.setStatus('')
-        }
-        else if (this.atMenu.open) {
-          // Only the completion menu closes; the token stays for typing.
-          this.atDismissed = this.atMenu.query
-          this.atMenu.close()
-        }
-        else if (this.palette.open) this.palette.close()
-        else if (this.overlay !== '') this.overlay = ''
-        else if (this.search !== undefined) this.clearSearch()
-        else if (this.tab.streaming) this.interrupt()
+      case 'esc':
+        this.dismissOverlay()
         return 'handled'
-      }
-      case 'up': {
-        const up = -1
-        if (this.palette.open) this.palette.move(up)
-        else if (this.atMenu.open) this.atMenu.move(up)
-        else if (this.history.isRecalling() || this.composer.atFirstRow(this.innerWidth())) {
-          const recalled = this.history.recall(up, this.composer.value())
-          if (recalled !== undefined) this.composer.setValue(recalled)
-        } else this.composer.moveRow(up, this.innerWidth())
+      case 'up':
+        this.moveComposerCursor(-1)
         return 'handled'
-      }
-      case 'down': {
-        const down = 1
-        if (this.palette.open) this.palette.move(down)
-        else if (this.atMenu.open) this.atMenu.move(down)
-        else if (this.history.isRecalling() || this.composer.atLastRow(this.innerWidth())) {
-          const recalled = this.history.recall(down, this.composer.value())
-          if (recalled !== undefined) this.composer.setValue(recalled)
-        } else this.composer.moveRow(down, this.innerWidth())
+      case 'down':
+        this.moveComposerCursor(1)
         return 'handled'
-      }
       case 'ctrl+p':
-        if (this.palette.open) this.palette.move(-1)
-        else if (this.atMenu.open) this.atMenu.move(-1)
+        this.moveMenu(-1)
         return 'handled'
       case 'ctrl+n':
-        if (this.palette.open) this.palette.move(1)
-        else if (this.atMenu.open) this.atMenu.move(1)
+        if (this.palette.open || this.atMenu.open) this.moveMenu(1)
         else void this.runCommand('new', '')
         return 'handled'
       case 'ctrl+r':
@@ -3037,6 +2976,70 @@ class TuiApp {
       default:
         return 'unhandled'
     }
+  }
+
+  /** Where esc lands, by what is on top: voice first, then each overlay. */
+  private dismissOverlay(): void {
+    // A live microphone outranks everything else esc can dismiss: it is
+    // the most modal state the app has, and the one to get out of first.
+    if (this.voicePhase !== undefined) {
+      this.cancelVoice()
+      return
+    }
+    if (this.drag !== undefined) {
+      this.drag = undefined
+      this.setStatus('')
+      return
+    }
+    if (this.selectedTurn !== undefined) {
+      this.selectedTurn = undefined
+      this.setStatus('')
+      return
+    }
+    if (this.atMenu.open) {
+      // Only the completion menu closes; the token stays for typing.
+      this.atDismissed = this.atMenu.query
+      this.atMenu.close()
+      return
+    }
+    if (this.palette.open) {
+      this.palette.close()
+      return
+    }
+    if (this.overlay !== '') {
+      this.overlay = ''
+      return
+    }
+    if (this.search !== undefined) {
+      this.clearSearch()
+      return
+    }
+    if (this.tab.streaming) this.interrupt()
+  }
+
+  /** Move the menu cursor when a menu is up, else recall or walk the draft. */
+  private moveComposerCursor(delta: -1 | 1): void {
+    if (this.palette.open) {
+      this.palette.move(delta)
+      return
+    }
+    if (this.atMenu.open) {
+      this.atMenu.move(delta)
+      return
+    }
+    const atEdge = delta === -1 ? this.composer.atFirstRow(this.innerWidth()) : this.composer.atLastRow(this.innerWidth())
+    if (this.history.isRecalling() || atEdge) {
+      const recalled = this.history.recall(delta, this.composer.value())
+      if (recalled !== undefined) this.composer.setValue(recalled)
+      return
+    }
+    this.composer.moveRow(delta, this.innerWidth())
+  }
+
+  /** Move whichever completion menu is open. */
+  private moveMenu(delta: -1 | 1): void {
+    if (this.palette.open) this.palette.move(delta)
+    else if (this.atMenu.open) this.atMenu.move(delta)
   }
 
   /** The composer's own editing keys: motion and deletion. */
