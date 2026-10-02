@@ -81,3 +81,39 @@ npm run test:package  # packs, installs into a clean prefix + DSH_HOME, boots
 npm run build         # and commit lib/ — see below
 npm publish           # prepublishOnly re-runs build + typecheck + npm test
 ```
+## Release gates
+
+Publishing is automated: run the gates below locally, then publish a GitHub
+Release whose tag matches `package.json` (`v0.3.0` for `0.3.0`) and the
+[Publish to npm](.github/workflows/publish.yml) workflow runs them again on a
+clean machine before publishing with provenance. It is triggered by the
+Release rather than by a push, because npm rejects an existing version and a
+workflow that bumped one for you would turn an ordinary merge into a release
+nobody decided on. The one-time npm-side setup — trusted publishing, so no
+long-lived token is stored — and the dry-run path are in
+[`docs/releasing.md`](docs/releasing.md).
+
+```sh
+npm test              # 34 suites, including the pty round trip
+npm run test:live     # a real model turn through the TUI (needs credentials)
+npm run test:package  # packs, installs into a clean prefix + DSH_HOME, boots
+npm run build         # and commit lib/ — see below
+npm publish           # prepublishOnly re-runs build + typecheck + npm test
+```
+
+**`lib/` is committed, and has to be rebuilt and committed with any source
+change.** The dshfind registry inspects this repository's public source tree
+and requires the manifest's `main` to be a file that is actually in it; build
+output that only appears after `npm run build` fails its check with
+`missing_file`. The cost of that is a build artifact in git, and the risk is a
+stale one — if `lib/` lags `src/`, the registry describes different code than
+npm ships. `tsc` output is deterministic for a given source and compiler, so
+`npm run build && git diff --exit-code lib` says whether the tree is honest.
+
+`prepublishOnly` runs all four gates, so publishing needs `dsh` on `PATH` — a
+broken artifact must fail the publish rather than reach the registry.
+
+`test:package` exists because the suites all run from the source checkout,
+where `link-types` has already made the Harness resolvable — which is exactly
+how a tarball that could not resolve `@deepseek-ai/*` once passed every test
+and still crashed on boot. It now fails the release instead.
