@@ -139,8 +139,7 @@ export function renderUsagePane(view: UsageView, width: number): string[] {
   if (view.plansPending && view.plans.length === 0) {
     out.push('', muted('Checking provider plans…'))
   } else if (view.plans.length > 0) {
-    out.push('')
-    out.push(...renderPlans(view.plans, view.now, width))
+    out.push('', ...renderPlans(view.plans, view.now, width))
   }
 
   // ----------------------------------------------- spend, as this app billed it
@@ -154,6 +153,7 @@ export function renderUsagePane(view: UsageView, width: number): string[] {
     return out
   }
 
+
   // One color per provider, assigned from the lifetime ledger's own busiest-
   // first order — lifetime never forgets a provider a shorter window has
   // rolled off, so it is always the superset the other two draw their colors
@@ -161,10 +161,8 @@ export function renderUsagePane(view: UsageView, width: number): string[] {
   const order = sortedRows(view.lifetime).map(([provider]) => provider)
   const nameWidth = Math.max(8, ...order.map((provider) => displayWidth(provider)))
 
-  out.push(...section('Token spend — session (5h)', view.session, order, nameWidth, width))
-  out.push('')
-  out.push(...section('Token spend — week (7d)', view.week, order, nameWidth, width))
-  out.push('')
+  out.push(...section('Token spend — session (5h)', view.session, order, nameWidth, width), '')
+  out.push(...section('Token spend — week (7d)', view.week, order, nameWidth, width), '')
   out.push(...section('Token spend — lifetime', view.lifetime, order, nameWidth, width))
 
   return out

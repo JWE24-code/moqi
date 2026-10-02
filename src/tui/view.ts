@@ -824,8 +824,7 @@ function pickerPane(snapshot: Snapshot, geometry: Layout): string[] {
   // Title line, plus a filter line that doubles as the query display.
   const head: string[] = [bold(picker.title)]
   const hint = picker.query === '' ? muted('type to filter') : ''
-  head.push(`${muted('› ')}${style(picker.query, { fg: colText })}${hint}`)
-  head.push('')
+  head.push(`${muted('› ')}${style(picker.query, { fg: colText })}${hint}`, '')
 
   // Build every body line, remembering which one carries the selection.
   const body: string[] = []
@@ -1369,10 +1368,7 @@ export function render(snapshot: Snapshot): {
   const gutter = ' '
 
   const rows: string[] = []
-  if (geometry.showHeader) {
-    rows.push(header(snapshot, width))
-    rows.push('')
-  }
+  if (geometry.showHeader) rows.push(header(snapshot, width), '')
   rows.push(...sessionBar(snapshot, geometry))
 
   if (geometry.viewportRows > 0) rows.push(...bodyPane(snapshot, geometry))
@@ -1381,9 +1377,7 @@ export function render(snapshot: Snapshot): {
   rows.push(...backgroundPane(snapshot, geometry))
 
   const palette = palettePane(snapshot, geometry)
-  rows.push(...palette)
-
-  rows.push(...atPane(snapshot, geometry))
+  rows.push(...palette, ...atPane(snapshot, geometry))
 
   if (geometry.pluginRows > 0 && snapshot.pluginLine !== undefined) {
     rows.push(muted(truncate(snapshot.pluginLine, width)))
@@ -1391,8 +1385,7 @@ export function render(snapshot: Snapshot): {
 
   const composer = composerPane(snapshot, geometry)
   const composerTop = rows.length
-  rows.push(...composer.lines)
-  rows.push(footer(snapshot, width))
+  rows.push(...composer.lines, footer(snapshot, width))
 
   // The whole frame sits inside a one-column gutter. The cursor has to move
   // with it: composerPane reports a column inside its own box, and every line
@@ -1415,17 +1408,13 @@ function panelPane(snapshot: Snapshot, geometry: Layout): string[] {
   const inner = Math.max(width - 2, 10)
   const out: string[] = []
 
-  out.push(bold(truncate(panel.title, inner)))
-  out.push('')
+  out.push(bold(truncate(panel.title, inner)), '')
   const detail = panel.detail.trim()
   if (detail !== '') {
-    for (const line of renderMarkdown(detail, width).split('\n')) out.push(truncate(line, inner))
-    out.push('')
+    const lines = renderMarkdown(detail, width).split('\n').map((line) => truncate(line, inner))
+    out.push(...lines, '')
   }
-  out.push(...panelRows(panel, inner))
-  out.push(...panelInput(panel, inner))
-  out.push('')
-  out.push(muted(truncate(panel.hint, inner)))
+  out.push(...panelRows(panel, inner), ...panelInput(panel, inner), '', muted(truncate(panel.hint, inner)))
   return out.slice(0, Math.max(geometry.viewportRows, 0))
 }
 

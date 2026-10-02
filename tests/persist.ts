@@ -16,9 +16,8 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { homedir } from 'node:os'
 
 import {
   assembleState,

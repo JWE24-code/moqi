@@ -132,6 +132,11 @@ function githubHeaders(token: string): Record<string, string> {
 }
 
 /** Every unresolved issue on the project, paged through the Sonar API. */
+/** One line of log-safe text: control characters never reach the console. */
+function flatten(text: string): string {
+  return text.replaceAll(/[\u0000-\u001f]+/g, ' ')
+}
+
 /** The host without its trailing slashes, so joins never double one. */
 function stripTrailingSlashes(host: string): string {
   let end = host.length
@@ -301,11 +306,12 @@ async function openIssuesFor(
       if (config.dryRun) report(`would create: ${issue.key} — ${issueTitle(issue)}`)
       return
     }
-    for (const label of labelsFor(issue, config.label)) {
-      if (ensured.has(label)) continue
+    await labelsFor(issue, config.label).reduce(async (done, label) => {
+      await done
+      if (ensured.has(label)) return
       await ensureLabel(label, { api: config.api, repo: config.repo, token: config.githubToken }, fetchImpl)
       ensured.add(label)
-    }
+    }, Promise.resolve())
     const number = await createIssue(
       issue,
       {
@@ -394,7 +400,7 @@ if (invokedDirectly) {
   try {
     await main()
   } catch (error: unknown) {
-    console.error(`sonar-issues: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(`sonar-issues: ${flatten(error instanceof Error ? error.message : String(error))}`)
     process.exitCode = 1
   }
 }

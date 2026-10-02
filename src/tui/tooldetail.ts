@@ -106,7 +106,7 @@ export function summarizeResult(
  */
 export function applyToolEvent(
   tools: ToolActivity[],
-  event: { type?: string; data?: Record<string, unknown> | undefined },
+  event: { type?: string; data?: Record<string, unknown> },
 ): void {
   if (event.data === undefined) return
   if (event.type === 'tool/call') applyToolCall(tools, event.data)

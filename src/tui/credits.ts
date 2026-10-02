@@ -575,7 +575,10 @@ function windowLine(window: CreditWindow, now: number, labelWidth: number, width
  */
 function planBlock(plan: ProviderPlan, now: number, labelWidth: number, width: number): string[] {
   let heading = style(plan.displayName, { bold: true })
-  if (plan.plan !== undefined) heading += ` ${muted(`— ${plan.plan}`)}`
+  if (plan.plan !== undefined) {
+    const dash = muted(`— ${plan.plan}`)
+    heading += ` ${dash}`
+  }
   const out: string[] = [`  ${truncate(heading, width - 2)}`]
 
   if (plan.problem !== undefined) {

@@ -29,10 +29,9 @@ check('two panes sit side by side', JSON.stringify(tileGrid(2)) === '{"columns":
 check('three panes make two rows', JSON.stringify(tileGrid(3)) === '{"columns":2,"rows":2}')
 check('four panes square off', JSON.stringify(tileGrid(4)) === '{"columns":2,"rows":2}')
 
-{
-  // Every layout covers the region exactly once: cells sum to the whole,
-  // no tile is degenerate, and none reaches past the edge.
-  for (const count of [1, 2, 3, 4, 5, 6, 7]) {
+// Every layout covers the region exactly once: cells sum to the whole,
+// no tile is degenerate, and none reaches past the edge.
+for (const count of [1, 2, 3, 4, 5, 6, 7]) {
     for (const width of [20, 37, 80]) {
       for (const height of [5, 11, 24]) {
         const rects = tiles(count, width, height)
@@ -46,7 +45,7 @@ check('four panes square off', JSON.stringify(tileGrid(4)) === '{"columns":2,"ro
       }
     }
   }
-}
+
 
 check('left stops at the first column', focusNeighbor(4, 0, 'left') === undefined)
 check('left reaches the neighbor', focusNeighbor(4, 1, 'left') === 0)

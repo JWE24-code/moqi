@@ -486,7 +486,7 @@ export class Palette {
    * on to the command's own arguments.
    */
   update(input: string, commands: readonly PaletteCommand[]): void {
-    if (!input.startsWith('/') || /[\s\n]/.test(input)) {
+    if (!input.startsWith('/') || /\s/.test(input)) {
       this.close()
       return
     }

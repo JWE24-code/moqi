@@ -698,7 +698,7 @@ class TuiApp {
   /** What was in force before the language picker opened a preview, restored on esc. */
   private previewBaseLang: Lang | undefined
   /** Last-seen status of each background job, so a finish is observed as a transition. */
-  private jobStatus = new Map<string, string>()
+  private readonly jobStatus = new Map<string, string>()
   /** The background-job watcher's interval. */
   private jobsTimer: NodeJS.Timeout | undefined
 
@@ -711,7 +711,7 @@ class TuiApp {
    * to it: needing a relaunch to see a machine you just remembered is the
    * whole reason this is editable.
    */
-  private peers: PeerList
+  private readonly peers: PeerList
   private readonly presence: PresencePublisher
   /** Signature of the last published set, so an unchanged paint writes nothing. */
   private presenceKey = ''
@@ -926,8 +926,6 @@ class TuiApp {
           this.paint()
         })
       }),
-    )
-    this.disposers.push(
       this.ctx.on('user-questions/request', async (request, next) => {
         if (request.agent !== undefined && !this.ownsRequest(request.agent)) return await next()
         return await new Promise<AskUserQuestionAnswer>((resolve, reject) => {
@@ -1186,15 +1184,13 @@ class TuiApp {
         this.settleApproval(panel, 'allowed-once')
         return
       case '2':
+      case 'esc':
+      case 'ctrl+c':
+        // Fail closed: esc means no, and so does the deny row.
         this.settleApproval(panel, 'rejected')
         return
       case 'enter':
         this.settleApproval(panel, panel.decision())
-        return
-      case 'esc':
-      case 'ctrl+c':
-        // Fail closed: esc means no.
-        this.settleApproval(panel, 'rejected')
         return
       default:
         break
@@ -1533,14 +1529,10 @@ class TuiApp {
         note(payload.agent, 'idle')
         return undefined
       }),
-    )
-    this.disposers.push(
       this.ctx.on('agent/status', (payload) => {
         note(payload.agent, payload.status)
         return undefined
       }),
-    )
-    this.disposers.push(
       this.ctx.on('agent/disposed', (payload) => {
         if (this.tabs.some((tab) => tab.agent === payload.agent)) return
         const id = String(payload.agent.session.header.id)

@@ -59,7 +59,7 @@ function textOfRecord(raw: string): { text: string; role?: 'user' | 'assistant' 
     return { text: '' }
   }
   const record = parsed as { type?: unknown; data?: { message?: { content?: unknown } } }
-  const type = String(record.type ?? '')
+  const type = typeof record.type === 'string' ? record.type : ''
   let role: 'user' | 'assistant' | undefined
   if (type === 'user/message') role = 'user'
   else if (type === 'assistant/message') role = 'assistant'

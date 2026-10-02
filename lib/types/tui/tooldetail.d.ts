@@ -41,5 +41,5 @@ export declare function summarizeResult(content: readonly unknown[], error?: {
  */
 export declare function applyToolEvent(tools: ToolActivity[], event: {
     type?: string;
-    data?: Record<string, unknown> | undefined;
+    data?: Record<string, unknown>;
 }): void;
