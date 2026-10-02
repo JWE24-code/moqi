@@ -45,6 +45,7 @@ import {
   colText,
   muted,
   ok,
+  readableOn,
   selected,
   style,
   warn,
@@ -487,9 +488,14 @@ function renderTool(tool: ToolActivity, width: number, toolStyle: ToolStyle): st
 }
 
 /**
- * One edit's diff rows: `NNNN - old` in red, `NNNN + new` in green, the rows
- * around them dimmed. The row number column is fixed width so the signs line
- * up even when an unplaced hunk has no numbers at all.
+ * One edit's diff rows: a removed row is a red bar, an added row a green one,
+ * each carrying its row number and text; the rows around them stay dim. The
+ * number column is fixed width so the signs line up even when an unplaced
+ * hunk has no numbers at all.
+ *
+ * The color goes on the whole padded line rather than on the words: a bar is
+ * what reads at a glance, and it survives a terminal that renders text
+ * attributes poorly.
  */
 function renderDiff(diff: readonly DiffLine[], width: number): string[] {
   const gutter = Math.max(
@@ -498,17 +504,20 @@ function renderDiff(diff: readonly DiffLine[], width: number): string[] {
   )
   return diff.map((row) => {
     const number = row.line === undefined ? ' '.repeat(gutter) : String(row.line).padStart(gutter)
+    const sign = row.kind === 'remove' ? '-' : row.kind === 'add' ? '+' : ' '
     const body = truncate(row.text, Math.max(width - gutter - 4, 8))
-    const { sign, painted } = diffPaint(row.kind, body)
-    return `  ${muted(number)} ${sign} ${painted}`
+    const line = padEnd(`  ${number} ${sign} ${body}`, width)
+    return diffPaint(row.kind, line)
   })
 }
 
-/** The sign and the body of one diff row, colored by whether it came or went. */
-function diffPaint(kind: DiffLine['kind'], body: string): { sign: string; painted: string } {
-  if (kind === 'remove') return { sign: style('-', { fg: colRose }), painted: style(body, { fg: colRose }) }
-  if (kind === 'add') return { sign: style('+', { fg: colGreen }), painted: style(body, { fg: colGreen }) }
-  return { sign: muted(' '), painted: muted(body) }
+/** One diff row, tinted by whether it came or went. */
+function diffPaint(kind: DiffLine['kind'], line: string): string {
+  // The foreground is measured against the bar, not assumed: the same palette
+  // needs dark text on its light rose and light text on its dark one.
+  if (kind === 'remove') return style(line, readableOn(colRose))
+  if (kind === 'add') return style(line, readableOn(colGreen))
+  return muted(line)
 }
 
 /** Seconds as a compact duration: 8s, 1m12s. */

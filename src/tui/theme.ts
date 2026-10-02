@@ -153,6 +153,41 @@ function channels(hex: string): [number, number, number] {
   ]
 }
 
+/** WCAG relative luminance of a resolved color. */
+function luminance(hex: string): number {
+  const [r, g, b] = channels(hex).map((value) => {
+    const channel = value / 255
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  }) as [number, number, number]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/**
+ * WCAG contrast ratio between two colors, 1 (identical) to 21 (black/white).
+ * 4.5 is the AA threshold for body text.
+ */
+export function contrastRatio(a: AdaptiveColor, b: AdaptiveColor): number {
+  const first = luminance(resolve(a))
+  const second = luminance(resolve(b))
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
+}
+
+/**
+ * Text on a colored bar: the given background, and whichever of the palette's
+ * two text colors reads better on it.
+ *
+ * Which one that is cannot be assumed — a bar that takes white text on a dark
+ * terminal may need dark text for the same palette's light variant — so the
+ * pair is measured rather than picked.
+ */
+export function readableOn(background: AdaptiveColor): StyleOptions {
+  const candidates: AdaptiveColor[] = [colText, colInvert]
+  const best = candidates.reduce((a, b) =>
+    contrastRatio(background, b) > contrastRatio(background, a) ? b : a,
+  )
+  return { bg: background, fg: best }
+}
+
 const ESC = ''
 
 /** Clears every attribute set by {@link style}. */

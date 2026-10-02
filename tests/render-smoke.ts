@@ -544,13 +544,30 @@ const edit: Message = {
 const editFrame = render(snapshot({ messages: [edit], expandTools: true })).lines
 const editText = editFrame.map((line) => stripAnsi(line))
 check('a diff numbers every row', editText.some((line) => /^\s*13 - const gone = 4$/.test(line.trim())))
+// The color is the row's background, not its words: a bar reads at a glance.
+const barOf = (color: { light: string; dark: string }): string => {
+  // `prefix` joins fg and bg into one SGR, so match the background channel.
+  const channels = /48;2;[0-9;]+/.exec(style('x', { bg: color }))
+  return channels?.[0] ?? ''
+}
 check(
-  'a removed row is painted red',
-  editFrame.some((line) => line.includes(style('const gone = 4', { fg: colRose }))),
+  'a removed row is a red bar',
+  editFrame.some((line) => line.includes('const gone = 4') && line.includes(barOf(colRose))),
 )
 check(
-  'an added row is painted green',
-  editFrame.some((line) => line.includes(style('const replaced = 5', { fg: colGreen }))),
+  'an added row is a green bar',
+  editFrame.some((line) => line.includes('const replaced = 5') && line.includes(barOf(colGreen))),
+)
+const widestRow = Math.max(...editFrame.map((line) => displayWidth(stripAnsi(line))))
+check(
+  'a bar spans the transcript width',
+  editFrame.some((line) => line.includes(barOf(colRose)) && displayWidth(stripAnsi(line)) === widestRow),
+)
+check(
+  'context rows carry no bar',
+  editFrame
+    .filter((line) => line.includes('const keep = 2'))
+    .every((line) => !line.includes(barOf(colRose)) && !line.includes(barOf(colGreen))),
 )
 check(
   'context rows surround the change',

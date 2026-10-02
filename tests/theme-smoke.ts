@@ -37,8 +37,11 @@ import {
   colRose,
   colText,
   colWarn,
+  contrastRatio,
   listThemes,
+  readableOn,
   refreshTheme,
+  resolve,
   style,
   type AdaptiveColor,
 } from '../src/tui/theme.ts'
@@ -211,6 +214,35 @@ try {
 
 const childEnv = { ...process.env }
 delete childEnv['FORCE_COLOR']
+// ------------------------------------------------- text on a colored bar
+
+// A diff bar fills its row with the change's color, so its text has to be
+// chosen against that bar rather than assumed: the better of the palette's two
+// text colors, measured. The wrong guess is invisible on one terminal and
+// unreadable on the other.
+for (const bar of [colRose, colGreen]) {
+  const chosen = readableOn(bar).fg
+  const other = chosen === colText ? colInvert : colText
+  check(
+    `the bar text is the better-contrasting palette color (${resolve(bar)})`,
+    chosen !== undefined && contrastRatio(bar, chosen) >= contrastRatio(bar, other),
+  )
+  check(
+    `the bar text clears the large-text contrast floor (${resolve(bar)})`,
+    chosen !== undefined && contrastRatio(bar, chosen) >= 3,
+  )
+}
+
+// The measured choice tracks the terminal: the same palette needs a different
+// text color on its light bar and its dark one.
+const darkChoice = readableOn(colRose).fg
+process.env['MOQI_THEME'] = 'light'
+refreshTheme()
+const lightChoice = readableOn(colRose).fg
+check('a bar text follows the terminal background', darkChoice !== lightChoice)
+delete process.env['MOQI_THEME']
+refreshTheme()
+
 delete childEnv['MOQI_THEME']
 
 execFileSync(process.execPath, ['--experimental-strip-types', fileURLToPath(import.meta.url)], {

@@ -62,6 +62,20 @@ export declare function refreshTheme(): void;
 export declare function isDark(): boolean;
 /** Resolve an adaptive color against the active background. */
 export declare function resolve(color: AdaptiveColor): string;
+/**
+ * WCAG contrast ratio between two colors, 1 (identical) to 21 (black/white).
+ * 4.5 is the AA threshold for body text.
+ */
+export declare function contrastRatio(a: AdaptiveColor, b: AdaptiveColor): number;
+/**
+ * Text on a colored bar: the given background, and whichever of the palette's
+ * two text colors reads better on it.
+ *
+ * Which one that is cannot be assumed — a bar that takes white text on a dark
+ * terminal may need dark text for the same palette's light variant — so the
+ * pair is measured rather than picked.
+ */
+export declare function readableOn(background: AdaptiveColor): StyleOptions;
 /** Clears every attribute set by {@link style}. */
 export declare const RESET = "\u001B[0m";
 /** Attributes a style can carry beyond its colors. */

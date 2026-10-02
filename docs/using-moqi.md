@@ -70,9 +70,11 @@ that produced it, and the choice is remembered across restarts:
 
 A file edit does not show its result line — `str_replace_editor` only answers
 "The file … has been edited successfully", which says nothing. Instead the
-expanded row is the change itself: rows taken out in red, rows written in
-green, each with its row number and three rows of context either side, so the
-edit can be read without opening the file:
+expanded row is the change itself: a removed row is a red bar, an added row a
+green one, each carrying its row number, with three rows of context either
+side, so the edit can be read without opening the file. The bar's text color is
+chosen by measured contrast against it, so the same palette stays readable on a
+light and a dark terminal:
 
 ```
  ✓ str_replace_editor  src/tui/view.ts

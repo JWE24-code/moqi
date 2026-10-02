@@ -9,11 +9,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **A file edit reads as a diff.** With tool calls expanded, a
-  `str_replace_editor` call shows the rows it removed in red and the rows it
-  wrote in green, each with its row number and three rows of context either
+  `str_replace_editor` call shows a removed row as a red bar and an added row
+  as a green one, each with its row number and three rows of context either
   side. The change comes from the call's own arguments, since the tool's
   result is a one-line success message; the numbers and context come from the
-  file as read once the call settles.
+  file as read once the call settles; and the bar's text takes whichever
+  palette color measures as the more readable against it.
 
 ### Changed
 
