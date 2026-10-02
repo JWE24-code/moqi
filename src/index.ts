@@ -2482,6 +2482,70 @@ class TuiApp {
     )
   }
 
+  /** `x` on a remote row: forget that device and refresh the list. */
+  private removeFleetPeer(): void {
+    // Only a remote row names a peer; this device is not one of them.
+    const row = this.fleet.current()
+    if (row === undefined || row.local) {
+      this.setStatus('select another device to remove it from the peer list')
+      this.paint()
+      return
+    }
+    if (this.removePeer(row.host)) {
+      this.setStatus(`removed ${row.host} from the peer list`)
+      this.fleet.loading = true
+      this.paint()
+      void this.refreshFleet()
+      return
+    }
+    this.setStatus(`${row.host} was not added here, so it cannot be removed`)
+    this.paint()
+  }
+
+  /**
+   * `k` on a row: close the session it names when this app owns it.
+   *
+   * "Kill" is the per-session lever the app actually has. A session in another
+   * process, or on a peer, has no per-session control channel — the only lever
+   * is the owning process, which would end every session it holds — so it is
+   * refused rather than silently killing more than the row under the cursor.
+   */
+  private closeFleetSelection(): void {
+    const row = this.fleet.current()
+    if (row === undefined || isActionRow(row)) return
+    const index = this.fleet.selected
+    const open = this.tabs.findIndex((tab) => tab.id === row.sessionId)
+    if (row.local && open !== -1) {
+      this.closeSession(open)
+      this.fleet.removeAt(index)
+      this.paint()
+      return
+    }
+    this.setStatus(
+      row.local
+        ? 'that session belongs to another process here, so it cannot be closed from this list'
+        : 'a session on another device cannot be closed from here — open it, then /close',
+    )
+    this.paint()
+  }
+
+  /** `d` on a remote row: run the composer's text as a task on that peer. */
+  private dispatchFleetSelection(): void {
+    const row = this.fleet.current()
+    if (row === undefined || row.local) {
+      this.setStatus('select another device to dispatch to it')
+      this.paint()
+      return
+    }
+    const draft = this.composer.value().trim()
+    if (draft === '') {
+      this.setStatus('type the task in the composer, then press d here')
+      this.paint()
+      return
+    }
+    void this.dispatchTo(row.host, draft)
+  }
+
   private handleFleetKey(key: Key): void {
     // While the prompt is up it owns the keyboard, or typing "r" into a host
     // name would refresh the list instead.
@@ -2522,50 +2586,13 @@ class TuiApp {
         break
 
       case 'x':
-      case 'delete': {
-        // Only a remote row names a peer; this device is not one of them.
-        const row = this.fleet.current()
-        if (row === undefined || row.local) {
-          this.setStatus('select another device to remove it from the peer list')
-          this.paint()
-          break
-        }
-        if (this.removePeer(row.host)) {
-          this.setStatus(`removed ${row.host} from the peer list`)
-          this.fleet.loading = true
-          this.paint()
-          void this.refreshFleet()
-        } else {
-          this.setStatus(`${row.host} was not added here, so it cannot be removed`)
-          this.paint()
-        }
+      case 'delete':
+        this.removeFleetPeer()
         break
-      }
 
-      case 'k': {
-        // "Kill" here is the per-session lever the app actually has: closing a
-        // session it owns. A session in another process, or on a peer, has no
-        // per-session control channel — the only lever is the owning process,
-        // which would end every session it holds — so it is refused rather
-        // than silently killing more than the row the cursor is on.
-        const row = this.fleet.current()
-        if (row === undefined || isActionRow(row)) break
-        const index = this.fleet.selected
-        const open = this.tabs.findIndex((tab) => tab.id === row.sessionId)
-        if (row.local && open !== -1) {
-          this.closeSession(open)
-          this.fleet.removeAt(index)
-          this.paint()
-          break
-        }
-        this.setStatus(
-          row.local
-            ? 'that session belongs to another process here, so it cannot be closed from this list'
-            : 'a session on another device cannot be closed from here — open it, then /close',
-        )
-        this.paint()
+      case 'k':
+        this.closeFleetSelection()
         break
-      }
 
       case 'enter':
         this.openFleetSelection()
@@ -2575,22 +2602,9 @@ class TuiApp {
         void this.previewFleetSelection()
         break
 
-      case 'd': {
-        const row = this.fleet.current()
-        if (row === undefined || row.local) {
-          this.setStatus('select another device to dispatch to it')
-          this.paint()
-          break
-        }
-        const draft = this.composer.value().trim()
-        if (draft === '') {
-          this.setStatus('type the task in the composer, then press d here')
-          this.paint()
-          break
-        }
-        void this.dispatchTo(row.host, draft)
+      case 'd':
+        this.dispatchFleetSelection()
         break
-      }
 
       default:
         break

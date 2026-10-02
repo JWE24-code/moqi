@@ -12,6 +12,7 @@ import {
   fleetSummary,
   isActionRow,
   renderFleet,
+  type FleetSession,
   type FleetView,
 } from './fleet.ts'
 import { renderUsagePane, type UsageView } from './usage-view.ts'
@@ -1294,6 +1295,13 @@ function footer(snapshot: Snapshot, width: number): string {
   return truncate(left, width)
 }
 
+/** What `enter` does on the highlighted row, as the footer advertises it. */
+function fleetActionLabel(current: FleetSession | undefined): string {
+  if (current === undefined) return 'open'
+  if (isActionRow(current)) return 'enter new session'
+  return 'enter open'
+}
+
 /**
  * The fleet overview pane, which replaces the transcript while it is open.
  *
@@ -1350,8 +1358,7 @@ function fleetPane(snapshot: Snapshot, geometry: Layout): string[] {
   // it is only where a real terminal is not attached on both ends that this
   // falls back to copying the command instead. The new-session action says
   // what it does instead.
-  const action =
-    current === undefined ? 'open' : isActionRow(current) ? 'enter new session' : 'enter open'
+  const action = fleetActionLabel(current)
   const hint = `↑↓ move  ·  ${action}  ·  k close  ·  a add  ·  x remove  ·  r refresh  ·  esc back`
   const shown = fleet.sessions.filter((session) => !isActionRow(session)).length
   const count = fleet.loading ? 'refreshing…' : `${String(shown)} sessions`
