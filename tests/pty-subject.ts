@@ -20,6 +20,7 @@
  * Run with: node --experimental-strip-types tests/pty-subject.ts
  */
 
+import { appendFileSync } from 'node:fs'
 import { Screen } from '../src/tui/screen.ts'
 import { Composer, Palette, Picker, textMessage, type Message } from '../src/tui/state.ts'
 import { render, type Snapshot } from '../src/tui/view.ts'
@@ -30,6 +31,8 @@ import { setLanguage } from '../src/tui/i18n.ts'
 const composer = new Composer()
 /** The same trust-surface state the real app keeps, in miniature. */
 let panel: ApprovalPanel | QuestionsPanel | undefined
+/** A picker over one of the app's lists (themes, sessions), the way /theme runs. */
+const picker = new Picker()
 const atMenu = new AtMenu()
 const CANDIDATES = ['src/tui/state.ts', 'src/tui/view.ts', 'src/index.ts', 'README.md']
 /**
@@ -47,7 +50,12 @@ function syncAtMenu(): void {
 function acceptAt(): void {
   const chosen = atMenu.current?.()
   const token = activeAtToken(composer.value(), composer.position())
-  if (chosen === undefined || token === undefined) return
+  // Match the real app: an accept with nothing to accept closes the menu,
+  // so a stuck menu can never swallow the enter keys that follow.
+  if (chosen === undefined || token === undefined) {
+    atMenu.close()
+    return
+  }
   const edit = acceptToken(composer.value(), composer.position(), token, chosen.path)
   composer.adopt(edit.text, edit.cursor)
   atMenu.close()
@@ -74,7 +82,7 @@ function snapshot(): Snapshot {
     showThinking: false,
     composer,
     palette: new Palette(),
-    picker: new Picker(),
+    picker,
     scrollBack: 0,
     expandTools: false,
     sessions: [],
@@ -146,6 +154,11 @@ function handleApprovalKey(approval: ApprovalPanel, key: { name: string }): void
 /** Keys for a waiting question set: toggle, answer, or cancel. */
 function handleQuestionKey(key: { name: string; text: string }): void {
   if (!(panel instanceof QuestionsPanel)) return
+  if (key.name === 'up' || key.name === 'down') {
+    panel.move(key.name === 'up' ? -1 : 1)
+    repaint()
+    return
+  }
   if (key.name === ' ' || key.text === ' ') {
     panel.toggle()
     repaint()
@@ -168,6 +181,32 @@ function handleQuestionKey(key: { name: string; text: string }): void {
   }
 }
 
+
+/** Keys while a picker owns the keyboard: navigate, choose, or dismiss. */
+function handlePickerKey(key: { name: string; text: string }): void {
+  switch (key.name) {
+    case 'esc':
+      notices.push('closed the picker')
+      picker.hide()
+      break
+    case 'up':
+      picker.move(-1)
+      break
+    case 'down':
+      picker.move(1)
+      break
+    case 'enter': {
+      const chosen = picker.current()
+      picker.hide()
+      if (chosen !== undefined) notices.push(`theme → ${chosen.id}`)
+      break
+    }
+    default:
+      picker.key(key)
+      break
+  }
+  repaint()
+}
 
 /** The app's own keys: menus, newlines, paste, and submitting the draft. */
 function handleAppKey(key: { name: string; text: string }): boolean {
@@ -212,6 +251,13 @@ function submitDraft(): void {
     return
   }
   if (submitCommand(text)) return
+  // Like the real app: a slash draft that names nothing is reported, not sent.
+  if (text.startsWith('/')) {
+    notices.push(`unknown command ${text} — type / to see them`)
+    composer.reset()
+    repaint()
+    return
+  }
   if (text !== '') {
     messages.push(textMessage('user', text))
     composer.reset()
@@ -250,8 +296,19 @@ function submitCommand(text: string): boolean {
       composer.reset()
       repaint()
     },
+    '/theme': () => {
+      picker.show('themes', 'Themes', [
+        { id: 'dark', title: 'Dark', subtitle: 'default' },
+        { id: 'light', title: 'Light', subtitle: '' },
+      ])
+      composer.reset()
+      repaint()
+    },
   }
   const run = commands[text]
+  if (process.env['SUBJECT_KEYLOG'] !== undefined) {
+    appendFileSync('/tmp/subject-submit', 'command ' + JSON.stringify(text) + ' matched=' + String(run !== undefined) + '\n')
+  }
   if (run === undefined) return false
   run()
   return true
@@ -282,24 +339,36 @@ function handleEditingKey(key: { name: string; text: string }): void {
   }
 }
 
-const screen = new Screen({
-  onKey(key: { name: string; text: string }): void {
+/** One key: logged when the driver asks, and never allowed to throw. */
+function handleKeyLogged(key: { name: string; text: string }): void {
+  try {
     if (handleDoubleCtrlC(key)) return
+    if (picker.kind !== 'none') {
+      handlePickerKey(key)
+      return
+    }
     if (panel !== undefined) {
       handlePanelKey(key)
       return
     }
     if (handleAppKey(key)) return
     handleEditingKey(key)
+  } catch (error) {
+    appendFileSync('/tmp/subject-error', String(error))
+  }
+}
+
+const screen = new Screen({
+  onKey(key: { name: string; text: string }): void {
+    handleKeyLogged(key)
   },
   onResize(): void {
     repaint()
   },
 })
 
-screen.start()
-repaint()
 
+/** Leave the terminal, report what happened, and exit cleanly. */
 function finish(): void {
   screen.stop()
   const line = `\nSUBJECT-DONE ${String(messages.length)} ${notices.join(' | ')}\n`
@@ -309,6 +378,9 @@ function finish(): void {
   // Belt and braces: never hang the driver if the write never drains.
   setTimeout(() => process.exit(0), 500).unref()
 }
+
+screen.start()
+repaint()
 
 function tick(): void {
   if (quit) {

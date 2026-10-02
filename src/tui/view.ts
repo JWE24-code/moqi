@@ -1238,8 +1238,15 @@ function footer(snapshot: Snapshot, width: number): string {
   const left = footerLeft(snapshot)
   const right = footerRight(snapshot, width)
   const gap = width - displayWidth(left) - displayWidth(right)
-  if (gap < 2) return truncate(left, width)
-  return left + ' '.repeat(gap) + right
+  // Truncate the assembled row as a belt-and-braces guarantee: the meter's
+  // glyphs can render a column wider than the width table predicts, and the
+  // status must never be the part the terminal silently clips.
+  if (gap >= 2) return truncate(left + ' '.repeat(gap) + right, width)
+  // The two cannot share the row. The status is the newer information — an
+  // answer, an error, a notice — so it wins; the meter waits for the next
+  // repaint to say its piece.
+  if (right !== '') return truncate(right, width)
+  return truncate(left, width)
 }
 
 /**
