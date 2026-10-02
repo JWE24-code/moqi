@@ -593,11 +593,16 @@ function planBlock(plan: ProviderPlan, now: number, labelWidth: number, width: n
   }
 
   for (const note of plan.notes) {
-    const text =
-      note.level === 'warn' ? warn(note.text) : note.level === 'ok' ? ok(note.text) : muted(note.text)
-    out.push(truncate(`    ${text}`, width))
+    out.push(truncate(`    ${noteText(note)}`, width))
   }
   return out
+}
+
+/** A plan note, colored by its level. */
+function noteText(note: ProviderPlan['notes'][number]): string {
+  if (note.level === 'warn') return warn(note.text)
+  if (note.level === 'ok') return ok(note.text)
+  return muted(note.text)
 }
 
 /** The balance line: what was granted and topped up, and whether it is usable. */

@@ -52,7 +52,7 @@ import { isImagePath, type AtMenu } from './atfile.ts'
 import { helpText, t, translate } from './i18n.ts'
 import { stackFrame } from './stack.ts'
 import { highlighted, type Span } from './select.ts'
-import type { PanelView } from './panels.ts'
+import type { PanelRow, PanelView } from './panels.ts'
 
 /** Most file-completion rows listed at once before the popup scrolls. */
 const MAX_AT_ROWS = 6
@@ -327,12 +327,12 @@ export function layout(snapshot: Snapshot): Layout {
   const pluginRows = snapshot.pluginLine !== undefined && snapshot.pluginLine.trim() !== '' ? 1 : 0
 
   // The background strip is one line when collapsed, or a bordered list.
-  const backgroundRows =
-    snapshot.background.length === 0
-      ? 0
-      : snapshot.expandBackground
-        ? Math.min(snapshot.background.length, MAX_BACKGROUND_ROWS) + POPUP_BORDER_ROWS
-        : 1
+  let backgroundRows = 0
+  if (snapshot.background.length > 0) {
+    backgroundRows = snapshot.expandBackground
+      ? Math.min(snapshot.background.length, MAX_BACKGROUND_ROWS) + POPUP_BORDER_ROWS
+      : 1
+  }
 
   const settled = shedChrome({
     rows: snapshot.rows,
@@ -359,6 +359,48 @@ export function layout(snapshot: Snapshot): Layout {
     showHeader: settled.showHeader,
     showGap: settled.showGap,
   }
+}
+
+/** A row's selection mark: cursor for single-select, ring for multi-select. */
+function rowMark(row: PanelRow): string {
+  if (row.checked === undefined) return row.selected ? '❯' : ' '
+  return row.checked ? '◉' : '○'
+}
+
+/** The row's description, set off by two spaces when there is one. */
+function rowSuffix(row: PanelRow): string {
+  return row.description === undefined ? '' : `  ${row.description}`
+}
+
+/** A session strip's status glyph. */
+function sessionMark(status: string, spinner: string): string {
+  if (status === 'running') return style(spinner, { fg: colGreen })
+  if (status === 'ready') return style('●', { fg: colGold })
+  return muted('·')
+}
+
+/** The empty-composer hint, shrinking as the terminal does. */
+function composerPlaceholder(question: string | undefined, inner: number): string {
+  if (question !== undefined && inner >= 12) return truncate(question, inner)
+  if (inner >= 34) return 'Ask the harness…  (/ for commands)'
+  if (inner >= 16) return 'Ask the harness…'
+  return '…'
+}
+
+/** What enter does in each picker, as the footer advertises it. */
+function pickerAction(kind: Picker['kind']): string {
+  if (kind === 'models' || kind === 'themes' || kind === 'login' || kind === 'login-method') return 'select'
+  if (kind === 'plugins' || kind === 'panel') return 'enable or disable'
+  if (kind === 'delete') return 'delete'
+  return 'open'
+}
+
+/** A tool call's status mark; a running call carries the spinner instead. */
+function toolMark(status: string, toolStyle: ToolStyle): string {
+  if (status !== 'running') return status === 'ok' ? ok('✓') : warn('✗')
+  return toolStyle.spinner === ''
+    ? style('●', { fg: colGreen })
+    : style(toolStyle.spinner, { fg: colAccent })
 }
 
 /** Strip the scheme and trailing slash from a base URL for the header. */
@@ -406,14 +448,7 @@ interface ToolStyle {
  * time instead of a status mark.
  */
 function renderTool(tool: ToolActivity, width: number, toolStyle: ToolStyle): string[] {
-  const mark =
-    tool.status === 'running'
-      ? toolStyle.spinner === ''
-        ? style('●', { fg: colGreen })
-        : style(toolStyle.spinner, { fg: colAccent })
-      : tool.status === 'ok'
-        ? ok('✓')
-        : warn('✗')
+  const mark = toolMark(tool.status, toolStyle)
 
   // The elapsed time belongs to the call in hand, not to the turn: it is the
   // one number that says "this is still going" rather than "this took a while".
@@ -819,12 +854,7 @@ function pickerPane(snapshot: Snapshot, geometry: Layout): string[] {
 
   const out = [...head, ...visible]
   while (out.length < height - 1) out.push('')
-  const action = picker.kind === 'models' || picker.kind === 'themes' ||
-    picker.kind === 'login' || picker.kind === 'login-method'
-    ? 'select'
-    : picker.kind === 'plugins' || picker.kind === 'panel'
-      ? 'enable or disable'
-      : picker.kind === 'delete' ? 'delete' : 'open'
+  const action = pickerAction(picker.kind)
   // The open-sessions list is the only one a key can act on beyond selecting
   // a row: "x" closes the session under the cursor without leaving the list.
   const keys = picker.kind === 'open'
@@ -906,12 +936,7 @@ function sessionBar(snapshot: Snapshot, geometry: Layout): string[] {
   const width = geometry.contentWidth
 
   const cells = snapshot.sessions.map((session, index) => {
-    const mark =
-      session.status === 'running'
-        ? style(snapshot.spinner, { fg: colGreen })
-        : session.status === 'ready'
-          ? style('●', { fg: colGold })
-          : muted('·')
+    const mark = sessionMark(session.status, snapshot.spinner)
     const name = session.title === '' ? 'new' : session.title
     const label = `${String(index + 1)} ${name}`
     const body = `${mark} ${truncate(label, 18)}`
@@ -1102,14 +1127,7 @@ function composerPane(
   // than in a status line the eye has already left.
   const question = snapshot.confirmText === undefined ? undefined : `${snapshot.confirmText}  (y/n)`
   // A narrow terminal has to drop the hint before it drops the prompt.
-  const placeholder =
-    question !== undefined && inner >= 12
-      ? truncate(question, inner)
-      : inner >= 34
-        ? 'Ask the harness…  (/ for commands)'
-        : inner >= 16
-          ? 'Ask the harness…'
-          : '…'
+  const placeholder = composerPlaceholder(question, inner)
   const body = slice.map((row, index) => {
     if (empty && index === 0) {
       return muted(padEnd(truncate(placeholder, inner), inner))
@@ -1201,13 +1219,13 @@ function scrolledFooter(snapshot: Snapshot): string {
 
 /** The idle footer: the key hint, or vim's mode badge. */
 function hintFooter(snapshot: Snapshot): string {
-  return snapshot.vimMode === undefined
-    ? muted(t('footer.hint'))
-    : style(snapshot.vimMode === 'normal' ? ' NORMAL ' : ' INSERT ', {
-        fg: colText,
-        bg: snapshot.vimMode === 'normal' ? colAccent : colBorder,
-        bold: true,
-      })
+  if (snapshot.vimMode === undefined) return muted(t('footer.hint'))
+  const normal = snapshot.vimMode === 'normal'
+  return style(normal ? ' NORMAL ' : ' INSERT ', {
+    fg: colText,
+    bg: normal ? colAccent : colBorder,
+    bold: true,
+  })
 }
 
 /** The status footer: model, context budget, usage, and the current status. */
@@ -1408,8 +1426,7 @@ function panelPane(snapshot: Snapshot, geometry: Layout): string[] {
 /** The panel's selectable rows: a cursor for the choice, a ring for multi-select. */
 function panelRows(panel: PanelView, inner: number): string[] {
   return panel.rows.map((row) => {
-    const mark = row.checked === undefined ? (row.selected ? '❯' : ' ') : row.checked ? '◉' : '○'
-    const body = truncate(`${mark} ${row.label}${row.description === undefined ? '' : `  ${row.description}`}`, inner)
+    const body = truncate(`${rowMark(row)} ${row.label}${rowSuffix(row)}`, inner)
     return row.selected ? selected(padEnd(body, inner)) : body
   })
 }

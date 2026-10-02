@@ -31,15 +31,18 @@ function relativeTime(epochMillis: number): string {
  * exposes. The service is documented as providing "filtered lists"; probing
  * keeps the app working across the rc releases rather than pinning one name.
  */
+/** The rows a query answered with: an array, or wrapped in `{ items }`. */
+function rowsOf(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw
+  const wrapped = raw as { items?: unknown }
+  return Array.isArray(wrapped?.items) ? (wrapped.items as unknown[]) : []
+}
+
 export async function listSessions(query: SessionQueryLike): Promise<PickerItem[]> {
   const method = query.listSessions ?? query.list ?? query.querySessions
   if (method === undefined) return []
   const raw = await method.call(query, undefined)
-  const rows = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as { items?: unknown[] })?.items)
-      ? ((raw as { items: unknown[] }).items)
-      : []
+  const rows = rowsOf(raw)
   return rows.slice(0, 200).map((row) => {
     const record = row as Record<string, unknown>
     // The corpus rows are `{ header, live, persisted }` with id and createdAt
@@ -109,11 +112,7 @@ export async function listSessionsWithParents(
   const method = query.listSessions ?? query.list ?? query.querySessions
   if (method === undefined) return []
   const raw = await method.call(query, undefined)
-  const rows = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as { items?: unknown[] })?.items)
-      ? (raw as { items: unknown[] }).items
-      : []
+  const rows = rowsOf(raw)
   return rows.slice(0, 500).map((row) => {
     const record = row as Record<string, unknown>
     // Same nested `header` shape as listSessions above.

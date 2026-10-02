@@ -282,11 +282,9 @@ export class QuestionsPanel {
       (total > 1
         ? t('questions.of', { n: this.index + 1, total })
         : t('questions.title'))
-    const hint = this.isPlanReview
-      ? t('questions.hintPlan')
-      : question?.multiSelect === true
-        ? t('questions.hintMulti')
-        : t('questions.hint')
+    let hint = t('questions.hint')
+    if (this.isPlanReview) hint = t('questions.hintPlan')
+    else if (question?.multiSelect === true) hint = t('questions.hintMulti')
     return {
       kind: 'questions',
       title,

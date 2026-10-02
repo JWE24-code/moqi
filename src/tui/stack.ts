@@ -170,7 +170,9 @@ function paneTitle(title: string, mark: 'input' | 'done' | undefined, width: num
   const label = truncate(title, Math.max(width - 6, 1))
   // The attention marker rides the title: `!` waits on you, `✓` finished
   // for you — one glyph, legible in every interface language.
-  const marked = mark === 'input' ? `! ${label}` : mark === 'done' ? `✓ ${label}` : label
+  let marked = label
+  if (mark === 'input') marked = `! ${label}`
+  else if (mark === 'done') marked = `✓ ${label}`
   return padEnd(` ${marked} `, Math.max(width - 2, 0))
 }
 

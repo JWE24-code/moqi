@@ -482,6 +482,13 @@ function newTab(id: string): SessionTab {
   }
 }
 
+
+/** The status an off-edge stack move reports. */
+function noNeighborMessage(direction: Direction): string {
+  if (direction === 'up') return 'no session above'
+  if (direction === 'down') return 'no session below'
+  return `no session to the ${direction}`
+}
 /** The arrow named by a key chord like `alt+up` or `shift+alt+left`. */
 function arrowDirection(name: string): Direction {
   if (name.endsWith('up')) return 'up'
@@ -1654,13 +1661,15 @@ class TuiApp {
     this.syncAttentionTimer()
     this.persistSoon()
     this.screen.invalidate()
-    this.setStatus(
-      this.stackMode
-        ? this.tabs.length > 1
+    if (this.stackMode) {
+      this.setStatus(
+        this.tabs.length > 1
           ? 'stacked view — alt+arrows move focus, alt+shift+arrows move a pane · ctrl+s for tabs'
-          : 'stacked view — /new opens a second session to tile · ctrl+s for tabs'
-        : 'tabbed view — ctrl+s for stacked',
-    )
+          : 'stacked view — /new opens a second session to tile · ctrl+s for tabs',
+      )
+    } else {
+      this.setStatus('tabbed view — ctrl+s for stacked')
+    }
     this.paint()
   }
 
@@ -1672,7 +1681,7 @@ class TuiApp {
   private moveStackFocus(direction: Direction): void {
     const target = focusNeighbor(this.tabs.length, this.active, direction)
     if (target === undefined) {
-      this.setStatus(`no session ${direction === 'up' ? 'above' : direction === 'down' ? 'below' : `to the ${direction}`}`)
+      this.setStatus(noNeighborMessage(direction))
       this.paint()
       return
     }
@@ -1683,7 +1692,7 @@ class TuiApp {
   private moveStackTile(direction: Direction): void {
     const target = focusNeighbor(this.tabs.length, this.active, direction)
     if (target === undefined) {
-      this.setStatus(`no session ${direction === 'up' ? 'above' : direction === 'down' ? 'below' : `to the ${direction}`}`)
+      this.setStatus(noNeighborMessage(direction))
       this.paint()
       return
     }
@@ -3183,12 +3192,11 @@ class TuiApp {
       }
       const lines = String(text.split('\n').length)
       const result = this.writeClipboard(text)
-      this.setStatus(
-        result.ok
-          ? `copied ${text.length} characters over ${lines} line${text.includes('\n') ? 's' : ''}`
-          : `copy failed: ${result.error}`,
-        !result.ok,
-      )
+      const plural = text.includes('\n') ? 's' : ''
+      const status = result.ok
+        ? `copied ${text.length} characters over ${lines} line${plural}`
+        : `copy failed: ${result.error}`
+      this.setStatus(status, !result.ok)
       this.paint()
       return
     }

@@ -60,7 +60,9 @@ function textOfRecord(raw: string): { text: string; role?: 'user' | 'assistant' 
   }
   const record = parsed as { type?: unknown; data?: { message?: { content?: unknown } } }
   const type = String(record.type ?? '')
-  const role = type === 'user/message' ? 'user' : type === 'assistant/message' ? 'assistant' : undefined
+  let role: 'user' | 'assistant' | undefined
+  if (type === 'user/message') role = 'user'
+  else if (type === 'assistant/message') role = 'assistant'
   if (role === undefined) return { text: '' }
   const blocks = record.data?.message?.content
   if (!Array.isArray(blocks)) return { text: '' }

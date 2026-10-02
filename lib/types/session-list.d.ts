@@ -6,11 +6,6 @@ export interface SessionQueryLike {
     list?: (options?: unknown) => unknown;
     querySessions?: (options?: unknown) => unknown;
 }
-/**
- * List sessions through whichever method this build of the query service
- * exposes. The service is documented as providing "filtered lists"; probing
- * keeps the app working across the rc releases rather than pinning one name.
- */
 export declare function listSessions(query: SessionQueryLike): Promise<PickerItem[]>;
 /**
  * Rebuild the transcript from a session's durable log. Only user and assistant
