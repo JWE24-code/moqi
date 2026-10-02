@@ -171,8 +171,11 @@ export function acceptToken(
 export function extractImageTokens(text: string): { text: string; numbers: number[] } {
   const numbers: number[] = []
   const stripped = withoutImageTokens(text, numbers)
-  // Tidy the doubled spaces removal can leave behind.
-  const cleaned = stripped.replace(/ {2,}/g, ' ').replace(/^[ \t]+/gm, '').replace(/[ \t]+$/gm, '')
+  // Tidy the doubled spaces removal can leave behind. Halve repeatedly until
+  // no double space is left — a plain, linear loop where a quantified regex
+  // was flagged as super-linear.
+  let cleaned = stripped.replace(/^[ \t]+/gm, '').replace(/[ \t]+$/gm, '')
+  while (cleaned.includes('  ')) cleaned = cleaned.replaceAll('  ', ' ')
   return { text: cleaned, numbers }
 }
 
