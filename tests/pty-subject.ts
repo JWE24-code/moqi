@@ -101,150 +101,193 @@ function repaint(): void {
   screen.paint(frame.lines)
 }
 
+/** Two ctrl+c inside the window quits, the first one only arms. */
+function handleDoubleCtrlC(key: { name: string }): boolean {
+  if (key.name !== 'ctrl+c') return false
+  const now = Date.now()
+  if (now - lastCtrlC < 1500) {
+    quit = true
+    return true
+  }
+  lastCtrlC = now
+  return true
+}
+
+/** Keys while a trust-surface panel owns the keyboard. */
+function handlePanelKey(key: { name: string; text: string }): void {
+  if (panel instanceof ApprovalPanel) {
+    handleApprovalKey(panel, key)
+    return
+  }
+  handleQuestionKey(key)
+}
+
+/** Keys for a waiting tool approval. */
+function handleApprovalKey(approval: ApprovalPanel, key: { name: string }): void {
+  if (key.name === '1') {
+    notices.push(`allowed ${approval.toolName} once`)
+    panel = undefined
+    repaint()
+    return
+  }
+  if (key.name === '2' || key.name === 'esc') {
+    notices.push(`denied ${approval.toolName}`)
+    panel = undefined
+    repaint()
+    return
+  }
+  approval.move(key.name === 'up' ? -1 : key.name === 'down' ? 1 : 0)
+  repaint()
+}
+
+/** Keys for a waiting question set: toggle, answer, or cancel. */
+function handleQuestionKey(key: { name: string; text: string }): void {
+  if (!(panel instanceof QuestionsPanel)) return
+  if (key.name === ' ' || key.text === ' ') {
+    panel.toggle()
+    repaint()
+    return
+  }
+  if (key.name === 'enter') {
+    const state = panel.advance()
+    if (state === 'done') {
+      const answer = panel.answers()[0]
+      notices.push(`answered ${answer?.selected.join(',') ?? ''}`)
+      panel = undefined
+    }
+    repaint()
+    return
+  }
+  if (key.name === 'esc') {
+    notices.push('cancelled the question')
+    panel = undefined
+    repaint()
+  }
+}
+
+
+/** The app's own keys: menus, newlines, paste, and submitting the draft. */
+function handleAppKey(key: { name: string; text: string }): boolean {
+  if (key.name === 'tab' && atMenu.open) {
+    acceptAt()
+    repaint()
+    return true
+  }
+  if (key.name === 'esc') {
+    if (atMenu.open) {
+      atMenu.close()
+      notices.push('escape closed the menu')
+      repaint()
+    } else {
+      notices.push('escape reached the app')
+    }
+    return true
+  }
+  if (key.name === 'shift+enter' || key.name === 'ctrl+j') {
+    composer.insert('\n')
+    repaint()
+    return true
+  }
+  if (key.name === 'paste') {
+    composer.insert(key.text)
+    repaint()
+    return true
+  }
+  if (key.name === 'enter') {
+    submitDraft()
+    return true
+  }
+  return false
+}
+
+/** Enter: an @-completion, a command the subject knows, or a plain prompt. */
+function submitDraft(): void {
+  const text = composer.value()
+  if (atMenu.open) {
+    acceptAt()
+    repaint()
+    return
+  }
+  if (submitCommand(text)) return
+  if (text !== '') {
+    messages.push(textMessage('user', text))
+    composer.reset()
+    repaint()
+  }
+}
+
+/** The commands the pty subject answers itself; true when one matched. */
+function submitCommand(text: string): boolean {
+  const commands: Record<string, () => void> = {
+    '/ask': () => {
+      panel = new ApprovalPanel('shell', 'the command writes outside the workspace', 'rm -rf build')
+      composer.reset()
+      repaint()
+    },
+    '/question': () => {
+      panel = new QuestionsPanel([
+        {
+          id: 'q1',
+          question: 'Which tests?',
+          multiSelect: true,
+          options: [{ label: 'unit' }, { label: 'pty' }, { label: 'fleet' }],
+        },
+      ])
+      composer.reset()
+      repaint()
+    },
+    '/clear': () => {
+      messages.length = 0
+      composer.reset()
+      repaint()
+    },
+    '/lang': () => {
+      setLanguage('zh-CN')
+      notices.push('language zh-CN')
+      composer.reset()
+      repaint()
+    },
+  }
+  const run = commands[text]
+  if (run === undefined) return false
+  run()
+  return true
+}
+
+/** The plain composer editing chords the subject keeps. */
+function handleEditingKey(key: { name: string; text: string }): void {
+  if (key.name === 'ctrl+a') {
+    composer.home()
+    repaint()
+    return
+  }
+  if (key.name === 'ctrl+e') {
+    composer.end()
+    repaint()
+    return
+  }
+  if (key.name === 'ctrl+u') {
+    composer.reset()
+    atMenu.close()
+    repaint()
+    return
+  }
+  if (key.text !== '') {
+    composer.insert(key.text)
+    syncAtMenu()
+    repaint()
+  }
+}
+
 const screen = new Screen({
   onKey(key: { name: string; text: string }): void {
-    if (key.name === 'ctrl+c') {
-      const now = Date.now()
-      if (now - lastCtrlC < 1500) {
-        quit = true
-        return
-      }
-      lastCtrlC = now
-      return
-    }
+    if (handleDoubleCtrlC(key)) return
     if (panel !== undefined) {
-      if (panel instanceof ApprovalPanel) {
-        if (key.name === '1') {
-          notices.push(`allowed ${panel.toolName} once`)
-          panel = undefined
-          repaint()
-          return
-        }
-        if (key.name === '2' || key.name === 'esc') {
-          notices.push(`denied ${panel.toolName}`)
-          panel = undefined
-          repaint()
-          return
-        }
-        panel.move(key.name === 'up' ? -1 : key.name === 'down' ? 1 : 0)
-        repaint()
-        return
-      }
-      if (key.name === ' ' || key.text === ' ') {
-        panel.toggle()
-        repaint()
-        return
-      }
-      if (key.name === 'enter') {
-        const state = panel.advance()
-        if (state === 'done') {
-          const answer = panel.answers()[0]
-          notices.push(`answered ${answer?.selected.join(',') ?? ''}`)
-          panel = undefined
-        }
-        repaint()
-        return
-      }
-      if (key.name === 'esc') {
-        notices.push('cancelled the question')
-        panel = undefined
-        repaint()
-        return
-      }
+      handlePanelKey(key)
       return
     }
-    if (key.name === 'tab' && atMenu.open) {
-      acceptAt()
-      repaint()
-      return
-    }
-    if (key.name === 'esc') {
-      if (atMenu.open) {
-        atMenu.close()
-        notices.push('escape closed the menu')
-        repaint()
-      } else {
-        notices.push('escape reached the app')
-      }
-      return
-    }
-    if (key.name === 'shift+enter' || key.name === 'ctrl+j') {
-      composer.insert('\n')
-      repaint()
-      return
-    }
-    if (key.name === 'paste') {
-      composer.insert(key.text)
-      repaint()
-      return
-    }
-    if (key.name === 'enter') {
-      const text = composer.value()
-      if (atMenu.open) {
-        acceptAt()
-        repaint()
-        return
-      }
-      if (text === '/ask') {
-        panel = new ApprovalPanel('shell', 'the command writes outside the workspace', 'rm -rf build')
-        composer.reset()
-        repaint()
-        return
-      }
-      if (text === '/question') {
-        panel = new QuestionsPanel([
-          {
-            id: 'q1',
-            question: 'Which tests?',
-            multiSelect: true,
-            options: [{ label: 'unit' }, { label: 'pty' }, { label: 'fleet' }],
-          },
-        ])
-        composer.reset()
-        repaint()
-        return
-      }
-      if (text === '/clear') {
-        messages.length = 0
-        composer.reset()
-        repaint()
-        return
-      }
-      if (text === '/lang') {
-        setLanguage('zh-CN')
-        notices.push('language zh-CN')
-        composer.reset()
-        repaint()
-        return
-      }
-      if (text !== '') {
-        messages.push(textMessage('user', text))
-        composer.reset()
-        repaint()
-      }
-      return
-    }
-    if (key.name === 'ctrl+a') {
-      composer.home()
-      repaint()
-      return
-    }
-    if (key.name === 'ctrl+e') {
-      composer.end()
-      repaint()
-      return
-    }
-    if (key.name === 'ctrl+u') {
-      composer.reset()
-      atMenu.close()
-      repaint()
-      return
-    }
-    if (key.text !== '') {
-      composer.insert(key.text)
-      syncAtMenu()
-      repaint()
-    }
+    if (handleAppKey(key)) return
+    handleEditingKey(key)
   },
   onResize(): void {
     repaint()

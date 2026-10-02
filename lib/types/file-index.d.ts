@@ -25,6 +25,8 @@ export declare class FileIndex {
     /** Synchronously rebuild the listing. Errors leave the previous snapshot. */
     refresh(): void;
     private walk;
+    /** One directory entry: descend into it, or add the file under its root path. */
+    private walkEntry;
     /**
      * List one directory for a path-shaped query, relative to the workspace
      * root. `.` and `..` are offered alongside the entries so navigation works

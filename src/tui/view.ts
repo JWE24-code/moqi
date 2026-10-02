@@ -223,99 +223,141 @@ function contentWidth(columns: number): number {
   return Math.max(Math.min(columns - 2, columns), 4)
 }
 
+/** Room left under the chrome for one popup, given what is already reserved. */
+function popupRows(
+  open: boolean,
+  matches: number,
+  max: number,
+  reserved: number,
+  snapshot: Snapshot,
+  inputRows: number,
+): number {
+  if (!open) return 0
+  const available =
+    snapshot.rows -
+    HEADER_ROWS -
+    GAP_ROWS -
+    inputRows -
+    FOOTER_ROWS -
+    MIN_VIEWPORT_ROWS -
+    POPUP_BORDER_ROWS -
+    reserved
+  return Math.max(Math.min(matches, max, available), 0)
+}
+
+/** The shrinkable and fixed chrome rows, as `layout` measured them. */
+interface Chrome {
+  rows: number
+  sessionRows: number
+  pluginRows: number
+  backgroundRows: number
+  showHeader: boolean
+  showGap: boolean
+  popupHeight: number
+  atHeight: number
+  inputRows: number
+}
+
+/**
+ * Shed chrome until the transcript has its minimum, cheapest first: the
+ * expanded agent list collapses to its one-line form, then the header goes,
+ * then the separator, and only a window too small for even that loses the
+ * strip entirely. The transcript outranks all of them — a frame showing a
+ * four-row agent panel and no conversation would be the wrong trade.
+ */
+function shedChrome(chrome: Chrome): Chrome {
+  if (spareRows(chrome) >= MIN_VIEWPORT_ROWS) return chrome
+  if (chrome.pluginRows > 0) return shedChrome({ ...chrome, pluginRows: 0 })
+  if (chrome.backgroundRows > 1) return shedChrome({ ...chrome, backgroundRows: 1 })
+  if (chrome.showHeader) return shedChrome({ ...chrome, showHeader: false })
+  if (chrome.showGap) return shedChrome({ ...chrome, showGap: false })
+  if (chrome.backgroundRows > 0) return shedChrome({ ...chrome, backgroundRows: 0 })
+  if (chrome.sessionRows > 0) return shedChrome({ ...chrome, sessionRows: 0 })
+  return chrome
+}
+
+/** The transcript rows left under the chrome. */
+function spareRows(chrome: Chrome): number {
+  return (
+    chrome.rows -
+    ((chrome.showHeader ? HEADER_ROWS : 0) +
+      chrome.sessionRows +
+      (chrome.showGap ? GAP_ROWS : 0) +
+      chrome.popupHeight +
+      chrome.atHeight +
+      chrome.pluginRows +
+      chrome.backgroundRows +
+      chrome.inputRows +
+      FOOTER_ROWS)
+  )
+}
+
 /** Compute the geometry for a frame. */
 export function layout(snapshot: Snapshot): Layout {
   const width = contentWidth(snapshot.columns)
   const composerRows = snapshot.composer.height(width - 4)
   const inputRows = composerRows + 2
 
-  let paletteRows = 0
-  if (snapshot.palette.open) {
-    const available =
-      snapshot.rows -
-      HEADER_ROWS -
-      GAP_ROWS -
-      inputRows -
-      FOOTER_ROWS -
-      MIN_VIEWPORT_ROWS -
-      POPUP_BORDER_ROWS
-    paletteRows = Math.max(Math.min(snapshot.palette.matches.length, MAX_PALETTE_ROWS, available), 0)
-  }
-
+  const paletteRows = popupRows(
+    snapshot.palette.open,
+    snapshot.palette.matches.length,
+    MAX_PALETTE_ROWS,
+    0,
+    snapshot,
+    inputRows,
+  )
   const paletteHeight = paletteRows > 0 ? paletteRows + POPUP_BORDER_ROWS : 0
 
-  let atRows = 0
-  if (snapshot.atMenu?.open === true) {
-    const available =
-      snapshot.rows -
-      HEADER_ROWS -
-      GAP_ROWS -
-      inputRows -
-      FOOTER_ROWS -
-      MIN_VIEWPORT_ROWS -
-      POPUP_BORDER_ROWS -
-      paletteHeight
-    atRows = Math.max(Math.min(snapshot.atMenu.matches.length, MAX_AT_ROWS, available), 0)
-  }
+  const atRows = popupRows(
+    snapshot.atMenu?.open === true,
+    snapshot.atMenu?.matches.length ?? 0,
+    MAX_AT_ROWS,
+    paletteHeight,
+    snapshot,
+    inputRows,
+  )
   const atHeight = atRows > 0 ? atRows + POPUP_BORDER_ROWS : 0
 
   // The tab bar earns its row only once there is more than one session, and
   // yields it in the stacked view: the tiles already say which session is
   // which, so the strip would spend a transcript row repeating them.
-  let sessionRows = snapshot.sessions.length > 1 && snapshot.stack === undefined ? 1 : 0
+  const sessionRows = snapshot.sessions.length > 1 && snapshot.stack === undefined ? 1 : 0
 
   // A plugin's status line is one row, surrendered first when space is short.
-  let pluginRows = snapshot.pluginLine !== undefined && snapshot.pluginLine.trim() !== '' ? 1 : 0
+  const pluginRows = snapshot.pluginLine !== undefined && snapshot.pluginLine.trim() !== '' ? 1 : 0
 
   // The background strip is one line when collapsed, or a bordered list.
-  let backgroundRows = 0
-  if (snapshot.background.length > 0) {
-    backgroundRows = snapshot.expandBackground
-      ? Math.min(snapshot.background.length, MAX_BACKGROUND_ROWS) + POPUP_BORDER_ROWS
-      : 1
-  }
+  const backgroundRows =
+    snapshot.background.length === 0
+      ? 0
+      : snapshot.expandBackground
+        ? Math.min(snapshot.background.length, MAX_BACKGROUND_ROWS) + POPUP_BORDER_ROWS
+        : 1
 
-  // The composer and the footer are the last things to go: on a window too
-  // short for everything, shed the header, then the separator row, and only
-  // then let the transcript collapse to nothing.
-  let showHeader = true
-  let showGap = true
-  const chrome = (): number =>
-    (showHeader ? HEADER_ROWS : 0) +
-    sessionRows +
-    (showGap ? GAP_ROWS : 0) +
-    paletteHeight +
-    atHeight +
-    pluginRows +
-    backgroundRows +
-    inputRows +
-    FOOTER_ROWS
-  const spare = (): number => snapshot.rows - chrome()
+  const settled = shedChrome({
+    rows: snapshot.rows,
+    sessionRows,
+    pluginRows,
+    backgroundRows,
+    showHeader: true,
+    showGap: true,
+    popupHeight: paletteHeight,
+    atHeight,
+    inputRows,
+  })
 
-  // Shed chrome until the transcript has its minimum, cheapest first: the
-  // expanded agent list collapses to its one-line form, then the header goes,
-  // then the separator, and only a window too small for even that loses the
-  // strip entirely. The transcript outranks all of them — a frame showing a
-  // four-row agent panel and no conversation would be the wrong trade.
-  if (spare() < MIN_VIEWPORT_ROWS && pluginRows > 0) pluginRows = 0
-  if (spare() < MIN_VIEWPORT_ROWS && backgroundRows > 1) backgroundRows = 1
-  if (spare() < MIN_VIEWPORT_ROWS && showHeader) showHeader = false
-  if (spare() < MIN_VIEWPORT_ROWS && showGap) showGap = false
-  if (spare() < MIN_VIEWPORT_ROWS && backgroundRows > 0) backgroundRows = 0
-  if (spare() < MIN_VIEWPORT_ROWS && sessionRows > 0) sessionRows = 0
-
-  const viewportRows = Math.max(spare(), 0)
+  const viewportRows = Math.max(spareRows(settled), 0)
   return {
     contentWidth: width,
     viewportRows,
     paletteRows,
     atRows,
-    pluginRows,
+    pluginRows: settled.pluginRows,
     inputRows,
-    backgroundRows,
-    sessionRows,
-    showHeader,
-    showGap,
+    backgroundRows: settled.backgroundRows,
+    sessionRows: settled.sessionRows,
+    showHeader: settled.showHeader,
+    showGap: settled.showGap,
   }
 }
 
@@ -419,31 +461,47 @@ function renderMessageBody(
   showThinking: boolean,
   toolStyle: ToolStyle,
 ): string[] {
+  if (message.role === 'user') return renderUserTurn(message, width)
+  if (message.command !== undefined) return renderCommandTurn(message, width)
+  return renderAssistantTurn(message, width, showThinking, toolStyle)
+}
+
+/** A user turn: the prompt in the speaker bar, then its attachments. */
+function renderUserTurn(message: Message, width: number): string[] {
+  const bar = style('▌', { fg: message.steering === true ? colMuted : colAccent })
   const out: string[] = []
-
-  if (message.role === 'user') {
-    const bar = style('▌', { fg: message.steering === true ? colMuted : colAccent })
-    for (const line of wrap(messageText(message), width - 2)) {
-      out.push(message.steering === true ? `${bar} ${muted(line)}` : `${bar} ${style(line, { fg: colText })}`)
-    }
-    if ((message.attachments ?? []).length > 0) {
-      const names = (message.attachments ?? [])
-        .map((image) => `🖼 ${image.name} ${String(image.width)}×${String(image.height)}`)
-        .join('  ')
-      out.push(`${bar} ${muted(names)}`)
-    }
-    return out
+  for (const line of wrap(messageText(message), width - 2)) {
+    out.push(message.steering === true ? `${bar} ${muted(line)}` : `${bar} ${style(line, { fg: colText })}`)
   }
-
-  if (message.command !== undefined) {
-    const mark = message.command.ok ? ok('✓') : warn('✗')
-    const label = style(`/${message.command.name}`, { fg: colAccent })
-    out.push(`${mark} ${label}`)
-    for (const line of wrap(messageText(message), width - 2)) {
-      out.push(`  ${muted(line)}`)
-    }
-    return out
+  if ((message.attachments ?? []).length > 0) {
+    const names = (message.attachments ?? [])
+      .map((image) => `🖼 ${image.name} ${String(image.width)}×${String(image.height)}`)
+      .join('  ')
+    out.push(`${bar} ${muted(names)}`)
   }
+  return out
+}
+
+/** A slash command's turn: the outcome mark, then what it printed. */
+function renderCommandTurn(message: Message, width: number): string[] {
+  const command = message.command
+  const mark = command?.ok ? ok('✓') : warn('✗')
+  const label = style(`/${command?.name ?? ''}`, { fg: colAccent })
+  const out = [`${mark} ${label}`]
+  for (const line of wrap(messageText(message), width - 2)) {
+    out.push(`  ${muted(line)}`)
+  }
+  return out
+}
+
+/** An assistant turn: reasoning, then the segments in the order they came. */
+function renderAssistantTurn(
+  message: Message,
+  width: number,
+  showThinking: boolean,
+  toolStyle: ToolStyle,
+): string[] {
+  const out: string[] = []
 
   if (showThinking && (message.reasoning ?? '').trim() !== '') {
     const bar = style('┆', { fg: colMuted })
@@ -1063,7 +1121,8 @@ function composerPane(
 }
 
 /** The status footer: model, context budget, usage, and the current status. */
-function footer(snapshot: Snapshot, width: number): string {
+/** The footer's left half: model, context budget, usage, and the spinner. */
+function footerLeft(snapshot: Snapshot): string {
   const used = snapshot.haveUsage
     ? snapshot.totalTokens
     : estimateTokens(
@@ -1093,8 +1152,11 @@ function footer(snapshot: Snapshot, width: number): string {
 
   let left = segments.join(separator)
   if (snapshot.streaming) left = `${accent(snapshot.spinner)} ${left}`
+  return left
+}
 
-  let right = ''
+/** The footer's right half, by what most needs saying at this moment. */
+function footerRight(snapshot: Snapshot, width: number): string {
   // A search counter or an error must not be hidden by the scroll indicator —
   // a match jump leaves the view scrolled, which is exactly when the "no
   // matches" error and the `match i/n` counter matter most.
@@ -1103,24 +1165,26 @@ function footer(snapshot: Snapshot, width: number): string {
     // An open microphone outranks all of it. Nothing else the footer says is
     // worth a person not knowing the room is being recorded, so this line
     // holds the slot for as long as the take lasts.
-    right =
-      snapshot.voice === 'recording'
-        ? style(t('footer.recording', { spinner: snapshot.spinner }), { fg: colRose })
-        : style(t('footer.transcribing', { spinner: snapshot.spinner }), { fg: colGold })
-  } else if (snapshot.scrollBack > 0 && !outranksScroll) {
+    return snapshot.voice === 'recording'
+      ? style(t('footer.recording', { spinner: snapshot.spinner }), { fg: colRose })
+      : style(t('footer.transcribing', { spinner: snapshot.spinner }), { fg: colGold })
+  }
+  if (snapshot.scrollBack > 0 && !outranksScroll) {
     // Scrolled away from the newest output: say so, and say how to get back.
-    right = style(
+    return style(
       t('footer.scrolled', {
         lines: snapshot.scrollBack,
         s: snapshot.scrollBack === 1 ? '' : 's',
       }),
       { fg: colGold },
     )
-  } else if (snapshot.status !== '') {
+  }
+  if (snapshot.status !== '') {
     const clipped = truncate(snapshot.status, Math.max(Math.floor(width / 2), 10))
-    right = snapshot.statusIsError ? warn(clipped) : ok(clipped)
-  } else if (snapshot.picker.kind === 'none' && !snapshot.palette.open) {
-    right = snapshot.vimMode === undefined
+    return snapshot.statusIsError ? warn(clipped) : ok(clipped)
+  }
+  if (snapshot.picker.kind === 'none' && !snapshot.palette.open) {
+    return snapshot.vimMode === undefined
       ? muted(t('footer.hint'))
       : style(snapshot.vimMode === 'normal' ? ' NORMAL ' : ' INSERT ', {
           fg: colText,
@@ -1128,7 +1192,13 @@ function footer(snapshot: Snapshot, width: number): string {
           bold: true,
         })
   }
+  return ''
+}
 
+/** The status footer: model, context budget, usage, and the current status. */
+function footer(snapshot: Snapshot, width: number): string {
+  const left = footerLeft(snapshot)
+  const right = footerRight(snapshot, width)
   const gap = width - displayWidth(left) - displayWidth(right)
   if (gap < 2) return truncate(left, width)
   return left + ' '.repeat(gap) + right
@@ -1214,6 +1284,42 @@ function usagePane(snapshot: Snapshot, geometry: Layout): string[] {
   return out.slice(0, height)
 }
 
+/**
+ * The transcript region's content, by what owns it: a trust-surface panel,
+ * the fleet overview, the usage dashboard, an open picker, the stacked
+ * tiles, or the plain scrolling transcript. An open picker outranks the
+ * stacked view: the keys already go to the picker, so the stack tiling must
+ * not paint over it and make every picker command look dead in the stack.
+ */
+function bodyPane(snapshot: Snapshot, geometry: Layout): string[] {
+  if (snapshot.panel !== undefined) return panelPane(snapshot, geometry)
+  if (snapshot.fleet?.open === true) return fleetPane(snapshot, geometry)
+  if (snapshot.usage?.open === true) return usagePane(snapshot, geometry)
+  if (snapshot.picker.kind !== 'none') return pickerPane(snapshot, geometry)
+  if (snapshot.stack !== undefined) return stackPane(snapshot, geometry)
+  return viewport(snapshot, geometry)
+}
+
+/** Where the composer's cursor lands, unless a full-pane surface owns the screen. */
+function frameCursor(
+  snapshot: Snapshot,
+  composerTop: number,
+  composer: { cursor: { row: number; column: number } },
+): { row: number; column: number } | undefined {
+  if (
+    snapshot.picker.kind !== 'none' ||
+    snapshot.fleet?.open === true ||
+    snapshot.usage?.open === true ||
+    snapshot.panel !== undefined
+  ) {
+    return undefined
+  }
+  return {
+    row: composerTop + composer.cursor.row,
+    column: composer.cursor.column + 1,
+  }
+}
+
 /** Build a full frame plus the cursor position for the screen to place. */
 export function render(snapshot: Snapshot): {
   lines: string[]
@@ -1230,24 +1336,7 @@ export function render(snapshot: Snapshot): {
   }
   rows.push(...sessionBar(snapshot, geometry))
 
-  if (geometry.viewportRows > 0) {
-    const body =
-      snapshot.panel !== undefined
-        ? panelPane(snapshot, geometry)
-        : snapshot.fleet?.open === true
-          ? fleetPane(snapshot, geometry)
-          : snapshot.usage?.open === true
-            ? usagePane(snapshot, geometry)
-            : snapshot.picker.kind !== 'none'
-              ? // An open picker outranks the stacked view: the keys already
-                // go to the picker, so the stack tiling must not paint over
-                // it and make every picker command look dead in the stack.
-                pickerPane(snapshot, geometry)
-              : snapshot.stack !== undefined
-                ? stackPane(snapshot, geometry)
-                : viewport(snapshot, geometry)
-    rows.push(...body)
-  }
+  if (geometry.viewportRows > 0) rows.push(...bodyPane(snapshot, geometry))
   if (geometry.showGap) rows.push('')
 
   rows.push(...backgroundPane(snapshot, geometry))
@@ -1271,16 +1360,7 @@ export function render(snapshot: Snapshot): {
   // of that box is about to be shifted right by the gutter.
   const lines = rows.map((line) => gutter + line)
   const painted = snapshot.selection === undefined ? lines : highlighted(lines, snapshot.selection)
-  const cursor =
-    snapshot.picker.kind === 'none' &&
-    snapshot.fleet?.open !== true &&
-    snapshot.usage?.open !== true &&
-    snapshot.panel === undefined
-      ? {
-          row: composerTop + composer.cursor.row,
-          column: composer.cursor.column + gutter.length,
-        }
-      : undefined
+  const cursor = frameCursor(snapshot, composerTop, composer)
   return { lines: painted, cursor }
 }
 
@@ -1303,19 +1383,28 @@ function panelPane(snapshot: Snapshot, geometry: Layout): string[] {
     for (const line of renderMarkdown(detail, width).split('\n')) out.push(truncate(line, inner))
     out.push('')
   }
-  for (const row of panel.rows) {
-    const mark = row.checked === undefined ? (row.selected ? '❯' : ' ') : row.checked ? '◉' : '○'
-    const body = truncate(`${mark} ${row.label}${row.description === undefined ? '' : `  ${row.description}`}`, inner)
-    out.push(row.selected ? selected(padEnd(body, inner)) : body)
-  }
-  if (panel.inputLabel !== undefined) {
-    const text = panel.inputText === undefined || panel.inputText === '' ? '(type an answer)' : panel.inputText
-    const line = truncate(`${panel.inputLabel}: ${text}`, inner)
-    out.push(panel.inputFocused === true ? selected(padEnd(line, inner)) : muted(line))
-  }
+  out.push(...panelRows(panel, inner))
+  out.push(...panelInput(panel, inner))
   out.push('')
   out.push(muted(truncate(panel.hint, inner)))
   return out.slice(0, Math.max(geometry.viewportRows, 0))
+}
+
+/** The panel's selectable rows: a cursor for the choice, a ring for multi-select. */
+function panelRows(panel: PanelView, inner: number): string[] {
+  return panel.rows.map((row) => {
+    const mark = row.checked === undefined ? (row.selected ? '❯' : ' ') : row.checked ? '◉' : '○'
+    const body = truncate(`${mark} ${row.label}${row.description === undefined ? '' : `  ${row.description}`}`, inner)
+    return row.selected ? selected(padEnd(body, inner)) : body
+  })
+}
+
+/** The panel's free-text line, when the answer is typed rather than chosen. */
+function panelInput(panel: PanelView, inner: number): string[] {
+  if (panel.inputLabel === undefined) return []
+  const text = panel.inputText === undefined || panel.inputText === '' ? '(type an answer)' : panel.inputText
+  const line = truncate(`${panel.inputLabel}: ${text}`, inner)
+  return [panel.inputFocused === true ? selected(padEnd(line, inner)) : muted(line)]
 }
 
 /**

@@ -57,6 +57,7 @@ import {
   type PaletteCommand,
   type BackgroundAgent,
   type PickerItem,
+  type PickerKind,
   type Segment,
   type SessionStatus,
 } from './tui/state.ts'
@@ -339,6 +340,13 @@ interface PromptDraft {
   text: string
   images: readonly ImageAttachmentRef[]
 }
+
+/**
+ * What one chord group did with a key: `handled` claims it and falls through
+ * to the shared tail, `stopped` claims it and ends the key's life, and
+ * `unhandled` leaves it for the next group — or plain typing.
+ */
+type ChatKeyOutcome = 'handled' | 'stopped' | 'unhandled'
 
 /** A tool approval waiting for the user, and the promise that answers it. */
 interface PendingApproval {
@@ -1076,91 +1084,98 @@ class TuiApp {
         return
       }
     }
-    if (panel instanceof LoginPanel) {
-      switch (key.name) {
-        case 'up':
-        case 'ctrl+p':
-          panel.move(-1)
-          break
-        case 'down':
-        case 'ctrl+n':
-          panel.move(1)
-          break
-        case 'enter': {
-          const value = panel.answer()
-          if (value !== undefined && (this.loginFlow.answer(value) || this.answerSecret(value))) {
-            panel.setPrompt(undefined)
-            break
-          }
-          // No question waiting: enter on a notice with a page to open opens
-          // it, rather than typing the URL out for a human to click or copy.
-          const url = panel.notice?.url
-          if (url !== undefined) {
-            this.setStatus(openUrlWithLocalHelper(url) ? `opened ${url}` : `could not open a browser — copy it yourself: ${url}`)
-          }
+    if (panel instanceof LoginPanel) this.handleLoginPanelKey(panel, key)
+    else if (panel instanceof ApprovalPanel) this.handleApprovalPanelKey(panel, key)
+    else this.handleQuestionsPanelKey(panel, key)
+  }
+
+  /** Keys for a running sign-in panel. */
+  private handleLoginPanelKey(panel: LoginPanel, key: Key): void {
+    switch (key.name) {
+      case 'up':
+      case 'ctrl+p':
+        panel.move(-1)
+        break
+      case 'down':
+      case 'ctrl+n':
+        panel.move(1)
+        break
+      case 'enter': {
+        const value = panel.answer()
+        if (value !== undefined && (this.loginFlow.answer(value) || this.answerSecret(value))) {
+          panel.setPrompt(undefined)
           break
         }
-        case 'esc':
-        case 'ctrl+c': {
-          if (this.loginFlow.decline() || this.cancelSecret()) {
-            // A question the surface can recover from: decline just this one,
-            // the same "no" a human gives to any single question.
-            panel.setPrompt(undefined)
-          } else {
-            // Nothing waiting on an answer: esc/ctrl+c withdraws the whole
-            // attempt instead. `begin()` still has to settle asynchronously,
-            // so the panel closes once that promise resolves, not here.
-            this.setStatus('cancelling…')
-            this.loginFlow.withdraw()
-          }
-          this.paint()
-          return
+        // No question waiting: enter on a notice with a page to open opens
+        // it, rather than typing the URL out for a human to click or copy.
+        const url = panel.notice?.url
+        if (url !== undefined) {
+          this.setStatus(openUrlWithLocalHelper(url) ? `opened ${url}` : `could not open a browser — copy it yourself: ${url}`)
         }
-        case 'backspace':
-          panel.backspaceText()
-          break
-        default:
-          if (key.text !== '') panel.typeText(key.text)
-          break
+        break
       }
-      this.paint()
-      return
-    }
-
-    if (panel instanceof ApprovalPanel) {
-      switch (key.name) {
-        case 'ctrl+v':
-          if (this.voicePhase === undefined) this.toggleVoice()
-          return
-        case 'up':
-        case 'ctrl+p':
-          panel.move(-1)
-          break
-        case 'down':
-        case 'ctrl+n':
-          panel.move(1)
-          break
-        case '1':
-          this.settleApproval(panel, 'allowed-once')
-          return
-        case '2':
-          this.settleApproval(panel, 'rejected')
-          return
-        case 'enter':
-          this.settleApproval(panel, panel.decision())
-          return
-        case 'esc':
-        case 'ctrl+c':
-          // Fail closed: esc means no.
-          this.settleApproval(panel, 'rejected')
-          return
-        default:
-          break
+      case 'esc':
+      case 'ctrl+c': {
+        if (this.loginFlow.decline() || this.cancelSecret()) {
+          // A question the surface can recover from: decline just this one,
+          // the same "no" a human gives to any single question.
+          panel.setPrompt(undefined)
+        } else {
+          // Nothing waiting on an answer: esc/ctrl+c withdraws the whole
+          // attempt instead. `begin()` still has to settle asynchronously,
+          // so the panel closes once that promise resolves, not here.
+          this.setStatus('cancelling…')
+          this.loginFlow.withdraw()
+        }
+        this.paint()
+        return
       }
-      this.paint()
-      return
+      case 'backspace':
+        panel.backspaceText()
+        break
+      default:
+        if (key.text !== '') panel.typeText(key.text)
+        break
     }
+    this.paint()
+  }
 
+  /** Keys for a tool-approval panel. */
+  private handleApprovalPanelKey(panel: ApprovalPanel, key: Key): void {
+    switch (key.name) {
+      case 'ctrl+v':
+        if (this.voicePhase === undefined) this.toggleVoice()
+        return
+      case 'up':
+      case 'ctrl+p':
+        panel.move(-1)
+        break
+      case 'down':
+      case 'ctrl+n':
+        panel.move(1)
+        break
+      case '1':
+        this.settleApproval(panel, 'allowed-once')
+        return
+      case '2':
+        this.settleApproval(panel, 'rejected')
+        return
+      case 'enter':
+        this.settleApproval(panel, panel.decision())
+        return
+      case 'esc':
+      case 'ctrl+c':
+        // Fail closed: esc means no.
+        this.settleApproval(panel, 'rejected')
+        return
+      default:
+        break
+    }
+    this.paint()
+  }
+
+  /** Keys for an `ask_user_question` panel. */
+  private handleQuestionsPanelKey(panel: QuestionsPanel, key: Key): void {
     switch (key.name) {
       case 'up':
       case 'ctrl+p':
@@ -2721,47 +2736,25 @@ class TuiApp {
       case 'x': {
         // Only the open-sessions list closes on this key; everywhere else "x"
         // is an ordinary character narrowing the query, same as any other key.
-        if (this.picker.kind === 'open') {
-          const item = this.picker.current()
-          if (item !== undefined && item.id !== NEW_SESSION_ROW) {
-            const before = this.tabs.length
-            this.closeSession(Number.parseInt(item.id, 10))
-            // Only rebuild the list once the close actually happened — the
-            // last-session guard sets a status this must not clobber.
-            if (this.tabs.length < before) this.showOpenSessions()
-          }
+        if (this.picker.kind !== 'open') {
+          this.picker.key(key)
           break
         }
-        this.picker.key(key)
+        const item = this.picker.current()
+        if (item !== undefined && item.id !== NEW_SESSION_ROW) {
+          const before = this.tabs.length
+          this.closeSession(Number.parseInt(item.id, 10))
+          // Only rebuild the list once the close actually happened — the
+          // last-session guard sets a status this must not clobber.
+          if (this.tabs.length < before) this.showOpenSessions()
+        }
         break
       }
       case 'enter': {
         const item = this.picker.current()
         const kind = this.picker.kind
         this.picker.hide()
-        if (item === undefined) break
-        if (kind === 'models') void this.switchModel(item)
-        else if (kind === 'themes') this.selectTheme(item.id)
-        else if (kind === 'open') {
-          if (item.id === NEW_SESSION_ROW) void this.newSession()
-          else this.selectSession(Number.parseInt(item.id, 10))
-        }
-        else if (kind === 'plugins') this.togglePlugin(item.id)
-        else if (kind === 'panel') void this.panelHost.activate(item.id)
-        else if (kind === 'delete') this.confirmDelete(item.id, item.title)
-        else if (kind === 'rewind') void this.performRewind(Number.parseInt(item.id, 10))
-        else if (kind === 'stored') void this.openStoredHit(item)
-        else if (kind === 'lang') this.selectLanguage(isLang(item.id) ? item.id : 'en')
-        else if (kind === 'setup') {
-          if (item.id === 'lang') void this.runCommand('lang', '')
-          else if (item.id === 'theme') this.showThemes()
-          else if (item.id === 'login') void this.runCommand('providers', '')
-          else if (item.id === 'voice') this.setStatus('run: npm run setup-voice — then ctrl+v in the app')
-          else this.finishSetup()
-        }
-        else if (kind === 'login') this.chooseLoginEntry(item.id)
-        else if (kind === 'login-method') this.beginLoginWithMethod(item.id)
-        else void this.openSession(item.id, item.title)
+        if (item !== undefined) this.activatePickerItem(kind, item)
         break
       }
       default:
@@ -2771,6 +2764,70 @@ class TuiApp {
         break
     }
     this.paint()
+  }
+
+  /** Run what the chosen picker row stands for, by the picker that showed it. */
+  private activatePickerItem(kind: PickerKind, item: PickerItem): void {
+    if (kind === 'none') return
+    if (kind === 'models') {
+      void this.switchModel(item)
+      return
+    }
+    if (kind === 'themes') {
+      this.selectTheme(item.id)
+      return
+    }
+    if (kind === 'open') {
+      if (item.id === NEW_SESSION_ROW) void this.newSession()
+      else this.selectSession(Number.parseInt(item.id, 10))
+      return
+    }
+    if (kind === 'plugins') {
+      this.togglePlugin(item.id)
+      return
+    }
+    if (kind === 'panel') {
+      void this.panelHost.activate(item.id)
+      return
+    }
+    if (kind === 'delete') {
+      this.confirmDelete(item.id, item.title)
+      return
+    }
+    if (kind === 'rewind') {
+      void this.performRewind(Number.parseInt(item.id, 10))
+      return
+    }
+    if (kind === 'stored') {
+      void this.openStoredHit(item)
+      return
+    }
+    if (kind === 'lang') {
+      this.selectLanguage(isLang(item.id) ? item.id : 'en')
+      return
+    }
+    if (kind === 'setup') {
+      this.activateSetupItem(item.id)
+      return
+    }
+    if (kind === 'login') {
+      this.chooseLoginEntry(item.id)
+      return
+    }
+    if (kind === 'login-method') {
+      this.beginLoginWithMethod(item.id)
+      return
+    }
+    void this.openSession(item.id, item.title)
+  }
+
+  /** Run what a chosen setup-wizard row opens next. */
+  private activateSetupItem(id: string): void {
+    if (id === 'lang') void this.runCommand('lang', '')
+    else if (id === 'theme') this.showThemes()
+    else if (id === 'login') void this.runCommand('providers', '')
+    else if (id === 'voice') this.setStatus('run: npm run setup-voice — then ctrl+v in the app')
+    else this.finishSetup()
   }
 
   private handleChatKey(key: Key): void {
@@ -2786,12 +2843,126 @@ class TuiApp {
         return
       }
     }
+    // One key, one owner: the chord groups are disjoint name sets, so the
+    // first group that claims the key is the one that runs it. `'handled'`
+    // falls through to the shared tail (palette, @-menu, repaint);
+    // `'stopped'` ends the key's life where it is.
+    const groups = [
+      this.chatSubmitKey,
+      this.chatMenuKey,
+      this.chatEditKey,
+      this.chatScrollKey,
+      this.chatMouseKey,
+      this.chatSessionKey,
+    ]
+    let handled = false
+    let stopped = false
+    for (const group of groups) {
+      const outcome = group.call(this, key)
+      if (outcome === 'unhandled') continue
+      handled = true
+      stopped = outcome === 'stopped'
+      break
+    }
+    if (!handled) this.handleTypedKey(key)
+    if (stopped) return
+
+    this.palette.update(this.composer.value(), this.commands())
+    this.updateAtMenu()
+    this.paint()
+  }
+
+  /** Submit, newline, paste, and the tab completion chord. */
+  private chatSubmitKey(key: Key): ChatKeyOutcome {
     switch (key.name) {
       case 'ctrl+c':
         this.requestQuit()
-        return
+        return 'stopped'
+      case 'enter':
+        // Enter submits, wherever the draft belongs: a menu selection, a slash
+        // command, a steer into a streaming turn, or a fresh prompt.
+        this.submitComposer()
+        return 'handled'
+      case 'shift+enter':
+        // Shift+Enter is the composer's carriage return, so a draft can span
+        // several lines without submitting on the first one.
+        this.history.reset()
+        this.composer.insert('\n')
+        return 'handled'
+      case 'ctrl+enter': {
+        // Interrupt-and-send: the redirection form of steering, the same
+        // thing `/interrupt` does to whatever is already queued.
+        const text = this.composer.value().trim()
+        if (text === '' || text.startsWith('/') || !this.tab.streaming) return 'handled'
+        const prompt = this.materializePrompt()
+        this.composer.reset()
+        this.history.add(prompt.text)
+        this.persistSoon()
+        this.tab.queued.push(prompt)
+        this.tab.drainQueue = true
+        this.interrupt()
+        return 'handled'
+      }
+      case 'ctrl+j':
+        // Ctrl+J is a line feed: the same newline as shift+enter, for
+        // terminals that deliver it as its own control byte.
+        this.history.reset()
+        this.composer.insert('\n')
+        return 'handled'
+      case 'paste':
+        // Bracketed paste arrives as one key: insert it whole, newlines and
+        // all, without letting its contents trigger a menu or a submit.
+        this.history.reset()
+        this.composer.insert(key.text)
+        return 'handled'
+      case 'tab': {
+        this.handleTabKey()
+        return 'handled'
+      }
+      default:
+        return 'unhandled'
+    }
+  }
 
-      case 'esc':
+  /** Tab: accept a completion, complete an argument, queue, or cycle sessions. */
+  private handleTabKey(): void {
+    const chosen = this.palette.current()
+    if (this.atMenu.open) {
+      this.acceptAtCompletion()
+      return
+    }
+    if (chosen === undefined && this.completeCommandArgument()) return
+    if (chosen !== undefined) {
+      this.composer.setValue(`/${chosen.name} `)
+      this.palette.close()
+    } else if (this.tab.streaming && this.composer.value().trim() !== '') {
+      // Queue behind the running turn: enter steers, tab waits.
+      const prompt = this.materializePrompt()
+      this.composer.reset()
+      this.history.add(prompt.text)
+      this.persistSoon()
+      this.tab.queued.push(prompt)
+      this.setStatus(
+        `${String(this.tab.queued.length)} queued — sends when the reply finishes`,
+      )
+    } else if (this.composer.value() !== '') {
+      // A draft plus muscle-memory tab must not switch sessions under it;
+      // cycling needs an empty composer, like n/N in a search.
+      this.setStatus('tab cycles sessions on an empty composer')
+    } else if (this.tabs.length > 1) {
+      // With no palette open and nothing typed, tab cycles sessions — the
+      // one-key form of alt+n, for moving between conversations without a
+      // chord.
+      this.selectSession((this.active + 1) % this.tabs.length)
+    } else {
+      this.setStatus('only one session — ctrl+n opens another')
+    }
+  }
+
+  /** The composer's menus and command chords: palette, @-file, and shortcuts. */
+  private chatMenuKey(key: Key): ChatKeyOutcome {
+    switch (key.name) {
+      case 'esc': {
         // A live microphone outranks everything else esc can dismiss: it is
         // the most modal state the app has, and the one to get out of first.
         if (this.voicePhase !== undefined) this.cancelVoice()
@@ -2812,295 +2983,243 @@ class TuiApp {
         else if (this.overlay !== '') this.overlay = ''
         else if (this.search !== undefined) this.clearSearch()
         else if (this.tab.streaming) this.interrupt()
-        break
-
-      case 'enter':
-        // Enter submits, wherever the draft belongs: a menu selection, a slash
-        // command, a steer into a streaming turn, or a fresh prompt.
-        this.submitComposer()
-        break
-
-      case 'shift+enter':
-        // Shift+Enter is the composer's carriage return, so a draft can span
-        // several lines without submitting on the first one.
-        this.history.reset()
-        this.composer.insert('\n')
-        break
-
-      case 'ctrl+enter': {
-        // Interrupt-and-send: the redirection form of steering, the same
-        // thing `/interrupt` does to whatever is already queued.
-        const text = this.composer.value().trim()
-        if (text === '' || text.startsWith('/') || !this.tab.streaming) break
-        const prompt = this.materializePrompt()
-        this.composer.reset()
-        this.history.add(prompt.text)
-        this.persistSoon()
-        this.tab.queued.push(prompt)
-        this.tab.drainQueue = true
-        this.interrupt()
-        break
+        return 'handled'
       }
-
-      case 'ctrl+j':
-        // Ctrl+J is a line feed: the same newline as shift+enter, for
-        // terminals that deliver it as its own control byte.
-        this.history.reset()
-        this.composer.insert('\n')
-        break
-
-      case 'paste':
-        // Bracketed paste arrives as one key: insert it whole, newlines and
-        // all, without letting its contents trigger a menu or a submit.
-        this.history.reset()
-        this.composer.insert(key.text)
-        break
-
-      case 'tab': {
-        const chosen = this.palette.current()
-        if (this.atMenu.open) {
-          this.acceptAtCompletion()
-          break
-        }
-        if (chosen === undefined && this.completeCommandArgument()) {
-          this.paint()
-          break
-        }
-        if (chosen !== undefined) {
-          this.composer.setValue(`/${chosen.name} `)
-          this.palette.close()
-        } else if (this.tab.streaming && this.composer.value().trim() !== '') {
-          // Queue behind the running turn: enter steers, tab waits.
-          const prompt = this.materializePrompt()
-          this.composer.reset()
-          this.history.add(prompt.text)
-          this.persistSoon()
-          this.tab.queued.push(prompt)
-          this.setStatus(
-            `${String(this.tab.queued.length)} queued — sends when the reply finishes`,
-          )
-        } else if (this.composer.value() !== '') {
-          // A draft plus muscle-memory tab must not switch sessions under it;
-          // cycling needs an empty composer, like n/N in a search.
-          this.setStatus('tab cycles sessions on an empty composer')
-        } else if (this.tabs.length > 1) {
-          // With no palette open and nothing typed, tab cycles sessions — the
-          // one-key form of alt+n, for moving between conversations without a
-          // chord.
-          this.selectSession((this.active + 1) % this.tabs.length)
-        } else {
-          this.setStatus('only one session — ctrl+n opens another')
-        }
-        break
-      }
-
-      case 'up':
-        if (this.palette.open) this.palette.move(-1)
-        else if (this.atMenu.open) this.atMenu.move(-1)
+      case 'up': {
+        const up = -1
+        if (this.palette.open) this.palette.move(up)
+        else if (this.atMenu.open) this.atMenu.move(up)
         else if (this.history.isRecalling() || this.composer.atFirstRow(this.innerWidth())) {
-          const recalled = this.history.recall(-1, this.composer.value())
+          const recalled = this.history.recall(up, this.composer.value())
           if (recalled !== undefined) this.composer.setValue(recalled)
-        } else this.composer.moveRow(-1, this.innerWidth())
-        break
-
-      case 'down':
-        if (this.palette.open) this.palette.move(1)
-        else if (this.atMenu.open) this.atMenu.move(1)
+        } else this.composer.moveRow(up, this.innerWidth())
+        return 'handled'
+      }
+      case 'down': {
+        const down = 1
+        if (this.palette.open) this.palette.move(down)
+        else if (this.atMenu.open) this.atMenu.move(down)
         else if (this.history.isRecalling() || this.composer.atLastRow(this.innerWidth())) {
-          const recalled = this.history.recall(1, this.composer.value())
+          const recalled = this.history.recall(down, this.composer.value())
           if (recalled !== undefined) this.composer.setValue(recalled)
-        } else this.composer.moveRow(1, this.innerWidth())
-        break
-
+        } else this.composer.moveRow(down, this.innerWidth())
+        return 'handled'
+      }
       case 'ctrl+p':
         if (this.palette.open) this.palette.move(-1)
         else if (this.atMenu.open) this.atMenu.move(-1)
-        break
-
+        return 'handled'
       case 'ctrl+n':
         if (this.palette.open) this.palette.move(1)
         else if (this.atMenu.open) this.atMenu.move(1)
         else void this.runCommand('new', '')
-        break
-
+        return 'handled'
       case 'ctrl+r':
         void this.runCommand('resume', '')
-        break
-
+        return 'handled'
       case 'ctrl+t':
         void this.runCommand('thinking', '')
-        break
-
+        return 'handled'
       case 'ctrl+x':
         // Compaction is a Harness command, so this is the same path as typing
         // /compact — the binding just saves the typing on a long session.
         void this.runCommand('compact', '')
-        break
-
+        return 'handled'
       case 'ctrl+y':
         this.copyLastReply()
-        break
-
+        return 'handled'
       case 'ctrl+f':
         this.openFleet()
-        break
-
+        return 'handled'
       case 'ctrl+v':
         this.toggleVoice()
-        break
+        return 'handled'
+      default:
+        return 'unhandled'
+    }
+  }
 
+  /** The composer's own editing keys: motion and deletion. */
+  private chatEditKey(key: Key): ChatKeyOutcome {
+    switch (key.name) {
       case 'left':
         this.composer.left()
-        break
+        return 'handled'
       case 'right':
         this.composer.right()
-        break
+        return 'handled'
       case 'ctrl+left':
       case 'alt+b':
         this.composer.wordLeft()
-        break
+        return 'handled'
       case 'ctrl+right':
       case 'alt+f':
         this.composer.wordRight()
-        break
+        return 'handled'
       case 'home':
       case 'ctrl+a':
         this.composer.home()
-        break
+        return 'handled'
       case 'end':
       case 'ctrl+e':
         this.composer.end()
-        break
+        return 'handled'
       case 'backspace':
         this.composer.backspace()
         this.history.reset()
-        break
+        return 'handled'
       case 'delete':
         this.composer.deleteForward()
         this.history.reset()
-        break
+        return 'handled'
       case 'ctrl+w':
         this.composer.deleteWord()
         this.history.reset()
-        break
+        return 'handled'
       case 'ctrl+k':
         this.composer.killToEnd()
         this.history.reset()
-        break
-      // Scrolling is a first-class keyboard surface: a page, a half page, a
-      // single line, and a way straight back to the newest output.
-      case 'pageup':
-        this.scroll(-this.pageRows())
-        break
-      case 'pagedown':
-        this.scroll(this.pageRows())
-        break
+        return 'handled'
       case 'ctrl+u':
         // Clear the line, as every shell does.
         this.composer.reset()
         this.history.reset()
-        break
+        return 'handled'
       case 'ctrl+d':
         // Delete forward — the readline pair to backspace.
         this.composer.deleteForward()
         this.history.reset()
-        break
+        return 'handled'
+      default:
+        return 'unhandled'
+    }
+  }
+
+  /** Scrolling is a first-class keyboard surface: page, half page, line, tail. */
+  private chatScrollKey(key: Key): ChatKeyOutcome {
+    switch (key.name) {
+      case 'pageup':
+        this.scroll(-this.pageRows())
+        return 'handled'
+      case 'pagedown':
+        this.scroll(this.pageRows())
+        return 'handled'
       case 'ctrl+up':
         this.scroll(-Math.max(Math.floor(this.pageRows() / 2), 1))
-        break
+        return 'handled'
       case 'ctrl+down':
         this.scroll(Math.max(Math.floor(this.pageRows() / 2), 1))
-        break
+        return 'handled'
       case 'shift+up':
         this.scroll(-1)
-        break
+        return 'handled'
       case 'shift+down':
         this.scroll(1)
-        break
+        return 'handled'
       case 'ctrl+g':
         this.scrollToBottom()
-        break
+        return 'handled'
+      case 'wheelup':
+        this.scroll(-3)
+        return 'handled'
+      case 'wheeldown':
+        this.scroll(3)
+        return 'handled'
+      default:
+        return 'unhandled'
+    }
+  }
+
+  /** Mouse reports over the transcript: selection, drag-copy, and clicks. */
+  private chatMouseKey(key: Key): ChatKeyOutcome {
+    switch (key.name) {
       case 'click': {
         // A left-button press starts a selection. Whether it ends as a drag
         // (copy on release) or a click (select) is decided at release, by
         // whether the pointer ever moved.
         const cell = key.mouse
-        if (cell === undefined) break
-        this.drag = { anchor: cell, head: cell }
-        break
+        if (cell !== undefined) this.drag = { anchor: cell, head: cell }
+        return 'handled'
       }
-
       case 'drag': {
         // Motion with the button down: extend the selection, repaint the
         // highlight. The drag module skips the highlight until the pointer
         // has actually left the anchor.
         const cell = key.mouse
-        if (cell === undefined || this.drag === undefined) break
-        this.drag = { ...this.drag, head: cell }
-        this.paint()
-        break
-      }
-
-      case 'release': {
-        const cell = key.mouse
-        const drag = this.drag
-        this.drag = undefined
-        if (cell === undefined || drag === undefined) break
-        if (isDrag(drag)) {
-          // A real drag: the box the user drew is what gets copied, over the
-          // same OSC 52 path as every other copy command.
-          const text = spanText(this.frame, drag)
-          if (text.trim() === '') {
-            this.setStatus('nothing selected')
-            this.paint()
-            break
-          }
-          const lines = String(text.split('\n').length)
-          const result = this.writeClipboard(text)
-          this.setStatus(
-            result.ok
-              ? `copied ${text.length} characters over ${lines} line${text.includes('\n') ? 's' : ''}`
-              : `copy failed: ${result.error}`,
-            !result.ok,
-          )
+        if (cell !== undefined && this.drag !== undefined) {
+          this.drag = { ...this.drag, head: cell }
           this.paint()
-          break
         }
-        // The pointer never moved: this was a click. The tab bar is the one
-        // region whose contents have stable, meaningful extents; a click
-        // anywhere else is ignored rather than guessed at. Its row comes from
-        // the layout, not from an assumption: the header above it is
-        // conditional, so the bar moves.
-        const index = tabClickTarget(this.snapshot(), cell)
-        if (index !== undefined) {
-          this.selectSession(index)
-          break
-        }
-        // A click on a transcript turn selects it; clicking the already
-        // selected turn copies it — the mouse shape of alt+c.
-        const turn = turnClickTarget(this.snapshot(), cell)
-        if (turn === undefined) break
-        if (this.selectedTurn === turn) {
-          this.copySelectedTurn()
-          break
-        }
-        this.selectedTurn = turn
-        const message = this.tab.messages[turn]
-        const what = message?.role === 'user' ? 'your prompt' : 'the reply'
-        this.setStatus(`${String(turn + 1)}/${String(this.tab.messages.length)}: ${what} selected · click again to copy`)
-        this.paint()
-        break
+        return 'handled'
       }
+      case 'release': {
+        this.handleMouseRelease(key.mouse)
+        return 'handled'
+      }
+      default:
+        return 'unhandled'
+    }
+  }
 
-      case 'wheelup':
-        this.scroll(-3)
-        break
-      case 'wheeldown':
-        this.scroll(3)
-        break
+  /**
+   * A button release over the transcript: a real drag copies its box, a plain
+   * click selects — the tab bar picks a session, a turn picks itself.
+   */
+  private handleMouseRelease(cell: { column: number; row: number } | undefined): void {
+    const drag = this.drag
+    this.drag = undefined
+    if (cell === undefined || drag === undefined) return
+    if (isDrag(drag)) {
+      // A real drag: the box the user drew is what gets copied, over the
+      // same OSC 52 path as every other copy command.
+      const text = spanText(this.frame, drag)
+      if (text.trim() === '') {
+        this.setStatus('nothing selected')
+        this.paint()
+        return
+      }
+      const lines = String(text.split('\n').length)
+      const result = this.writeClipboard(text)
+      this.setStatus(
+        result.ok
+          ? `copied ${text.length} characters over ${lines} line${text.includes('\n') ? 's' : ''}`
+          : `copy failed: ${result.error}`,
+        !result.ok,
+      )
+      this.paint()
+      return
+    }
+    // The pointer never moved: this was a click. The tab bar is the one
+    // region whose contents have stable, meaningful extents; a click
+    // anywhere else is ignored rather than guessed at. Its row comes from
+    // the layout, not from an assumption: the header above it is
+    // conditional, so the bar moves.
+    const index = tabClickTarget(this.snapshot(), cell)
+    if (index !== undefined) {
+      this.selectSession(index)
+      return
+    }
+    // A click on a transcript turn selects it; clicking the already
+    // selected turn copies it — the mouse shape of alt+c.
+    const turn = turnClickTarget(this.snapshot(), cell)
+    if (turn === undefined) return
+    if (this.selectedTurn === turn) {
+      this.copySelectedTurn()
+      return
+    }
+    this.selectedTurn = turn
+    const message = this.tab.messages[turn]
+    const what = message?.role === 'user' ? 'your prompt' : 'the reply'
+    this.setStatus(`${String(turn + 1)}/${String(this.tab.messages.length)}: ${what} selected · click again to copy`)
+    this.paint()
+  }
+
+  /** The alt chords: selection movement, stack focus, and view toggles. */
+  private chatSessionKey(key: Key): ChatKeyOutcome {
+    switch (key.name) {
       case 'alt+e':
         void this.editDraft()
-        break
+        return 'handled'
       case 'alt+up':
       case 'alt+down':
       case 'alt+left':
@@ -3115,71 +3234,69 @@ class TuiApp {
         if (this.stackMode && this.tabs.length > 1) {
           if (key.name.startsWith('shift+')) this.moveStackTile(direction)
           else this.moveStackFocus(direction)
-          break
+          return 'handled'
         }
         if (key.name === 'alt+up') this.moveSelection(-1)
         else if (key.name === 'alt+down') this.moveSelection(1)
-        break
+        return 'handled'
       }
       case 'alt+c':
         this.copySelectedTurn()
-        break
+        return 'handled'
       case 'alt+n':
         this.selectSession((this.active + 1) % this.tabs.length)
-        break
+        return 'handled'
       case 'alt+p':
         this.selectSession((this.active - 1 + this.tabs.length) % this.tabs.length)
-        break
-
+        return 'handled'
       case 'ctrl+b':
         if (this.tab.background.size === 0) {
           this.setStatus('no background agents running')
-          break
+          return 'handled'
         }
         this.expandBackground = !this.expandBackground
-        break
-
+        return 'handled'
       case 'ctrl+s':
         // Switch the view: one key between the stacked and tabbed layouts,
         // the same toggle `/stack` runs.
         this.toggleStackView()
-        break
-
+        return 'handled'
       case 'ctrl+o':
         this.expandTools = !this.expandTools
         this.setStatus(this.expandTools ? 'showing every tool call' : 'tool calls collapsed')
-        break
-
-      default: {
-        const jump = /^alt\+([1-9])$/.exec(key.name)
-        if (jump !== null) {
-          this.selectSession(Number.parseInt(jump[1] ?? '1', 10) - 1)
-          break
-        }
-        // A plugin may own this key; if it does, the key is never text.
-        if (key.text !== '' && this.tuiHost.dispatch(key.name)) break
-        if (key.text === '') break
-        // With a search active and nothing typed, `n`/`N` walk the matches —
-        // the same letter a pager uses — instead of inserting into the buffer.
-        if (this.search !== undefined && this.composer.value() === '' && (key.name === 'n' || key.name === 'N')) {
-          this.jumpToMatch(key.name === 'n' ? 1 : -1)
-          break
-        }
-        // `?` on an empty composer opens the key reference, matching the hint
-        // the footer prints; otherwise it is just a question mark.
-        if (key.name === '?' && this.composer.value() === '') {
-          void this.runCommand('help', '')
-          break
-        }
-        this.history.reset()
-        this.composer.insert(key.text)
-        break
-      }
+        return 'handled'
+      default:
+        return 'unhandled'
     }
+  }
 
-    this.palette.update(this.composer.value(), this.commands())
-    this.updateAtMenu()
-    this.paint()
+  /**
+   * Everything the named chords did not claim: a session-number jump, a
+   * plugin binding, search's `n`/`N`, `?` for help, or plain typing.
+   */
+  private handleTypedKey(key: Key): void {
+    const jump = /^alt\+([1-9])$/.exec(key.name)
+    if (jump !== null) {
+      this.selectSession(Number.parseInt(jump[1] ?? '1', 10) - 1)
+      return
+    }
+    // A plugin may own this key; if it does, the key is never text.
+    if (key.text !== '' && this.tuiHost.dispatch(key.name)) return
+    if (key.text === '') return
+    // With a search active and nothing typed, `n`/`N` walk the matches —
+    // the same letter a pager uses — instead of inserting into the buffer.
+    if (this.search !== undefined && this.composer.value() === '' && (key.name === 'n' || key.name === 'N')) {
+      this.jumpToMatch(key.name === 'n' ? 1 : -1)
+      return
+    }
+    // `?` on an empty composer opens the key reference, matching the hint
+    // the footer prints; otherwise it is just a question mark.
+    if (key.name === '?' && this.composer.value() === '') {
+      void this.runCommand('help', '')
+      return
+    }
+    this.history.reset()
+    this.composer.insert(key.text)
   }
 
   /**
@@ -3836,70 +3953,158 @@ class TuiApp {
   }
 
   /** Run a slash command: this app's own first, then the Harness registry. */
+  /**
+   * Run a slash command: this app's own first, then the Harness registry.
+   *
+   * The app's commands are grouped by theme, one small dispatcher each: a
+   * command either belongs to this app — the group returns `true` and the
+   * command has run — or falls through the groups to the Harness registry.
+   */
   private async runCommand(name: string, rawInput: string): Promise<void> {
     this.tab.scrollBack = 0
+    if (await this.runSessionCommand(name, rawInput)) return
+    if (this.runViewCommand(name, rawInput)) return
+    if (this.runLanguageCommand(name, rawInput)) return
+    if (this.runProvidersCommand(name)) return
+    if (this.runActionCommand(name, rawInput)) return
+    if (this.runPeerCommand(name, rawInput)) return
+    if (this.runSurfaceCommand(name, rawInput)) return
+    await this.runHarnessCommand(name, rawInput)
+  }
+
+  /** The session commands: open, restore, rename, close, fork, and the tree. */
+  private async runSessionCommand(name: string, rawInput: string): Promise<boolean> {
     switch (name) {
       case 'new':
         await this.newSession()
-        return
-
+        return true
       case 'resume':
         await this.showSessions()
-        return
-
+        return true
       case 'delete':
         await this.showSessions('delete')
-        return
-
+        return true
       case 'rename':
         await this.renameSession(rawInput)
-        return
-
+        return true
       case 'sessions':
         this.showOpenSessions()
-        return
-
+        return true
       case 'close':
         this.closeSession(this.active)
-        return
+        return true
+      case 'rewind':
+        this.showRewind()
+        return true
+      case 'fork':
+        void this.performFork()
+        return true
+      case 'tree':
+        void this.showTree()
+        return true
+      default:
+        return false
+    }
+  }
 
-      case 'model': {
-        if (rawInput.trim() === '') await this.showModels()
-        else await this.selectModelByName(rawInput.trim())
-        return
-      }
-
-      case 'theme': {
+  /** The view commands: what the composer and the screen are looking at. */
+  private runViewCommand(name: string, rawInput: string): boolean {
+    switch (name) {
+      case 'model':
+        void (rawInput.trim() === '' ? this.showModels() : this.selectModelByName(rawInput.trim()))
+        return true
+      case 'theme':
         if (rawInput.trim() === '') this.showThemes()
         else this.selectTheme(rawInput.trim())
-        return
-      }
-
+        return true
       case 'plugins':
         this.handlePluginsInput(rawInput.trim())
-        return
-
+        return true
       case 'thinking':
         this.showThinking = !this.showThinking
         this.persistSoon()
         this.setStatus(this.showThinking ? 'showing reasoner thinking' : 'hiding reasoner thinking')
         this.paint()
-        return
-
+        return true
       case 'stack':
         this.toggleStackView()
-        return
+        return true
+      default:
+        return false
+    }
+  }
 
+  /** The language command: a picker with no argument, a switch with one. */
+  private runLanguageCommand(name: string, rawInput: string): boolean {
+    if (name !== 'lang') return false
+    const wanted = rawInput.trim()
+    if (wanted === '') {
+      // The base a cancelled preview returns to; see syncPickerPreview.
+      this.previewBaseLang = currentLanguage()
+      this.picker.show(
+        'lang',
+        'Language',
+        LANGS.map((entry) => ({
+          id: entry.id,
+          title: entry.label,
+          subtitle: entry.id,
+          active: entry.id === currentLanguage(),
+        })),
+      )
+      this.setStatus('')
+    } else if (isLang(wanted)) {
+      this.selectLanguage(wanted)
+    } else {
+      this.setStatus(`unknown language ${wanted} — try en or zh-CN`, true)
+    }
+    this.paint()
+    return true
+  }
+
+  /** The providers command: what this profile can sign into. */
+  private runProvidersCommand(name: string): boolean {
+    if (name !== 'providers') return false
+    const auth = this.ctx.get('authorization')
+    if (auth === undefined) {
+      this.setStatus('this profile has no authorization service', true)
+      this.paint()
+      return true
+    }
+    const entries = auth.list()
+    if (entries.length === 0) {
+      this.setStatus('nothing here can be signed into — mount a plugin that offers a login', true)
+      this.paint()
+      return true
+    }
+    this.loginEntries = entries
+    this.picker.show(
+      'login',
+      'Sign in',
+      entries.map((entry, index) => ({
+        id: String(index),
+        title: entry.label,
+        subtitle: entry.inFlight
+          ? 'already signing in…'
+          : entry.methods.map((method) => method.label).join(' · '),
+      })),
+    )
+    this.setStatus('')
+    this.paint()
+    return true
+  }
+
+  /** The in-conversation actions: search, queue, interrupt, copy, export. */
+  private runActionCommand(name: string, rawInput: string): boolean {
+    switch (name) {
       case 'find': {
         const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')
         if (words[0] === '--sessions' || words[0] === '-s') {
           this.searchStoredSessions(words.slice(1).join(' '))
-          return
+          return true
         }
         this.startSearch(rawInput)
-        return
+        return true
       }
-
       case 'unqueue': {
         const count = this.tab.queued.length
         this.tab.queued = []
@@ -3909,29 +4114,8 @@ class TuiApp {
             : `cleared ${String(count)} queued message${count === 1 ? '' : 's'}`,
         )
         this.paint()
-        return
+        return true
       }
-
-      case 'rewind':
-        this.showRewind()
-        return
-
-      case 'fork':
-        void this.performFork()
-        return
-
-      case 'tree':
-        void this.showTree()
-        return
-
-      case 'jobs':
-        this.showJobs(rawInput)
-        return
-
-      case 'mcp':
-        this.showMcp()
-        return
-
       case 'dispatch': {
         const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')
         const device = words.shift()
@@ -3939,67 +4123,11 @@ class TuiApp {
         if (device === undefined || task === '') {
           this.setStatus('usage: /dispatch <device> <task>', true)
           this.paint()
-          return
+          return true
         }
         void this.dispatchTo(device, task)
-        return
+        return true
       }
-
-      case 'lang': {
-        const wanted = rawInput.trim()
-        if (wanted === '') {
-          // The base a cancelled preview returns to; see syncPickerPreview.
-          this.previewBaseLang = currentLanguage()
-          this.picker.show(
-            'lang',
-            'Language',
-            LANGS.map((entry) => ({
-              id: entry.id,
-              title: entry.label,
-              subtitle: entry.id,
-              active: entry.id === currentLanguage(),
-            })),
-          )
-          this.setStatus('')
-        } else if (isLang(wanted)) {
-          this.selectLanguage(wanted)
-        } else {
-          this.setStatus(`unknown language ${wanted} — try en or zh-CN`, true)
-        }
-        this.paint()
-        return
-      }
-
-      case 'providers': {
-        const auth = this.ctx.get('authorization')
-        if (auth === undefined) {
-          this.setStatus('this profile has no authorization service', true)
-          this.paint()
-          return
-        }
-        const entries = auth.list()
-        if (entries.length === 0) {
-          this.setStatus('nothing here can be signed into — mount a plugin that offers a login', true)
-          this.paint()
-          return
-        }
-        this.loginEntries = entries
-        this.picker.show(
-          'login',
-          'Sign in',
-          entries.map((entry, index) => ({
-            id: String(index),
-            title: entry.label,
-            subtitle: entry.inFlight
-              ? 'already signing in…'
-              : entry.methods.map((method) => method.label).join(' · '),
-          })),
-        )
-        this.setStatus('')
-        this.paint()
-        return
-      }
-
       case 'interrupt': {
         // Two ways to stop a reply. `esc` is a bid for silence: the queue
         // freezes until the user sends again. `/interrupt` is a redirection:
@@ -4007,7 +4135,7 @@ class TuiApp {
         if (!this.tab.streaming) {
           this.setStatus('nothing is streaming')
           this.paint()
-          return
+          return true
         }
         this.tab.drainQueue = true
         this.setStatus(
@@ -4016,48 +4144,56 @@ class TuiApp {
             : 'interrupting…',
         )
         this.interrupt()
-        return
+        return true
       }
-
       case 'copy':
         this.copyLastReply()
-        return
-
+        return true
       case 'export':
-        await this.exportTranscript(rawInput.trim())
-        return
+        void this.exportTranscript(rawInput.trim())
+        return true
+      default:
+        return false
+    }
+  }
 
+  /** The peer command: the fleet's device list, edited from the composer. */
+  private runPeerCommand(name: string, rawInput: string): boolean {
+    if (name !== 'peer') return false
+    const [verb = '', ...rest] = rawInput.trim().split(/\s+/)
+    const host = rest.join(' ').trim()
+    if (verb === '') {
+      this.setStatus(
+        this.peers.all().length === 0
+          ? 'no devices yet — /peer add <host>, or press a in the fleet'
+          : `fleet devices: ${this.peers.all().join(', ')}`,
+      )
+    } else if (verb === 'add') {
+      if (this.addPeer(host)) this.setStatus(`added ${host} — ctrl+f to see it`)
+    } else if (verb === 'rm' || verb === 'remove') {
+      this.setStatus(
+        this.removePeer(host) ? `removed ${host}` : `${host} is not in the fleet`,
+        !this.peers.has(host) && host === '',
+      )
+    } else {
+      this.setStatus('usage: /peer [add|rm <host>]', true)
+    }
+    this.paint()
+    return true
+  }
+
+  /** The surface commands: overlays, the usage dashboard, and quitting. */
+  private runSurfaceCommand(name: string, rawInput: string): boolean {
+    switch (name) {
+      case 'jobs':
+        this.showJobs(rawInput)
+        return true
+      case 'mcp':
+        this.showMcp()
+        return true
       case 'fleet':
         this.openFleet()
-        return
-
-      case 'peer': {
-        const [verb = '', ...rest] = rawInput.trim().split(/\s+/)
-        const host = rest.join(' ').trim()
-        if (verb === '') {
-          this.setStatus(
-            this.peers.all().length === 0
-              ? 'no devices yet — /peer add <host>, or press a in the fleet'
-              : `fleet devices: ${this.peers.all().join(', ')}`,
-          )
-        } else if (verb === 'add') {
-          if (this.addPeer(host)) this.setStatus(`added ${host} — ctrl+f to see it`)
-        } else if (verb === 'rm' || verb === 'remove') {
-          this.setStatus(
-            this.removePeer(host) ? `removed ${host}` : `${host} is not in the fleet`,
-            !this.peers.has(host) && host === '',
-          )
-        } else {
-          this.setStatus('usage: /peer [add|rm <host>]', true)
-        }
-        this.paint()
-        return
-      }
-
-      case 'update':
-        void this.selfUpdate()
-        return
-
+        return true
       case 'tools': {
         const tools = this.ctx.get('tools')
         let listed: string[] = []
@@ -4073,36 +4209,36 @@ class TuiApp {
             : `**Tools**\n\n${listed.map((tool) => `- \`${tool}\``).join('\n')}`,
           'esc to close',
         )
-        return
+        return true
       }
-
-      case 'usage': {
+      case 'usage':
         if (rawInput.trim() === 'reset') {
           this.usage.clear()
           this.usageView.hide()
           this.persistSoon()
           this.setStatus('usage ledger reset')
           this.paint()
-          return
+          return true
         }
         this.openUsageView()
-        return
-      }
-
+        return true
       case 'help':
         this.showOverlay(keyReference(), 'esc to close help')
-        return
-
+        return true
+      case 'update':
+        void this.selfUpdate()
+        return true
       case 'exit':
       case 'quit':
         this.quit()
-        return
-
+        return true
       default:
-        break
+        return false
     }
+  }
 
-    // Anything else belongs to the Harness command registry.
+  /** Everything the app did not claim belongs to the Harness command registry. */
+  private async runHarnessCommand(name: string, rawInput: string): Promise<void> {
     const registry = this.ctx.get('commands')
     const agent = this.tab.agent
     if (registry === undefined || agent === undefined) {
@@ -4571,21 +4707,26 @@ class TuiApp {
     }
     for (const job of jobs) {
       if (typeof job.status !== 'string') continue
-      const id = String(job.id)
-      const previous = this.jobStatus.get(id)
-      if (job.status === 'running') {
-        this.jobStatus.set(id, 'running')
-        continue
-      }
-      if (previous === 'running') {
-        this.jobStatus.set(id, job.status)
-        const label = typeof job.label === 'string' ? job.label : ''
-        this.tabStrip.ring()
-        this.setStatus(`background job ${label === '' ? id : label} finished`)
-        this.paint()
-      } else if (previous === undefined) {
-        this.jobStatus.set(id, job.status)
-      }
+      this.observeJob(String(job.id), job)
+    }
+  }
+
+  /** Watch one job for the running → finished transition worth a bell. */
+  private observeJob(id: string, job: { status: unknown; label: unknown }): void {
+    if (typeof job.status !== 'string') return
+    const previous = this.jobStatus.get(id)
+    if (job.status === 'running') {
+      this.jobStatus.set(id, 'running')
+      return
+    }
+    if (previous === 'running') {
+      this.jobStatus.set(id, job.status)
+      const label = typeof job.label === 'string' ? job.label : ''
+      this.tabStrip.ring()
+      this.setStatus(`background job ${label === '' ? id : label} finished`)
+      this.paint()
+    } else if (previous === undefined) {
+      this.jobStatus.set(id, job.status)
     }
   }
 

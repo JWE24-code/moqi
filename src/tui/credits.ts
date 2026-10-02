@@ -585,19 +585,8 @@ function planBlock(plan: ProviderPlan, now: number, labelWidth: number, width: n
     return out
   }
 
-  if (plan.balance !== undefined) {
-    const balance = plan.balance
-    const split: string[] = []
-    if (balance.granted !== undefined && balance.granted > 0) {
-      split.push(`${money(balance.granted, '')} granted`)
-    }
-    if (balance.toppedUp !== undefined && balance.toppedUp > 0) {
-      split.push(`${money(balance.toppedUp, '')} topped up`)
-    }
-    const detail = split.length === 0 ? '' : muted(` (${split.join(' + ')})`)
-    const state = balance.available ? ok('available') : warn('unavailable')
-    out.push(truncate(`    balance ${bold(money(balance.total, balance.currency))}${detail}  ${state}`, width))
-  }
+  const balance = plan.balance === undefined ? undefined : balanceLine(plan.balance)
+  if (balance !== undefined) out.push(truncate(balance, width))
 
   for (const window of plan.windows) {
     out.push(windowLine(window, now, labelWidth, width))
@@ -609,6 +598,20 @@ function planBlock(plan: ProviderPlan, now: number, labelWidth: number, width: n
     out.push(truncate(`    ${text}`, width))
   }
   return out
+}
+
+/** The balance line: what was granted and topped up, and whether it is usable. */
+function balanceLine(balance: NonNullable<ProviderPlan['balance']>): string {
+  const split: string[] = []
+  if (balance.granted !== undefined && balance.granted > 0) {
+    split.push(`${money(balance.granted, '')} granted`)
+  }
+  if (balance.toppedUp !== undefined && balance.toppedUp > 0) {
+    split.push(`${money(balance.toppedUp, '')} topped up`)
+  }
+  const detail = split.length === 0 ? '' : muted(` (${split.join(' + ')})`)
+  const state = balance.available ? ok('available') : warn('unavailable')
+  return `    balance ${bold(money(balance.total, balance.currency))}${detail}  ${state}`
 }
 
 /**

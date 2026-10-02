@@ -85,6 +85,137 @@ function modifiers(parameter: string | undefined): string {
   return prefix
 }
 
+/** What decoding one escape sequence produced. */
+interface EscapeStep {
+  /** The keys the sequence stands for; empty when it is noise. */
+  keys: Key[]
+  /** Bytes the sequence spans; the caller skips past them. */
+  consumed: number
+  /**
+   * True when the sequence is truncated and more bytes may complete it: the
+   * caller holds the tail for the next chunk rather than reporting junk.
+   */
+  incomplete?: boolean
+}
+
+/**
+ * Decode one SGR mouse report: `ESC [ < button ; column ; row (M press | m
+ * release)`. A left-click press and the wheel are acted on; every other
+ * report is swallowed so a click cannot leak into the composer as stray
+ * text. Reports with modifier bits set are ignored rather than unmasked:
+ * shift+click is how a terminal makes its own text selection while
+ * reporting is on, and treating that workaround as an app click would make
+ * copying impossible.
+ */
+function decodeMouse(rest: string): EscapeStep {
+  const mouse = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])/.exec(rest)
+  if (mouse === null) {
+    // Under the bound is a report still arriving; over it, junk.
+    return { keys: [], consumed: 0, incomplete: rest.length < 24 }
+  }
+  const button = Number.parseInt(mouse[1] ?? '0', 10)
+  const cell = {
+    column: Number.parseInt(mouse[2] ?? '1', 10) - 1,
+    row: Number.parseInt(mouse[3] ?? '1', 10) - 1,
+  }
+  const keys: Key[] = []
+  if (mouse[4] === 'M') {
+    if (button === 0) keys.push({ name: 'click', text: '', mouse: cell })
+    else if (button === 64) keys.push({ name: 'wheelup', text: '', mouse: cell })
+    else if (button === 65) keys.push({ name: 'wheeldown', text: '', mouse: cell })
+    else if (button === 32) keys.push({ name: 'drag', text: '', mouse: cell })
+  } else if (button === 0) {
+    // A left-button release: the end of a drag, or the back half of a
+    // click. The app tells the two apart by whether the pointer moved.
+    keys.push({ name: 'release', text: '', mouse: cell })
+  }
+  return { keys, consumed: mouse[0].length }
+}
+
+/**
+ * Decode one bracketed paste: everything between the start and end markers
+ * is one paste. Delivering it as a single `paste` key keeps its newlines
+ * out of the submit path, and normalizing CR/CRLF to LF matches the
+ * composer's own line separator. An incomplete paste is held until the
+ * terminator arrives, the same way a split escape sequence is.
+ */
+function decodePaste(rest: string): EscapeStep {
+  const end = rest.indexOf(`${ESC}[201~`, 6)
+  if (end === -1) return { keys: [], consumed: 0, incomplete: true }
+  const text = rest.slice(6, end).replace(/\r\n?/g, '\n')
+  return { keys: [{ name: 'paste', text }], consumed: end + 6 }
+}
+
+/** The key one CSI sequence's parameters and final byte name, if known. */
+function csiKey(parameters: readonly string[], final: string): Key | undefined {
+  let name: string | undefined
+  if (final === 'u') {
+    // CSI-u (fixterms / kitty): `ESC [ codepoint ; modifier u`.
+    const base = codepointName(parameters[0])
+    if (base !== undefined) name = modifiers(parameters[1]) + base
+  } else if (final === '~' && parameters[0] === '27' && parameters.length >= 3) {
+    // xterm modifyOtherKeys: `ESC [ 27 ; modifier ; codepoint ~`, which
+    // is how Ghostty and foot report ctrl+enter without the app asking
+    // for the kitty protocol.
+    const base = codepointName(parameters[2])
+    if (base !== undefined) name = modifiers(parameters[1]) + base
+  } else if (final === '~') {
+    const base = TILDE_NAMES[parameters[0] ?? '']
+    if (base !== undefined) name = modifiers(parameters[1]) + base
+  } else {
+    const base = CSI_NAMES[final]
+    if (base !== undefined) name = modifiers(parameters[1]) + base
+  }
+  return name === undefined ? undefined : { name, text: '' }
+}
+
+/** Decode one `ESC [` / `ESC O` sequence: arrows, tildes, and the encodings. */
+function decodeCsi(rest: string): EscapeStep {
+  const match = new RegExp(`^${ESC}[[O]([0-9;]*)([A-Za-z~])`).exec(rest)
+  if (match === null) {
+    // Incomplete CSI: keep it for the next chunk, unless it is clearly junk.
+    return { keys: [], consumed: 0, incomplete: rest.length < 16 }
+  }
+  const parameters = (match[1] ?? '').split(';')
+  const key = csiKey(parameters, match[2] ?? '')
+  return { keys: key === undefined ? [] : [key], consumed: match[0].length }
+}
+
+/** Decode the sequence following one escape byte. */
+function decodeEscape(rest: string): EscapeStep {
+  // A lone ESC at the very end may be the start of a longer sequence.
+  if (rest.length === 1) return { keys: [], consumed: 0, incomplete: true }
+  if (rest.startsWith(`${ESC}[<`)) return decodeMouse(rest)
+  if (rest.startsWith(`${ESC}[200~`)) return decodePaste(rest)
+  if (rest[1] === '[' || rest[1] === 'O') return decodeCsi(rest)
+  // alt+<char>
+  const next = rest[1] ?? ''
+  if (next >= ' ' && next <= '~') {
+    return { keys: [{ name: `alt+${next.toLowerCase()}`, text: '' }], consumed: 2 }
+  }
+  return { keys: [{ name: 'esc', text: '' }], consumed: 1 }
+}
+
+/** The key one non-escape character stands for, and its width in the input. */
+function plainKey(char: string): { key: Key; consumed: number } {
+  if (char === '\r') {
+    // Return submits. A line feed is Ctrl+J, so it deliberately falls
+    // through to the ctrl+<letter> branch below and stays a newline.
+    return { key: { name: 'enter', text: '' }, consumed: 1 }
+  }
+  if (char === '\t') return { key: { name: 'tab', text: '' }, consumed: 1 }
+  const code = char.codePointAt(0) ?? 0
+  if (code === 127 || code === 8) {
+    return { key: { name: 'backspace', text: '' }, consumed: 1 }
+  }
+  // Control characters map to ctrl+<letter>; ctrl+a is 0x01.
+  if (code < 32) {
+    return { key: { name: `ctrl+${String.fromCharCode(code + 96)}`, text: '' }, consumed: 1 }
+  }
+  const point = String.fromCodePoint(code)
+  return { key: { name: point, text: point }, consumed: point.length }
+}
+
 /**
  * Decode a buffer into keys, returning the keys and any trailing bytes that
  * form an incomplete sequence.
@@ -97,134 +228,18 @@ export function decode(input: string): { keys: Key[]; rest: string } {
     const char = input[index] ?? ''
 
     if (char === ESC) {
-      const rest = input.slice(index)
-
-      // A lone ESC at the very end may be the start of a longer sequence.
-      if (rest.length === 1) return { keys, rest }
-
-      // SGR mouse report: ESC [ < button ; column ; row (M press | m release).
-      // A left-click press and the wheel are acted on; every other report is
-      // swallowed so a click cannot leak into the composer as stray text.
-      // Reports with modifier bits set are ignored rather than unmasked:
-      // shift+click is how a terminal makes its own text selection while
-      // reporting is on, and treating that workaround as an app click would
-      // make copying impossible.
-      if (rest.startsWith(`${ESC}[<`)) {
-        const mouse = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])/.exec(rest)
-        if (mouse === null) {
-          if (rest.length < 24) return { keys, rest }
-          index += 1
-          continue
-        }
-        const button = Number.parseInt(mouse[1] ?? '0', 10)
-        const cell = {
-          column: Number.parseInt(mouse[2] ?? '1', 10) - 1,
-          row: Number.parseInt(mouse[3] ?? '1', 10) - 1,
-        }
-        if (mouse[4] === 'M') {
-          if (button === 0) keys.push({ name: 'click', text: '', mouse: cell })
-          else if (button === 64) keys.push({ name: 'wheelup', text: '', mouse: cell })
-          else if (button === 65) keys.push({ name: 'wheeldown', text: '', mouse: cell })
-          else if (button === 32) keys.push({ name: 'drag', text: '', mouse: cell })
-        } else if (button === 0) {
-          // A left-button release: the end of a drag, or the back half of a
-          // click. The app tells the two apart by whether the pointer moved.
-          keys.push({ name: 'release', text: '', mouse: cell })
-        }
-        index += mouse[0].length
-        continue
-      }
-
-      // Bracketed paste: everything between the start and end markers is one
-      // paste. Delivering it as a single `paste` key keeps its newlines out of
-      // the submit path, and normalizing CR/CRLF to LF matches the composer's
-      // own line separator. An incomplete paste is held until the terminator
-      // arrives, the same way a split escape sequence is.
-      if (rest.startsWith(`${ESC}[200~`)) {
-        const end = rest.indexOf(`${ESC}[201~`, 6)
-        if (end === -1) return { keys, rest }
-        const text = rest.slice(6, end).replace(/\r\n?/g, '\n')
-        keys.push({ name: 'paste', text })
-        index += end + 6
-        continue
-      }
-
-      if (rest[1] === '[' || rest[1] === 'O') {
-        const match = new RegExp(`^${ESC}[[O]([0-9;]*)([A-Za-z~])`).exec(rest)
-        if (match === null) {
-          // Incomplete CSI: keep it for the next chunk, unless it is clearly junk.
-          if (rest.length < 16) return { keys, rest }
-          index += 1
-          continue
-        }
-        const parameters = (match[1] ?? '').split(';')
-        const final = match[2] ?? ''
-        let name: string | undefined
-        if (final === 'u') {
-          // CSI-u (fixterms / kitty): `ESC [ codepoint ; modifier u`.
-          const base = codepointName(parameters[0])
-          if (base !== undefined) name = modifiers(parameters[1]) + base
-        } else if (final === '~' && parameters[0] === '27' && parameters.length >= 3) {
-          // xterm modifyOtherKeys: `ESC [ 27 ; modifier ; codepoint ~`, which
-          // is how Ghostty and foot report ctrl+enter without the app asking
-          // for the kitty protocol.
-          const base = codepointName(parameters[2])
-          if (base !== undefined) name = modifiers(parameters[1]) + base
-        } else if (final === '~') {
-          const base = TILDE_NAMES[parameters[0] ?? '']
-          if (base !== undefined) name = modifiers(parameters[1]) + base
-        } else {
-          const base = CSI_NAMES[final]
-          if (base !== undefined) name = modifiers(parameters[1]) + base
-        }
-        if (name !== undefined) keys.push({ name, text: '' })
-        index += match[0].length
-        continue
-      }
-
-      // alt+<char>
-      const next = rest[1] ?? ''
-      if (next >= ' ' && next <= '~') {
-        keys.push({ name: `alt+${next.toLowerCase()}`, text: '' })
-        index += 2
-        continue
-      }
-
-      keys.push({ name: 'esc', text: '' })
-      index += 1
+      const step = decodeEscape(input.slice(index))
+      if (step.incomplete === true) return { keys, rest: input.slice(index) }
+      keys.push(...step.keys)
+      // A consumed count of zero is junk: skip one byte and keep reading,
+      // so a malformed report cannot stall the stream.
+      index += Math.max(step.consumed, 1)
       continue
     }
 
-    const code = char.codePointAt(0) ?? 0
-
-    if (char === '\r') {
-      // Return submits. A line feed is Ctrl+J, so it deliberately falls
-      // through to the ctrl+<letter> branch below and stays a newline.
-      keys.push({ name: 'enter', text: '' })
-      index += 1
-      continue
-    }
-    if (char === '\t') {
-      keys.push({ name: 'tab', text: '' })
-      index += 1
-      continue
-    }
-    if (code === 127 || code === 8) {
-      keys.push({ name: 'backspace', text: '' })
-      index += 1
-      continue
-    }
-    // Control characters map to ctrl+<letter>; ctrl+a is 0x01.
-    if (code < 32) {
-      const letter = String.fromCharCode(code + 96)
-      keys.push({ name: `ctrl+${letter}`, text: '' })
-      index += 1
-      continue
-    }
-
-    const point = String.fromCodePoint(code)
-    keys.push({ name: point, text: point })
-    index += point.length
+    const { key, consumed } = plainKey(char)
+    keys.push(key)
+    index += consumed
   }
 
   return { keys, rest: '' }

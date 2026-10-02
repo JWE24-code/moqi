@@ -91,25 +91,9 @@ export function projectStreamChunk(surface: StreamingSurface, chunk: StreamChunk
     case 'reasoning-delta':
       surface.streamingReasoning += chunk.text ?? ''
       break
-    case 'tool-call-delta': {
-      // The name arrives on the first delta of a call and is omitted on the
-      // argument deltas that follow, so the call id is what identifies a row.
-      // The argument deltas accumulate into the row's detail as they arrive —
-      // partial JSON still reads as the command typing itself out.
-      const id = String(chunk.id)
-      let row = findTool(surface.streamingSegments, (tool) => tool.id === id)
-      if (row === undefined) {
-        row = { id, name: chunk.name ?? 'tool', status: 'running' }
-        surface.streamingSegments.push({ kind: 'tool', tool: row })
-      }
-      if (chunk.name !== undefined && row.name === 'tool') row.name = chunk.name
-      if (chunk.argumentsDelta !== undefined && chunk.argumentsDelta !== '') {
-        argumentBuffers.set(row, (argumentBuffers.get(row) ?? '') + chunk.argumentsDelta)
-        const detail = describeToolCall(row.name, argumentBuffers.get(row))
-        if (detail !== '') row.detail = detail
-      }
+    case 'tool-call-delta':
+      projectCallDelta(surface, chunk)
       break
-    }
     case 'usage': {
       const usage = chunk.usage
       if (usage === undefined) break
@@ -121,36 +105,63 @@ export function projectStreamChunk(surface: StreamingSurface, chunk: StreamChunk
       surface.haveUsage = true
       break
     }
-    case 'block-end': {
-      // A settled tool-call block flips its row from running to done, fills
-      // in the name the deltas may have omitted, and says what the call does:
-      // the block carries the complete raw `arguments`, which summarize into
-      // the row's one-line detail (the command, the path, the query).
-      const block = chunk.block
-      if (block === undefined || block.type !== 'tool-call') break
-      const row =
-        findTool(surface.streamingSegments, (tool) => tool.id === String(block.id)) ??
-        findTool(surface.streamingSegments, (tool) => tool.name === block.name)
-      if (row === undefined) {
-        surface.streamingSegments.push({
-          kind: 'tool',
-          tool: {
-            id: String(block.id),
-            name: block.name ?? 'tool',
-            status: 'ok',
-            detail: describeToolCall(block.name ?? 'tool', block.arguments),
-          },
-        })
-      } else {
-        row.name = block.name ?? row.name
-        row.status = 'ok'
-        argumentBuffers.delete(row)
-        const detail = describeToolCall(row.name, block.arguments)
-        if (detail !== '') row.detail = detail
-      }
+    case 'block-end':
+      projectBlockEnd(surface, chunk.block)
       break
-    }
     default:
       break
   }
+}
+
+/**
+ * The name arrives on the first delta of a call and is omitted on the
+ * argument deltas that follow, so the call id is what identifies a row.
+ * The argument deltas accumulate into the row's detail as they arrive —
+ * partial JSON still reads as the command typing itself out.
+ */
+function projectCallDelta(surface: StreamingSurface, chunk: StreamChunkLike): void {
+  const id = String(chunk.id)
+  let row = findTool(surface.streamingSegments, (tool) => tool.id === id)
+  if (row === undefined) {
+    row = { id, name: chunk.name ?? 'tool', status: 'running' }
+    surface.streamingSegments.push({ kind: 'tool', tool: row })
+  }
+  if (chunk.name !== undefined && row.name === 'tool') row.name = chunk.name
+  if (chunk.argumentsDelta === undefined || chunk.argumentsDelta === '') return
+  argumentBuffers.set(row, (argumentBuffers.get(row) ?? '') + chunk.argumentsDelta)
+  const detail = describeToolCall(row.name, argumentBuffers.get(row))
+  if (detail !== '') row.detail = detail
+}
+
+/**
+ * A settled tool-call block flips its row from running to done, fills in the
+ * name the deltas may have omitted, and says what the call does: the block
+ * carries the complete raw `arguments`, which summarize into the row's
+ * one-line detail (the command, the path, the query).
+ */
+function projectBlockEnd(
+  surface: StreamingSurface,
+  block: { type: string; id?: string | number; name?: string; arguments?: string } | undefined,
+): void {
+  if (block === undefined || block.type !== 'tool-call') return
+  const row =
+    findTool(surface.streamingSegments, (tool) => tool.id === String(block.id)) ??
+    findTool(surface.streamingSegments, (tool) => tool.name === block.name)
+  if (row === undefined) {
+    surface.streamingSegments.push({
+      kind: 'tool',
+      tool: {
+        id: String(block.id),
+        name: block.name ?? 'tool',
+        status: 'ok',
+        detail: describeToolCall(block.name ?? 'tool', block.arguments),
+      },
+    })
+    return
+  }
+  row.name = block.name ?? row.name
+  row.status = 'ok'
+  argumentBuffers.delete(row)
+  const detail = describeToolCall(row.name, block.arguments)
+  if (detail !== '') row.detail = detail
 }

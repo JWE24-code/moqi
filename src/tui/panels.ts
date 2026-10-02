@@ -369,20 +369,6 @@ export class LoginPanel {
   view(): PanelView {
     const notice = this.notice
     const prompt = this.prompt
-    const lines: string[] = []
-    // The url and code are what a device-code flow (GitHub Copilot's shape:
-    // notify the page and the code, then prompt to confirm) still needs on
-    // screen once its own prompt takes over — only the notice's plain message
-    // is redundant then, since the prompt speaks for the moment now.
-    if (notice !== undefined) {
-      if (prompt === undefined) lines.push(notice.message)
-      if (notice.url !== undefined) lines.push('', `Open: ${notice.url}`)
-      if (notice.code !== undefined) lines.push('', `Code: \`${notice.code}\``)
-    }
-    if (prompt !== undefined) {
-      if (lines.length > 0) lines.push('')
-      lines.push(prompt.message)
-    }
     const rows: PanelRow[] =
       prompt?.kind === 'select'
         ? prompt.options.map((option, index) => ({
@@ -392,26 +378,55 @@ export class LoginPanel {
           }))
         : []
     const textPrompt = prompt?.kind === 'text' || prompt?.kind === 'secret'
-    // enter opens the page for the caller — this class stays free of the
-    // Harness and npm alike, so it never spawns a browser itself — whenever
-    // there is a page to open and no question is waiting on an answer first.
-    const hint =
-      prompt === undefined
-        ? notice?.url === undefined
-          ? 'esc cancels the sign-in'
-          : 'enter opens the browser  ·  esc cancels the sign-in'
-        : prompt.kind === 'select'
-          ? '↑↓ move  ·  enter choose  ·  esc decline'
-          : 'enter submit  ·  esc decline'
     return {
       kind: 'login',
       title: `Sign in — ${this.label}`,
-      detail: lines.join('\n'),
+      detail: loginDetail(notice, prompt),
       rows,
-      hint,
+      hint: loginHint(notice, prompt),
       inputLabel: textPrompt ? 'answer' : undefined,
-      inputText: textPrompt ? (prompt.kind === 'secret' ? '•'.repeat(this.draft.length) : this.draft) : undefined,
+      inputText: textPrompt && prompt !== undefined ? loginDraft(prompt, this.draft) : undefined,
       inputFocused: textPrompt,
     }
   }
+}
+
+/** The sign-in's body: what the flow reports, then what it asks. */
+function loginDetail(
+  notice: LoginNotice | undefined,
+  prompt: LoginPrompt | undefined,
+): string {
+  const lines: string[] = []
+  // The url and code are what a device-code flow (GitHub Copilot's shape:
+  // notify the page and the code, then prompt to confirm) still needs on
+  // screen once its own prompt takes over — only the notice's plain message
+  // is redundant then, since the prompt speaks for the moment now.
+  if (notice !== undefined) {
+    if (prompt === undefined) lines.push(notice.message)
+    if (notice.url !== undefined) lines.push('', `Open: ${notice.url}`)
+    if (notice.code !== undefined) lines.push('', `Code: \`${notice.code}\``)
+  }
+  if (prompt !== undefined) {
+    if (lines.length > 0) lines.push('')
+    lines.push(prompt.message)
+  }
+  return lines.join('\n')
+}
+
+/** The hint line: enter opens the page for the caller — this class stays free
+ * of the Harness and npm alike, so it never spawns a browser itself. */
+function loginHint(notice: LoginNotice | undefined, prompt: LoginPrompt | undefined): string {
+  if (prompt === undefined) {
+    return notice?.url === undefined
+      ? 'esc cancels the sign-in'
+      : 'enter opens the browser  ·  esc cancels the sign-in'
+  }
+  return prompt.kind === 'select'
+    ? '↑↓ move  ·  enter choose  ·  esc decline'
+    : 'enter submit  ·  esc decline'
+}
+
+/** What the masked or plain draft shows while a text prompt waits. */
+function loginDraft(prompt: LoginPrompt & { kind: 'text' | 'secret' }, draft: string): string {
+  return prompt.kind === 'secret' ? '•'.repeat(draft.length) : draft
 }

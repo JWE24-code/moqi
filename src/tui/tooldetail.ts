@@ -108,37 +108,38 @@ export function applyToolEvent(
   tools: ToolActivity[],
   event: { type?: string; data?: Record<string, unknown> | undefined },
 ): void {
-  const data = event.data
-  if (data === undefined) return
+  if (event.data === undefined) return
+  if (event.type === 'tool/call') applyToolCall(tools, event.data)
+  else if (event.type === 'tool/result') applyToolResult(tools, event.data)
+}
 
-  if (event.type === 'tool/call') {
-    const row = tools.find((tool) => tool.id === String(data['callId']))
-    if (row === undefined) return
-    const name = typeof data['name'] === 'string' ? data['name'] : undefined
-    if (row.name === 'tool' && name !== undefined) row.name = name
-    if (row.detail === undefined || row.detail === '') {
-      const detail = describeToolCall(name ?? row.name, str(data['arguments']))
-      if (detail !== '') row.detail = detail
-    }
-    return
-  }
+/** `tool/call` fills a row's name and, when the deltas left it empty, its detail. */
+function applyToolCall(tools: ToolActivity[], data: Record<string, unknown>): void {
+  const row = tools.find((tool) => tool.id === String(data['callId']))
+  if (row === undefined) return
+  const name = typeof data['name'] === 'string' ? data['name'] : undefined
+  if (row.name === 'tool' && name !== undefined) row.name = name
+  if (row.detail !== undefined && row.detail !== '') return
+  const detail = describeToolCall(name ?? row.name, str(data['arguments']))
+  if (detail !== '') row.detail = detail
+}
 
-  if (event.type === 'tool/result') {
-    const message = data['message'] as { content?: unknown[] } | undefined
-    const block = Array.isArray(message?.content)
-      ? (message?.content as { toolCallId?: unknown; content?: unknown[]; isError?: unknown }[])[0]
-      : undefined
-    if (block === undefined) return
-    const row = tools.find((tool) => tool.id === String(block.toolCallId))
-    if (row === undefined) return
-    const error = data['error'] as { name?: string; code?: string } | undefined
-    row.status = block.isError === true || error !== undefined ? 'error' : 'ok'
-    const summary = summarizeResult(
-      Array.isArray(block.content) ? block.content : [],
-      error !== undefined ? error : undefined,
-    )
-    if (summary !== undefined) row.result = summary
-  }
+/** `tool/result` settles the row the result block names, with its outcome. */
+function applyToolResult(tools: ToolActivity[], data: Record<string, unknown>): void {
+  const message = data['message'] as { content?: unknown[] } | undefined
+  const block = Array.isArray(message?.content)
+    ? (message?.content as { toolCallId?: unknown; content?: unknown[]; isError?: unknown }[])[0]
+    : undefined
+  if (block === undefined) return
+  const row = tools.find((tool) => tool.id === String(block.toolCallId))
+  if (row === undefined) return
+  const error = data['error'] as { name?: string; code?: string } | undefined
+  row.status = block.isError === true || error !== undefined ? 'error' : 'ok'
+  const summary = summarizeResult(
+    Array.isArray(block.content) ? block.content : [],
+    error !== undefined ? error : undefined,
+  )
+  if (summary !== undefined) row.result = summary
 }
 
 /** `unknown` to `string | undefined`, the only coercion event fields need. */

@@ -69,23 +69,29 @@ export class FileIndex {
     }
     for (const name of names) {
       if (found.length >= MAX_ENTRIES) return
-      if (name.startsWith('.') && name !== '.github') continue
-      const full = join(directory, name)
-      let stats
-      try {
-        stats = statSync(full)
-      } catch {
-        continue
-      }
-      if (stats.isDirectory()) {
-        if (SKIP_DIRECTORIES.has(name)) continue
-        this.walk(full, depth + 1, found)
-      } else if (stats.isFile()) {
-        if (SKIP_SUFFIXES.some((suffix) => name.endsWith(suffix))) continue
-        const rel = relative(this.root, full)
-        found.push(sep === '/' ? rel : rel.replaceAll(sep, '/'))
-      }
+      this.walkEntry(directory, name, depth, found)
     }
+  }
+
+  /** One directory entry: descend into it, or add the file under its root path. */
+  private walkEntry(directory: string, name: string, depth: number, found: string[]): void {
+    if (name.startsWith('.') && name !== '.github') return
+    const full = join(directory, name)
+    let stats
+    try {
+      stats = statSync(full)
+    } catch {
+      return
+    }
+    if (stats.isDirectory()) {
+      if (SKIP_DIRECTORIES.has(name)) return
+      this.walk(full, depth + 1, found)
+      return
+    }
+    if (!stats.isFile()) return
+    if (SKIP_SUFFIXES.some((suffix) => name.endsWith(suffix))) return
+    const rel = relative(this.root, full)
+    found.push(sep === '/' ? rel : rel.replaceAll(sep, '/'))
   }
 
   /**

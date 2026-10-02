@@ -194,33 +194,49 @@ export function searchSessions(
   let skippedCompressed = 0
   for (const candidate of sessionDirs(root)) {
     if (scanned >= limits.maxSessions || hits.length >= limits.maxHits) break
-    const path = logFile(candidate.dir)
-    if (path === undefined) continue
-    if (path.endsWith('.zstd') && !zstdAvailable()) {
-      skippedCompressed += 1
-      continue
-    }
-    const body = readLog(path, limits.maxBytes)
-    if (body === undefined) continue
+    const found = searchableLog(candidate.dir, limits)
+    if (found.skipped === true) skippedCompressed += 1
+    if (found.path === undefined) continue
     scanned += 1
-    for (const raw of body.split('\n')) {
-      if (hits.length >= limits.maxHits) break
-      if (!raw.includes('"')) continue
-      const { text, role } = textOfRecord(raw)
-      if (text === '') continue
-      const context = text.replace(/\s+/g, ' ').trim()
-      const index = context.toLowerCase().indexOf(needle)
-      if (index === -1) continue
-      const at = Math.max(index - 30, 0)
-      const snippet = context.slice(at, at + 140)
-      hits.push({
-        sessionId: candidate.id,
-        project: candidate.project.replace(/^--|--$/g, ''),
-        line: at > 0 ? `…${snippet}` : snippet,
-        ...(role === undefined ? {} : { role }),
-        path,
-      })
-    }
+    searchLog(found.path, candidate, needle, limits, hits)
   }
   return { hits, scanned, skippedCompressed }
+}
+
+/** The one log file a session directory contributes, or why it contributes none. */
+function searchableLog(dir: string, limits: SearchLimits): { path?: string; skipped?: boolean } {
+  const path = logFile(dir)
+  if (path === undefined) return {}
+  if (path.endsWith('.zstd') && !zstdAvailable()) return { skipped: true }
+  if (readLog(path, limits.maxBytes) === undefined) return {}
+  return { path }
+}
+
+/** Scan one session log's lines into hit rows, up to the hit cap. */
+function searchLog(
+  path: string,
+  candidate: { id: string; project: string },
+  needle: string,
+  limits: SearchLimits,
+  hits: SessionHit[],
+): void {
+  const body = readLog(path, limits.maxBytes) ?? ''
+  for (const raw of body.split('\n')) {
+    if (hits.length >= limits.maxHits) break
+    if (!raw.includes('"')) continue
+    const { text, role } = textOfRecord(raw)
+    if (text === '') continue
+    const context = text.replace(/\s+/g, ' ').trim()
+    const index = context.toLowerCase().indexOf(needle)
+    if (index === -1) continue
+    const at = Math.max(index - 30, 0)
+    const snippet = context.slice(at, at + 140)
+    hits.push({
+      sessionId: candidate.id,
+      project: candidate.project.replace(/^--|--$/g, ''),
+      line: at > 0 ? `…${snippet}` : snippet,
+      ...(role === undefined ? {} : { role }),
+      path,
+    })
+  }
 }

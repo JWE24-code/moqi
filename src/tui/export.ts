@@ -24,25 +24,33 @@ export function transcriptMarkdown(messages: readonly Message[], title: string):
       lines.push('## >', '', ...indented(messageText(message)), '')
       continue
     }
-    const label = message.command === undefined ? '' : ` (${message.command.ok ? 'ok' : 'failed'})`
-    lines.push(`## assistant${label}`, '')
-    if (message.reasoning !== undefined && message.reasoning !== '') {
-      lines.push('<details><summary>thinking</summary>', '', '```', ...message.reasoning.split('\n'), '```', '', '</details>', '')
-    }
-    for (const segment of message.segments) {
-      if (segment.kind === 'text') {
-        if (segment.text.trim() !== '') lines.push(...segment.text.trim().split('\n'), '')
-        continue
-      }
-      const tool = segment.tool
-      const mark = tool.status === 'ok' ? 'x' : tool.status === 'error' ? ' ' : '~'
-      lines.push(
-        `- [${mark}] \`${tool.name}\`${tool.detail === undefined ? '' : ` — ${tool.detail}`}`,
-        '',
-      )
-    }
+    lines.push(...assistantSection(message))
   }
   return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`
+}
+
+/** One assistant turn: the heading, the hidden thinking, then the segments. */
+function assistantSection(message: Message): string[] {
+  const label = message.command === undefined ? '' : ` (${message.command.ok ? 'ok' : 'failed'})`
+  const lines: string[] = [`## assistant${label}`, '']
+  if (message.reasoning !== undefined && message.reasoning !== '') {
+    lines.push('<details><summary>thinking</summary>', '', '```', ...message.reasoning.split('\n'), '```', '', '</details>', '')
+  }
+  for (const segment of message.segments) {
+    if (segment.kind === 'text') {
+      if (segment.text.trim() !== '') lines.push(...segment.text.trim().split('\n'), '')
+      continue
+    }
+    lines.push(...toolLine(segment.tool), '')
+  }
+  return lines
+}
+
+/** One tool call as a checklist line, marked by how it ended. */
+function toolLine(tool: { name: string; status: string; detail?: string }): string[] {
+  const mark = tool.status === 'ok' ? 'x' : tool.status === 'error' ? ' ' : '~'
+  const detail = tool.detail === undefined ? '' : ` — ${tool.detail}`
+  return [`- [${mark}] \`${tool.name}\`${detail}`]
 }
 
 /** Quote a user turn the way an email client quotes a reply. */

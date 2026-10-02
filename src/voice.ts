@@ -319,24 +319,42 @@ export function parseWhisperText(stdout: string): string {
   for (const raw of stdout.split('\n')) {
     const line = raw.trim()
     if (line === '') continue
-
-    const segment = /^\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]\s*(.*)$/.exec(line)
-    if (segment !== null) {
-      const text = (segment[1] ?? '').trim()
-      if (text !== '' && !NON_SPEECH.test(text)) timestamped.push(text)
+    if (isTimestamped(line)) {
+      const text = timestampText(line)
+      if (text !== '') timestamped.push(text)
       continue
     }
-
-    // A log line from whisper or its loader, e.g. `whisper_init_from_file:` or
-    // `main: processing ...`. Real speech can contain a colon, but not one
-    // sitting directly after a leading run of identifier characters.
-    if (/^[a-z_][a-z0-9_.]*\s*:/i.test(line)) continue
-    if (line.startsWith('[') || line.startsWith('<')) continue
-    if (!NON_SPEECH.test(line)) plain.push(line)
+    const speech = plainSpeech(line)
+    if (speech !== undefined) plain.push(speech)
   }
 
   const parts = timestamped.length > 0 ? timestamped : plain
   return parts.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+/** The spoken text a timestamped subtitle line carries, empty when non-speech. */
+function timestampText(line: string): string {
+  const segment = /^\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]\s*(.*)$/.exec(line)
+  const text = (segment?.[1] ?? '').trim()
+  return NON_SPEECH.test(text) ? '' : text
+}
+
+/** Whether the line carries a timestamped subtitle. */
+function isTimestamped(line: string): boolean {
+  return /^\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]/.test(line)
+}
+
+/**
+ * The plain text a non-timestamped line contributes, or undefined when it is
+ * log chatter rather than speech.
+ */
+function plainSpeech(line: string): string | undefined {
+  // A log line from whisper or its loader, e.g. `whisper_init_from_file:` or
+  // `main: processing ...`. Real speech can contain a colon, but not one
+  // sitting directly after a leading run of identifier characters.
+  if (/^[a-z_][a-z0-9_.]*\s*:/i.test(line)) return undefined
+  if (line.startsWith('[') || line.startsWith('<')) return undefined
+  return NON_SPEECH.test(line) ? undefined : line
 }
 
 /**

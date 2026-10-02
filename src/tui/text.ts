@@ -166,32 +166,34 @@ export function wrap(text: string, width: number): string[] {
   if (width < 1) return text.split('\n')
   const out: string[] = []
   for (const paragraph of text.split('\n')) {
-    if (paragraph === '') {
-      out.push('')
-      continue
-    }
-    let line = ''
-    for (const word of paragraph.split(' ')) {
-      const candidate = line === '' ? word : `${line} ${word}`
-      if (displayWidth(candidate) <= width) {
-        line = candidate
-        continue
-      }
-      if (line !== '') {
-        out.push(line)
-        line = ''
-      }
-      let rest = word
-      while (displayWidth(rest) > width) {
-        const head = cut(rest, width)
-        out.push(head)
-        rest = rest.slice(head.length)
-      }
-      line = rest
-    }
-    out.push(line)
+    if (paragraph === '') out.push('')
+    else wrapParagraph(paragraph, width, out)
   }
   return out
+}
+
+/** Wrap one paragraph's words into `out`, breaking overlong words hard. */
+function wrapParagraph(paragraph: string, width: number, out: string[]): void {
+  let line = ''
+  for (const word of paragraph.split(' ')) {
+    const candidate = line === '' ? word : `${line} ${word}`
+    if (displayWidth(candidate) <= width) {
+      line = candidate
+      continue
+    }
+    if (line !== '') {
+      out.push(line)
+      line = ''
+    }
+    let rest = word
+    while (displayWidth(rest) > width) {
+      const head = cut(rest, width)
+      out.push(head)
+      rest = rest.slice(head.length)
+    }
+    line = rest
+  }
+  out.push(line)
 }
 
 /** Take exactly as many code points as fit in `width` columns, no ellipsis. */

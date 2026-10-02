@@ -270,11 +270,23 @@ export async function sync(
     { api: config.api, repo: config.repo, token: config.githubToken, label: config.label },
     fetchImpl,
   )
-  const openKeys = new Set(issues.map((issue) => issue.key))
+  const created = await openIssuesFor(issues, tracked, config, fetchImpl, report)
+  const closed = config.closeResolved
+    ? await closeResolved(issues, tracked, config, fetchImpl, report)
+    : []
+  return { open: issues.length, created, closed }
+}
+
+/** Open a GitHub issue for every Sonar issue nothing tracks yet. */
+async function openIssuesFor(
+  issues: SonarIssue[],
+  tracked: Map<string, GitHubIssue>,
+  config: SyncConfig,
+  fetchImpl: FetchLike,
+  report: (line: string) => void,
+): Promise<number[]> {
   const ensured = new Set<string>()
   const created: number[] = []
-  const closed: number[] = []
-
   for (const issue of issues) {
     if (tracked.has(issue.key)) continue
     if (config.dryRun) {
@@ -301,21 +313,30 @@ export async function sync(
     created.push(number)
     report(`created #${String(number)} for ${issue.key}`)
   }
+  return created
+}
 
-  if (config.closeResolved) {
-    for (const [key, item] of tracked) {
-      if (openKeys.has(key) || item.state === 'closed') continue
-      if (config.dryRun) {
-        report(`would close #${String(item.number)} (${key} is resolved)`)
-        continue
-      }
-      await closeIssue(item, { api: config.api, repo: config.repo, token: config.githubToken }, fetchImpl)
-      closed.push(item.number)
-      report(`closed #${String(item.number)} (${key} was resolved)`)
+/** Close the tracked issues whose Sonar finding is resolved. */
+async function closeResolved(
+  issues: SonarIssue[],
+  tracked: Map<string, GitHubIssue>,
+  config: SyncConfig,
+  fetchImpl: FetchLike,
+  report: (line: string) => void,
+): Promise<number[]> {
+  const openKeys = new Set(issues.map((issue) => issue.key))
+  const closed: number[] = []
+  for (const [key, item] of tracked) {
+    if (openKeys.has(key) || item.state === 'closed') continue
+    if (config.dryRun) {
+      report(`would close #${String(item.number)} (${key} is resolved)`)
+      continue
     }
+    await closeIssue(item, { api: config.api, repo: config.repo, token: config.githubToken }, fetchImpl)
+    closed.push(item.number)
+    report(`closed #${String(item.number)} (${key} was resolved)`)
   }
-
-  return { open: issues.length, created, closed }
+  return closed
 }
 
 async function main(): Promise<void> {

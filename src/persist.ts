@@ -217,14 +217,12 @@ export function decodeState(raw: string): PersistedState {
   // An entry from a different version is discarded rather than guessed at:
   // the fields it does share may well have meant something else.
   if (parsed.version !== STATE_VERSION) return fallbackState()
+  return adoptState(parsed)
+}
 
-  const sessions: PersistedSession[] = []
-  if (Array.isArray(parsed.sessions)) {
-    for (const entry of parsed.sessions) {
-      const session = readSession(entry)
-      if (session !== undefined) sessions.push(session)
-    }
-  }
+/** Trust the envelope: turn an on-disk record into usable state. */
+function adoptState(parsed: OnDisk): PersistedState {
+  const sessions = readSessions(parsed.sessions)
   // A malformed index would otherwise select a tab that is not there.
   const rawActive = parsed.activeSession
   const activeSession =
@@ -233,13 +231,9 @@ export function decodeState(raw: string): PersistedState {
       : 0
 
   return {
-    inputHistory: Array.isArray(parsed.inputHistory)
-      ? parsed.inputHistory.filter((entry): entry is string => typeof entry === 'string')
-      : [],
+    inputHistory: stringsOf(parsed.inputHistory),
     thinking: parsed.thinking === true,
-    peers: Array.isArray(parsed.peers)
-      ? parsed.peers.filter((entry): entry is string => typeof entry === 'string')
-      : [],
+    peers: stringsOf(parsed.peers),
     theme: typeof parsed.theme === 'string' ? parsed.theme : undefined,
     // `lang` is written on every save but was never read back here, which
     // quietly reset the interface to English on every restart — the choice
@@ -253,6 +247,24 @@ export function decodeState(raw: string): PersistedState {
     usage: readUsage(parsed.usage),
     usageEntries: readUsageEntries(parsed.usageEntries),
   }
+}
+
+/** The sessions on disk that still make sense, in order. */
+function readSessions(entries: unknown): PersistedSession[] {
+  if (!Array.isArray(entries)) return []
+  const sessions: PersistedSession[] = []
+  for (const entry of entries) {
+    const session = readSession(entry)
+    if (session !== undefined) sessions.push(session)
+  }
+  return sessions
+}
+
+/** The string entries of a stored list; anything else is dropped. */
+function stringsOf(entries: unknown): string[] {
+  return Array.isArray(entries)
+    ? entries.filter((entry): entry is string => typeof entry === 'string')
+    : []
 }
 
 /**

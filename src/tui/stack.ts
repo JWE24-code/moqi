@@ -76,22 +76,37 @@ export function focusNeighbor(
   const column = focused % columns
   const row = Math.floor(focused / columns)
   const target =
-    direction === 'left'
-      ? column === 0
-        ? undefined
-        : focused - 1
-      : direction === 'right'
-        ? column === columns - 1 || focused + 1 >= count
-          ? undefined
-          : focused + 1
-        : direction === 'up'
-          ? row === 0
-            ? undefined
-            : focused - columns
-          : focused + columns >= count
-            ? undefined
-            : focused + columns
+    rowNeighbor(count, columns, row, focused, direction) ??
+    columnNeighbor(count, columns, column, focused, direction)
   return target !== undefined && target >= 0 && target < count ? target : undefined
+}
+
+/** The pane above or below `focused`, or undefined off the grid or direction. */
+function rowNeighbor(
+  count: number,
+  columns: number,
+  row: number,
+  focused: number,
+  direction: Direction,
+): number | undefined {
+  if (direction === 'up') return row === 0 ? undefined : focused - columns
+  if (direction === 'down') return focused + columns >= count ? undefined : focused + columns
+  return undefined
+}
+
+/** The pane left or right of `focused`, or undefined off the row or direction. */
+function columnNeighbor(
+  count: number,
+  columns: number,
+  column: number,
+  focused: number,
+  direction: Direction,
+): number | undefined {
+  if (direction === 'left') return column === 0 ? undefined : focused - 1
+  if (direction === 'right') {
+    return column === columns - 1 || focused + 1 >= count ? undefined : focused + 1
+  }
+  return undefined
 }
 
 /** What the stitcher needs to turn a set of panes into frame lines. */
@@ -122,31 +137,79 @@ export interface StackFrame {
   blinkOn?: boolean
 }
 
+/** A blank canvas of single-character cells the tiles write into. */
+function initCanvas(width: number, height: number): string[][] {
+  const canvas: string[][] = Array.from({ length: height }, () => [])
+  for (const row of canvas) for (let x = 0; x < width; x += 1) row.push(' ')
+  return canvas
+}
+
+/** How a pane's border line is styled, by its attention and focus. */
+function paneBorder(
+  mark: 'input' | 'done' | undefined,
+  isFocused: boolean,
+  blinkOn: boolean | undefined,
+): (line: string) => string {
+  // Every pane sits in a full line box, so sessions read as separate
+  // surfaces; the focused pane's whole border is the accent in bold, the
+  // rest are dim. Bold survives NO_COLOR terminals, so focus stays legible
+  // even where color does not. An attention pane outranks focus with the
+  // highlight color — warn for input, ok for done — and blinks by falling
+  // back to dim on the off phase, so the eye catches it without focus.
+  return (line: string): string => {
+    if (mark !== undefined && (blinkOn === true || isFocused)) {
+      return style(line, { fg: mark === 'input' ? colWarn : colOK, bold: true })
+    }
+    if (mark !== undefined) return muted(line)
+    return isFocused ? style(line, { fg: colAccent, bold: true }) : muted(line)
+  }
+}
+
+/** The label in a pane's top border, with its attention marker if any. */
+function paneTitle(title: string, mark: 'input' | 'done' | undefined, width: number): string {
+  const label = truncate(title, Math.max(width - 6, 1))
+  // The attention marker rides the title: `!` waits on you, `✓` finished
+  // for you — one glyph, legible in every interface language.
+  const marked = mark === 'input' ? `! ${label}` : mark === 'done' ? `✓ ${label}` : label
+  return padEnd(` ${marked} `, Math.max(width - 2, 0))
+}
+
+/** A pane body fit to its tile: clipped per line, padded, bottom-anchored. */
+function paneBody(
+  rendered: string[],
+  tile: { width: number },
+  innerHeight: number,
+  border: (line: string) => string,
+): string[] {
+  // The tail of the body is what shows — a transcript reads from its bottom,
+  // where the newest turn is — and a short one is top-padded so that bottom
+  // stays anchored just above the pane's lower border.
+  const body = [
+    ...Array<string>(Math.max(innerHeight - rendered.length, 0)).fill(''),
+    ...rendered,
+  ].slice(-innerHeight)
+  // Only the walls take the border style: a body line carries its own
+  // colors, and an escape inside it would end a wrap-around style early.
+  const out: string[] = []
+  for (let row = 0; row < innerHeight; row += 1) {
+    const line = body[row] ?? ''
+    const inner = padEnd(truncate(line, Math.max(tile.width - 2, 1)), Math.max(tile.width - 2, 0))
+    out.push(tile.width > 2 ? `${border('│')}${inner}${border('│')}` : inner)
+  }
+  return out
+}
+
 /** Compose every pane's body into `height` lines of `width` columns. */
 export function stackFrame(options: StackFrame): string[] {
   const { count, width, height, focused, title, renderBody, attention, blinkOn } = options
   if (count < 1 || width < 1 || height < 1) return []
 
   // The canvas is plain text plus styled slices, so cells join with spaces.
-  const canvas: string[][] = Array.from({ length: height }, () => [])
-  for (const row of canvas) for (let x = 0; x < width; x += 1) row.push(' ')
+  const canvas = initCanvas(width, height)
 
   for (const [index, tile] of tiles(count, width, height).entries()) {
-    const isFocused = index === focused
     const mark = attention?.(index)
-    // Every pane sits in a full line box, so sessions read as separate
-    // surfaces; the focused pane's whole border is the accent in bold, the
-    // rest are dim. Bold survives NO_COLOR terminals, so focus stays legible
-    // even where color does not. An attention pane outranks focus with the
-    // highlight color — warn for input, ok for done — and blinks by falling
-    // back to dim on the off phase, so the eye catches it without focus.
-    const styleBorder = (line: string): string => {
-      if (mark !== undefined && (blinkOn === true || isFocused)) {
-        return style(line, { fg: mark === 'input' ? colWarn : colOK, bold: true })
-      }
-      if (mark !== undefined) return muted(line)
-      return isFocused ? style(line, { fg: colAccent, bold: true }) : muted(line)
-    }
+    const border = paneBorder(mark, index === focused, blinkOn)
     // A tile's line is written as one cell — styled text cannot be split into
     // per-character cells without its escapes shifting everything after it —
     // and the cells it covers are emptied, so the grid's indices stay honest
@@ -157,37 +220,18 @@ export function stackFrame(options: StackFrame): string[] {
       cells.splice(tile.x, tile.width, line, ...Array<string>(tile.width - 1).fill(''))
     }
 
-    const label = truncate(title(index), Math.max(tile.width - 6, 1))
-    // The attention marker rides the title: `!` waits on you, `✓` finished
-    // for you — one glyph, legible in every interface language.
-    const marked =
-      mark === 'input' ? `! ${label}` : mark === 'done' ? `✓ ${label}` : label
-    const top = padEnd(` ${marked} `, Math.max(tile.width - 2, 0))
-    place(tile.y, styleBorder(tile.width > 2 ? `┌${top}┐` : top))
+    const top = paneTitle(title(index), mark, tile.width)
+    place(tile.y, border(tile.width > 2 ? `┌${top}┐` : top))
 
     const innerHeight = Math.max(tile.height - 2, 0)
-    // The tail of the body is what shows — a transcript reads from its bottom,
-    // where the newest turn is — and a short one is top-padded so that bottom
-    // stays anchored just above the pane's lower border.
     const rendered = renderBody(index, Math.max(tile.width - 2, 1), innerHeight)
-    const body = [
-      ...Array<string>(Math.max(innerHeight - rendered.length, 0)).fill(''),
-      ...rendered,
-    ].slice(-innerHeight)
-    // Only the walls take the border style: a body line carries its own
-    // colors, and an escape inside it would end a wrap-around style early.
-    for (let row = 0; row < innerHeight; row += 1) {
-      const line = body[row] ?? ''
-      const inner = padEnd(truncate(line, Math.max(tile.width - 2, 1)), Math.max(tile.width - 2, 0))
-      place(
-        tile.y + 1 + row,
-        tile.width > 2 ? `${styleBorder('│')}${inner}${styleBorder('│')}` : inner,
-      )
-    }
+    paneBody(rendered, tile, innerHeight, border).forEach((line, row) => {
+      place(tile.y + 1 + row, line)
+    })
 
     if (innerHeight >= 0 && tile.height >= 2) {
       const bottom = '─'.repeat(Math.max(tile.width - 2, 0))
-      place(tile.y + tile.height - 1, styleBorder(tile.width > 2 ? `└${bottom}┘` : bottom))
+      place(tile.y + tile.height - 1, border(tile.width > 2 ? `└${bottom}┘` : bottom))
     }
   }
   return canvas.map((row) => row.join(''))

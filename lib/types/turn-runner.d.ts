@@ -78,4 +78,19 @@ export declare class TurnRunner {
      * second time (recall would then surface it twice).
      */
     private sendTo;
+    /** Put a turn on screen: the user turn, the title, and the running state. */
+    private beginTurn;
+    /** Commit whatever streamed, even on an interrupt, so nothing is lost. */
+    private settleTurn;
+    /**
+     * Run the queue's rules once a turn has settled.
+     *
+     * An interrupted turn must not launch the next prompt unbidden: the
+     * user asked for silence, so the queue waits for a clean finish —
+     * unless the interrupt was the redirection kind (`/interrupt`), which
+     * stops this answer precisely so the queue can carry on. The follow-up
+     * is fire-and-forget like every other send call site — awaiting it here
+     * would stack one frame per queued prompt.
+     */
+    private drainAfterTurn;
 }
