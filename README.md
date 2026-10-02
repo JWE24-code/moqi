@@ -38,7 +38,7 @@ puts each tool call where it was made, and gets out of the way.
   key ([docs/using-moqi.md](docs/using-moqi.md#steering-queueing-and-interrupting-a-running-reply)).
 - **Several sessions at once** — tabs with live status, a bell when a
   background turn finishes ([docs/using-moqi.md](docs/using-moqi.md#several-sessions-at-once)).
-- **One fleet overview** — every dsh session across every device, over plain
+- **Sessions across devices** — every dsh session on every device, over plain
   SSH; preview or dispatch to a peer without leaving the terminal
   ([docs/using-moqi.md](docs/using-moqi.md#one-list-of-every-device)).
 - **`/usage`** — plan limits and billed token spend, per provider, in rolling

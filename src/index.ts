@@ -166,7 +166,9 @@ import { UsageView } from './tui/usage-view.ts'
 import {
   FleetView,
   dispatchArgv,
+  isActionRow,
   isValidPeer,
+  newSessionRow,
   PeerList,
   jumpArgv,
   jumpCommand,
@@ -210,7 +212,7 @@ export interface Config {
   /**
    * The view to open in: `stack` tiles every open session on screen at once;
    * anything else — including absent — reads as `tabs`, the default. The view
-   * you switched to with `/stack` or `ctrl+s` is remembered across restarts
+   * you switched to with `/tiled` is remembered across restarts
    * and outranks this.
    */
   view?: string
@@ -251,9 +253,6 @@ export const Config: z<Config> = z.object({
 /** Spinner frames for the streaming indicator. */
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-/** Sentinel id for the picker row that opens a new session. */
-const NEW_SESSION_ROW = 'new-session'
-
 /** Context budget assumed when the provider publishes no capacity. */
 const DEFAULT_CONTEXT_LIMIT = 65536
 
@@ -266,8 +265,8 @@ const QUIT_CONFIRM_MS = 1500
 /** Commands this app implements itself, on top of whatever the Harness adds. */
 const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
   { name: 'new', args: '', description: 'Open another session alongside this one' },
-  { name: 'sessions', args: '', description: 'Switch between open sessions' },
-  { name: 'stack', args: '', description: 'Tile every open session in one view (alt+arrows)' },
+  { name: 'sessions', args: '', description: 'Every session, here and on peers (ctrl+s)' },
+  { name: 'tiled', args: '', description: 'Tile every session in one view (ctrl+t)' },
   { name: 'close', args: '', description: 'Close this session' },
   { name: 'resume', args: '', description: 'Pick up an earlier session' },
   { name: 'delete', args: '', description: 'Delete a stored session for good' },
@@ -315,8 +314,7 @@ const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
     args: '<device> <task>',
     description: 'Run a task on a peer through its headless profile',
   },
-  { name: 'fleet', args: '', description: 'Sessions across every device (ctrl+f)' },
-  { name: 'peer', args: '[add|rm <host>]', description: 'Devices the fleet overview reads' },
+  { name: 'peer', args: '[add|rm <host>]', description: 'Devices the sessions overview reads' },
   { name: 'update', args: '', description: 'Update this package from npm, if a newer one exists' },
   { name: 'help', args: '', description: 'Show keys and commands' },
   { name: 'exit', args: '', description: 'Quit dsh' },
@@ -1718,8 +1716,8 @@ class TuiApp {
   /**
    * Switch between the stacked and tabbed views.
    *
-   * One toggle for both entry points — `/stack` and `ctrl+s` — so the two can
-   * never disagree about what the current view is. The choice is remembered
+   * The `/tiled` command's toggle, kept in one place so the view state can
+   * never disagree with the command. The choice is remembered
    * across restarts; the profile's `view` is only a first-run default.
    */
   private toggleStackView(): void {
@@ -1742,11 +1740,11 @@ class TuiApp {
     if (this.stackMode) {
       this.setStatus(
         this.tabs.length > 1
-          ? 'stacked view — alt+arrows move focus, alt+shift+arrows move a pane · ctrl+s for tabs'
-          : 'stacked view — /new opens a second session to tile · ctrl+s for tabs',
+          ? 'tiled view — alt+arrows move focus, alt+shift+arrows move a pane'
+          : 'tiled view — /new opens a second session to tile',
       )
     } else {
-      this.setStatus('tabbed view — ctrl+s for stacked')
+      this.setStatus('tabbed view — ctrl+t for tiled')
     }
     this.paint()
   }
@@ -2151,7 +2149,7 @@ class TuiApp {
     const result = this.peers.add(host)
     if (!result.ok) {
       this.setStatus(
-        result.reason === 'invalid' ? `not a usable host: ${host.trim()}` : `${host.trim()} is already in the fleet`,
+        result.reason === 'invalid' ? `not a usable host: ${host.trim()}` : `${host.trim()} is already a peer`,
         result.reason === 'invalid',
       )
       return false
@@ -2363,9 +2361,15 @@ class TuiApp {
       const sources = await collectFleet(peers)
       // The overview may have been closed while SSH was still running.
       if (!this.fleet.open) return
-      this.fleet.setResult(mergeFleet(sources, Date.now()), sources)
+      const rows = mergeFleet(sources, Date.now())
+      // The action that starts a conversation belongs to this device and sits
+      // at the top of its group; mergeFleet sorts local rows first, so an
+      // unshift puts it exactly there even when this device has no session.
+      const localHost = sources.find((source) => source.local)?.host ?? 'local'
+      rows.unshift(newSessionRow(localHost))
+      this.fleet.setResult(rows, sources)
     } catch (error) {
-      this.fleet.setResult([], [])
+      this.fleet.setResult([newSessionRow('local')], [])
       this.setStatus(describeError(error), true)
     }
     this.paint()
@@ -2389,6 +2393,11 @@ class TuiApp {
   private openFleetSelection(): void {
     const session = this.fleet.current()
     if (session === undefined) return
+    if (isActionRow(session)) {
+      this.fleet.hide()
+      void this.newSession()
+      return
+    }
 
     const open = this.tabs.findIndex((tab) => tab.id === session.sessionId)
     if (session.local && open !== -1) {
@@ -2489,7 +2498,6 @@ class TuiApp {
 
       case 'up':
       case 'ctrl+p':
-      case 'k':
         this.fleet.move(-1)
         this.paint()
         break
@@ -2518,12 +2526,12 @@ class TuiApp {
         // Only a remote row names a peer; this device is not one of them.
         const row = this.fleet.current()
         if (row === undefined || row.local) {
-          this.setStatus('select another device to remove it from the fleet')
+          this.setStatus('select another device to remove it from the peer list')
           this.paint()
           break
         }
         if (this.removePeer(row.host)) {
-          this.setStatus(`removed ${row.host} from the fleet`)
+          this.setStatus(`removed ${row.host} from the peer list`)
           this.fleet.loading = true
           this.paint()
           void this.refreshFleet()
@@ -2531,6 +2539,31 @@ class TuiApp {
           this.setStatus(`${row.host} was not added here, so it cannot be removed`)
           this.paint()
         }
+        break
+      }
+
+      case 'k': {
+        // "Kill" here is the per-session lever the app actually has: closing a
+        // session it owns. A session in another process, or on a peer, has no
+        // per-session control channel — the only lever is the owning process,
+        // which would end every session it holds — so it is refused rather
+        // than silently killing more than the row the cursor is on.
+        const row = this.fleet.current()
+        if (row === undefined || isActionRow(row)) break
+        const index = this.fleet.selected
+        const open = this.tabs.findIndex((tab) => tab.id === row.sessionId)
+        if (row.local && open !== -1) {
+          this.closeSession(open)
+          this.fleet.removeAt(index)
+          this.paint()
+          break
+        }
+        this.setStatus(
+          row.local
+            ? 'that session belongs to another process here, so it cannot be closed from this list'
+            : 'a session on another device cannot be closed from here — open it, then /close',
+        )
+        this.paint()
         break
       }
 
@@ -2645,6 +2678,11 @@ class TuiApp {
   private async previewFleetSelection(): Promise<void> {
     const row = this.fleet.current()
     if (row === undefined) return
+    if (isActionRow(row)) {
+      this.setStatus('press enter to start a new session')
+      this.paint()
+      return
+    }
     if (row.local) {
       this.setStatus('this is this device — the session is on screen here')
       this.paint()
@@ -2758,8 +2796,8 @@ class TuiApp {
   private handleKey(key: Key): void {
     try {
       // Any other key disarms a pending quit: ctrl+c, then a moment of
-      // navigation, then ctrl+c again should open the menu, not lose the
-      // session to a stale confirmation.
+      // navigation, then ctrl+c again should start a fresh confirmation, not
+      // lose the session to a stale one.
       if (key.name !== 'ctrl+c') this.lastQuitRequest = 0
       if (this.panel !== undefined) {
         this.handlePanelKey(key)
@@ -2820,23 +2858,6 @@ class TuiApp {
         if (this.picker.kind === 'setup') this.finishSetup()
         this.picker.hide()
         break
-      case 'x': {
-        // Only the open-sessions list closes on this key; everywhere else "x"
-        // is an ordinary character narrowing the query, same as any other key.
-        if (this.picker.kind !== 'open') {
-          this.picker.key(key)
-          break
-        }
-        const item = this.picker.current()
-        if (item !== undefined && item.id !== NEW_SESSION_ROW) {
-          const before = this.tabs.length
-          this.closeSession(Number.parseInt(item.id, 10))
-          // Only rebuild the list once the close actually happened — the
-          // last-session guard sets a status this must not clobber.
-          if (this.tabs.length < before) this.showOpenSessions()
-        }
-        break
-      }
       case 'enter': {
         const item = this.picker.current()
         const kind = this.picker.kind
@@ -2867,10 +2888,6 @@ class TuiApp {
     return {
       models: (item) => void this.switchModel(item),
       themes: (item) => this.selectTheme(item.id),
-      open: (item) => {
-        if (item.id === NEW_SESSION_ROW) void this.newSession()
-        else this.selectSession(Number.parseInt(item.id, 10))
-      },
       plugins: (item) => this.togglePlugin(item.id),
       panel: (item) => void this.panelHost.activate(item.id),
       delete: (item) => this.confirmDelete(item.id, item.title),
@@ -3040,7 +3057,7 @@ class TuiApp {
         void this.runCommand('resume', '')
         return 'handled'
       case 'ctrl+t':
-        void this.runCommand('thinking', '')
+        this.toggleStackView()
         return 'handled'
       case 'ctrl+x':
         // Compaction is a Harness command, so this is the same path as typing
@@ -3050,7 +3067,7 @@ class TuiApp {
       case 'ctrl+y':
         this.copyLastReply()
         return 'handled'
-      case 'ctrl+f':
+      case 'ctrl+s':
         this.openFleet()
         return 'handled'
       case 'ctrl+v':
@@ -3337,11 +3354,6 @@ class TuiApp {
           return 'handled'
         }
         this.expandBackground = !this.expandBackground
-        return 'handled'
-      case 'ctrl+s':
-        // Switch the view: one key between the stacked and tabbed layouts,
-        // the same toggle `/stack` runs.
-        this.toggleStackView()
         return 'handled'
       case 'ctrl+o':
         this.expandTools = !this.expandTools
@@ -4065,7 +4077,7 @@ class TuiApp {
         await this.renameSession(rawInput)
         return true
       case 'sessions':
-        this.showOpenSessions()
+        this.openFleet()
         return true
       case 'close':
         this.closeSession(this.active)
@@ -4103,7 +4115,7 @@ class TuiApp {
         this.setStatus(this.showThinking ? 'showing reasoner thinking' : 'hiding reasoner thinking')
         this.paint()
         return true
-      case 'stack':
+      case 'tiled':
         this.toggleStackView()
         return true
       default:
@@ -4238,14 +4250,14 @@ class TuiApp {
     if (verb === '') {
       this.setStatus(
         this.peers.all().length === 0
-          ? 'no devices yet — /peer add <host>, or press a in the fleet'
-          : `fleet devices: ${this.peers.all().join(', ')}`,
+          ? 'no devices yet — /peer add <host>, or press a in the sessions view'
+          : `peer devices: ${this.peers.all().join(', ')}`,
       )
     } else if (verb === 'add') {
-      if (this.addPeer(host)) this.setStatus(`added ${host} — ctrl+f to see it`)
+      if (this.addPeer(host)) this.setStatus(`added ${host} — ctrl+s to see it`)
     } else if (verb === 'rm' || verb === 'remove') {
       this.setStatus(
-        this.removePeer(host) ? `removed ${host}` : `${host} is not in the fleet`,
+        this.removePeer(host) ? `removed ${host}` : `${host} is not a peer`,
         !this.peers.has(host) && host === '',
       )
     } else {
@@ -4263,9 +4275,6 @@ class TuiApp {
         return true
       case 'mcp':
         this.showMcp()
-        return true
-      case 'fleet':
-        this.openFleet()
         return true
       case 'tools': {
         const tools = this.ctx.get('tools')
@@ -5276,23 +5285,6 @@ class TuiApp {
     this.paint()
   }
 
-  /** Open a picker over the sessions already open in this app. */
-  private showOpenSessions(): void {
-    const rows: PickerItem[] = this.tabs.map((tab, index) => ({
-      id: String(index),
-      title: `${String(index + 1)}. ${tab.title === '' ? 'new session' : tab.title}`,
-      subtitle: sessionStatusLabel(tab),
-      active: index === this.active,
-    }))
-    // Starting a conversation is the other thing you come to this list to do,
-    // so it is an entry here rather than a key you have to already know.
-    rows.push({ id: NEW_SESSION_ROW, title: '+  Ask the harness in a new session', subtitle: 'ctrl+n' })
-    this.picker.show('open', 'Open sessions', rows)
-    this.picker.selectById(String(this.active))
-    this.setStatus('')
-    this.paint()
-  }
-
   /** Open the session picker, listing what the query service can see. */
   private async showSessions(mode: 'resume' | 'delete' = 'resume'): Promise<void> {
     const query = this.ctx.get('sessionQuery') as SessionQueryLike | undefined
@@ -5411,9 +5403,8 @@ class TuiApp {
   }
 
   /**
-   * The two-step ctrl+c: the first press opens the sessions menu (or, when a
-   * picker is already up, just arms the confirmation), and a second press
-   * inside the window quits. Anything else leaves the app running.
+   * The two-step ctrl+c: the first press arms the confirmation and the second,
+   * inside the window, quits. Anything else leaves the app running.
    */
   private requestQuit(): void {
     const now = Date.now()
@@ -5422,7 +5413,6 @@ class TuiApp {
       return
     }
     this.lastQuitRequest = now
-    if (this.picker.kind === 'none') this.showOpenSessions()
     this.setStatus('ctrl+c again to quit')
     this.paint()
   }

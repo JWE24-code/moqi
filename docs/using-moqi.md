@@ -214,17 +214,17 @@ The `/usage` ledger lives in the same file and survives a restart the same
 way, so a provider's running total is a lifetime one, not a per-session one;
 see [Rate, cache, usage, and background jobs](#rate-cache-usage-and-background-jobs).
 
-## One list of every device
+## Sessions across every device
 
 ```sh
 dsh --profile tui --peer laptop --peer workstation
 ```
 
-`ctrl+f` (or `/fleet`) shows every dsh session across every device, grouped by
+`ctrl+s` (or `/sessions`) shows every dsh session across every device, grouped by
 machine, most urgent first, with a status mark and the age of each heartbeat.
 
 ```
- Fleet
+ Sessions
  2 running, 1 ready across 2 devices
 
  workstation  (this device)
@@ -248,7 +248,7 @@ it is running.
 one it hands the terminal to a real `ssh -t`, running that device's `tui`
 profile and resuming the session — the same keys, the same screen, as if it
 were local. Leaving that remote session (its own `/close` or `/exit`, or just
-disconnecting) returns you to the fleet overview here, repainted. This needs
+disconnecting) returns you to the Sessions view here, repainted. This needs
 this process to actually be attached to a terminal on both ends; short of
 that (piped output, a non-interactive run) it falls back to copying the
 command instead, the same as it always did.
@@ -278,7 +278,7 @@ exits. The prompt is quoted for the remote shell and SSH runs in `BatchMode`, so
 a password prompt can never swallow the terminal; the peer's answer comes back
 as an overlay, and the session it left behind stays the peer's to resume.
 
-See [docs/fleet-overview.md](docs/fleet-overview.md) for why presence files
+See [docs/sessions-overview.md](docs/sessions-overview.md) for why presence files
 rather than the session store.
 
 ## Reaching it from another device
@@ -299,7 +299,7 @@ It is authenticated: a request from the tailnet without credentials answers
 so the script prints a warning every time. See
 [docs/remote-access.md](docs/remote-access.md).
 
-The design behind the fleet is in [docs/fleet-overview.md](fleet-overview.md);
+The design behind Sessions is in [docs/sessions-overview.md](sessions-overview.md);
 reaching the app from another device over tailnet is in
 [docs/remote-access.md](remote-access.md).
 
@@ -326,7 +326,7 @@ closed this way either, the same guard `/close` already has.
 the point of running several: you start one, go and do something else, and get
 told when it is done. A session you are already looking at is marked seen
 rather than nagged about. A background job that finishes rings the same bell
-with a status line naming it, and so does a fleet dispatch returning from a
+with a status line naming it, and so does a dispatch returning from a
 peer — anything the user has stopped waiting for gets announced, never just
 the turns. `--no-bell` turns the sound off.
 

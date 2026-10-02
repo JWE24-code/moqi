@@ -309,20 +309,8 @@ const withPicker = assertFrame('picker', snapshot({ picker }))
 check('picker shows its title', withPicker.some((line) => stripAnsi(line).includes('Sessions')))
 check('picker shows a row', withPicker.some((line) => stripAnsi(line).includes('first')))
 
-// The open-sessions list alone advertises "x close" in its footer — that key
-// only closes a tab there, so nowhere else should claim it.
-const openSessions = new Picker()
-openSessions.show('open', 'Open sessions', [
-  { id: '0', title: '1. first', subtitle: 'idle' },
-  { id: '1', title: '2. second', subtitle: 'idle' },
-])
-const withOpenSessions = assertFrame('open sessions', snapshot({ picker: openSessions }))
 check(
-  'open-sessions footer offers x to close',
-  withOpenSessions.some((line) => stripAnsi(line).includes('x close')),
-)
-check(
-  'the resume list does not offer x close',
+  'the resume list offers no extra close key',
   !withPicker.some((line) => stripAnsi(line).includes('x close')),
 )
 
@@ -429,7 +417,7 @@ check(
   'help documents the session keys',
   HELP_TEXT.includes('alt+1'),
 )
-check('help documents the fleet keys', HELP_TEXT.includes('ctrl+f'))
+check('help documents the sessions key', HELP_TEXT.includes('ctrl+s'))
 check('help documents /rename', HELP_TEXT.includes('/rename'))
 check(
   'help scrolled to the bottom ends on the commands section',
@@ -1033,26 +1021,26 @@ check('a wrapped buffer ends on the last row only', wrappedRow.atLastRow(10) && 
 
 check(
   'help documents the ctrl+c two-step',
-  HELP_TEXT.includes('`ctrl+c` — sessions menu · again within 1.5s — quit'),
+  HELP_TEXT.includes('`ctrl+c` twice within 1.5s — quit'),
 )
 const helpClaim = render(snapshot({ overlay: HELP_TEXT })).lines.map((line) => stripAnsi(line))
 check(
   'the help overlay renders the ctrl+c two-step',
-  helpClaim.some((line) => line.includes('sessions menu')) &&
-    helpClaim.some((line) => line.includes('again within 1.5s — quit')),
+  helpClaim.some((line) => line.includes('twice within 1.5s')) &&
+    helpClaim.some((line) => line.includes('— quit')),
 )
 check(
-  'the footer default hint says ctrl+c menu',
-  stripAnsi(normal.at(-1) ?? '').includes('ctrl+c menu'),
+  'the footer default hint says ctrl+c quit',
+  stripAnsi(normal.at(-1) ?? '').includes('ctrl+c quit'),
 )
 const busyStatus = assertFrame('busy status', snapshot({ status: 'working on it' })).map((line) =>
   stripAnsi(line),
 )
-check('a status displaces the footer hint', !busyStatus.some((line) => line.includes('ctrl+c menu')))
+check('a status displaces the footer hint', !busyStatus.some((line) => line.includes('ctrl+c quit')))
 const scrolledHint = render({ ...tall, scrollBack: 2 }).lines.map((line) => stripAnsi(line))
 check(
   'scrolling displaces the footer hint',
-  !scrolledHint.some((line) => line.includes('ctrl+c menu')) &&
+  !scrolledHint.some((line) => line.includes('ctrl+c quit')) &&
     scrolledHint.some((line) => line.includes('ctrl+g newest')),
 )
 

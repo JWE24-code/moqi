@@ -88,6 +88,33 @@ export interface FleetSession {
   ageSeconds: number
 }
 
+/** Sentinel id for the "start a new session here" action row. */
+export const NEW_SESSION_ID = 'new-session'
+
+/** Whether a row is the new-session action rather than a real session. */
+export function isActionRow(session: FleetSession): boolean {
+  return session.sessionId === NEW_SESSION_ID
+}
+
+/**
+ * The action row shown at the top of this device's group.
+ *
+ * It is not a presence record and never travels over SSH: it exists so the
+ * list is also where a conversation is started, as the open-sessions picker
+ * used to be.
+ */
+export function newSessionRow(host: string): FleetSession {
+  return {
+    host,
+    sessionId: NEW_SESSION_ID,
+    title: 'Ask the harness in a new session',
+    status: 'idle',
+    updatedAt: 0,
+    local: true,
+    ageSeconds: 0,
+  }
+}
+
 /** What a device's collector returned, including the failure case. */
 export interface FleetSource {
   host: string
@@ -284,6 +311,15 @@ export function renderFleet(
       out.push(style(label, { fg: colText, bold: true }))
     }
 
+    if (isActionRow(session)) {
+      const head = ` ${ok('+')} ${truncate(session.title, Math.max(width - 22, 8))}`
+      const hint = muted('ctrl+n')
+      const pad = Math.max(width - displayWidth(head) - displayWidth(hint) - 1, 1)
+      const row = `${head}${' '.repeat(pad)}${hint}`
+      out.push(index === selectedIndex ? selected(padEnd(row, width)) : row)
+      return
+    }
+
     const mark = statusMark(session.status, spinner)
     const age = muted(formatAge(session.ageSeconds))
     const model = session.model === undefined ? '' : muted(`  ${session.model}`)
@@ -304,13 +340,16 @@ export function renderFleet(
 
 /** A one-line summary for the status bar: how much is running where. */
 export function fleetSummary(sessions: readonly FleetSession[]): string {
-  const running = sessions.filter((session) => session.status === 'running').length
-  const ready = sessions.filter((session) => session.status === 'ready').length
+  // The new-session action is chrome, not work: it must not inflate the count,
+  // though its host still counts as a device the list is showing.
+  const real = sessions.filter((session) => !isActionRow(session))
+  const running = real.filter((session) => session.status === 'running').length
+  const ready = real.filter((session) => session.status === 'ready').length
   const hosts = new Set(sessions.map((session) => session.host)).size
   const parts: string[] = []
   if (running > 0) parts.push(`${String(running)} running`)
   if (ready > 0) parts.push(`${String(ready)} ready`)
-  if (parts.length === 0) parts.push(`${String(sessions.length)} idle`)
+  if (parts.length === 0) parts.push(`${String(real.length)} idle`)
   return `${parts.join(', ')} across ${String(hosts)} device${hosts === 1 ? '' : 's'}`
 }
 
@@ -419,6 +458,17 @@ export class FleetView {
 
   current(): FleetSession | undefined {
     return this.sessions[this.selected]
+  }
+
+  /**
+   * Drop a row the app just closed, so the list does not keep showing it until
+   * the next collection round. The cursor stays put unless that was the last
+   * row.
+   */
+  removeAt(index: number): void {
+    if (index < 0 || index >= this.sessions.length) return
+    this.sessions.splice(index, 1)
+    this.clamp()
   }
 
   /** Start asking for a device to add. */

@@ -1,4 +1,4 @@
-# Cross-device session overview
+# Cross-device Sessions view
 
 One list of every dsh session across every device, with status, and a way to
 open any of them.
@@ -79,7 +79,7 @@ no auth.
 
 ## Using it
 
-Press `ctrl+f`, or type `/fleet`. The list groups by device, most urgent first
+Press `ctrl+s`, or type `/sessions`. The list groups by device, most urgent first
 within each one, and refreshes with `r`.
 
 `enter` opens the highlighted session when this app already owns it. It cannot
@@ -104,7 +104,7 @@ installed there beyond `dsh` itself, and nothing listens anywhere.
 
 Wired and verified end to end. A live run under a pseudo-terminal was checked
 against the real app: a record appears in `$DSH_HOME/tui-presence/` while a
-session is open, `ctrl+f` renders the device's own session grouped under its
+session is open, `ctrl+s` renders the device's own session grouped under its
 hostname, and the record is removed again when the process is told to stop —
 so a device that exits does not linger in anyone else's list as stale.
 

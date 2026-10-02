@@ -99,7 +99,7 @@ export interface Snapshot {
     /** The composer's vim mode, when modal editing is on. */
     vimMode?: 'insert' | 'normal';
     /**
-     * The stacked view, while `/stack` has it open: every open session tiled
+     * The tiled view, while `ctrl+t` has it open: every open session tiled
      * into the transcript region at once, one per pane. The pane snapshots are
      * whole ones so a pane draws with the exact renderer the full view uses.
      * Optional so every existing snapshot builder renders exactly as before.

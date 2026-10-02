@@ -14,7 +14,7 @@ Flags, keys, commands, palettes, vim mode, interface language, and MCP.
 | `--no-mouse` | Disable mouse reporting; the wheel scrolls and the tab bar clicks by default, and shift selects text for the terminal |
 | `--no-bell` | Stay silent when a session finishes |
 | `--vim` | Modal vim editing in the composer: `esc` for normal mode, `i` to insert |
-| `--peer <host>` | Device to include in the fleet overview; repeatable |
+| `--peer <host>` | Device to include in the Sessions list; repeatable |
 | `--no-restore` | Start with one empty session instead of reopening the last ones |
 | `--version` | Print the app version |
 
@@ -45,7 +45,7 @@ overrides background detection; `NO_COLOR` disables styling.
 | `ctrl+x` | Compact the session |
 | `ctrl+b` | Expand or collapse the background-agent strip |
 | `ctrl+y` | Copy the last reply to the clipboard |
-| `ctrl+f` | Fleet overview: sessions across every device |
+| `ctrl+s` | Sessions: every session, on this device and peers |
 | `n` / `N` | With a search open and an empty composer, next / previous match |
 | `alt+1`…`alt+9` | Jump to a session · `alt+n`/`alt+p` cycle · `tab` cycles on an empty composer |
 | `ctrl+a`/`ctrl+e`/`home`/`end`, `ctrl+w`, `ctrl+k` | Line start/end, delete word, kill to end |
@@ -151,7 +151,7 @@ footer shows the mode and bare keys follow vim:
 While vim mode is on, `esc` belongs to the editor: `ctrl+c` is the interrupt,
 which is also what the footer's mode badge is there to remind you of. The mode
 is session-scoped and not persisted, and the vim layer only ever touches the
-composer — a panel, picker, or fleet screen owns the keyboard when it is open.
+composer — a panel, picker, or sessions screen owns the keyboard when it is open.
 
 ## Interface language
 
@@ -181,7 +181,7 @@ alongside the app's own:
 | Command | Owner |
 |---|---|
 | `/compact`, and any other plugin command | `ctx.commands` (the Harness registry) |
-| `/new`, `/sessions`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/fleet`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
+| `/new`, `/sessions`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
 
 Unknown commands are dispatched to `ctx.commands.execute()` and only reported
 as unknown if the registry also rejects them.

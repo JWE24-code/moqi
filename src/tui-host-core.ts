@@ -41,7 +41,7 @@ export const RESERVED_COMBOS: ReadonlySet<string> = new Set([
   'ctrl+w',
   'ctrl+x',
   'ctrl+y',
-  'ctrl+f',
+  'ctrl+s',
   'ctrl+g',
   'ctrl+b',
   'ctrl+o',

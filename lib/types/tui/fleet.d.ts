@@ -68,6 +68,18 @@ export interface FleetSession {
     /** Seconds since the last heartbeat, for display. */
     ageSeconds: number;
 }
+/** Sentinel id for the "start a new session here" action row. */
+export declare const NEW_SESSION_ID = "new-session";
+/** Whether a row is the new-session action rather than a real session. */
+export declare function isActionRow(session: FleetSession): boolean;
+/**
+ * The action row shown at the top of this device's group.
+ *
+ * It is not a presence record and never travels over SSH: it exists so the
+ * list is also where a conversation is started, as the open-sessions picker
+ * used to be.
+ */
+export declare function newSessionRow(host: string): FleetSession;
 /** What a device's collector returned, including the failure case. */
 export interface FleetSource {
     host: string;
@@ -202,6 +214,12 @@ export declare class FleetView {
     setResult(sessions: readonly FleetSession[], sources: readonly FleetSource[]): void;
     move(delta: number): void;
     current(): FleetSession | undefined;
+    /**
+     * Drop a row the app just closed, so the list does not keep showing it until
+     * the next collection round. The cursor stays put unless that was the last
+     * row.
+     */
+    removeAt(index: number): void;
     /** Start asking for a device to add. */
     beginAdd(): void;
     /** Abandon the prompt, leaving the list as it was. */

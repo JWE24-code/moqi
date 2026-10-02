@@ -10,6 +10,7 @@
 import {
   fleetLineOf,
   fleetSummary,
+  isActionRow,
   renderFleet,
   type FleetView,
 } from './fleet.ts'
@@ -165,7 +166,7 @@ export interface Snapshot {
   /** The composer's vim mode, when modal editing is on. */
   vimMode?: 'insert' | 'normal'
   /**
-   * The stacked view, while `/stack` has it open: every open session tiled
+   * The tiled view, while `ctrl+t` has it open: every open session tiled
    * into the transcript region at once, one per pane. The pane snapshots are
    * whole ones so a pane draws with the exact renderer the full view uses.
    * Optional so every existing snapshot builder renders exactly as before.
@@ -906,11 +907,7 @@ function pickerPane(snapshot: Snapshot, geometry: Layout): string[] {
   const out = [...head, ...visible]
   while (out.length < height - 1) out.push('')
   const action = pickerAction(picker.kind)
-  // The open-sessions list is the only one a key can act on beyond selecting
-  // a row: "x" closes the session under the cursor without leaving the list.
-  const keys = picker.kind === 'open'
-    ? `↑↓ move  ·  enter ${action}  ·  x close  ·  esc back`
-    : `↑↓ move  ·  enter ${action}  ·  esc back`
+  const keys = `↑↓ move  ·  enter ${action}  ·  esc back`
   const count = `${matches.length}/${picker.items.length}`
   out.push(
     muted(keys) +
@@ -1311,7 +1308,7 @@ function fleetPane(snapshot: Snapshot, geometry: Layout): string[] {
   const fleet = snapshot.fleet
   if (fleet === undefined) return []
 
-  const head: string[] = [bold('Fleet')]
+  const head: string[] = [bold('Sessions')]
   head.push(
     fleet.loading && fleet.sessions.length === 0
       ? muted('collecting from every device…')
@@ -1351,10 +1348,13 @@ function fleetPane(snapshot: Snapshot, geometry: Layout): string[] {
   // A local session switches in place; a remote one is attached to over SSH,
   // handing the terminal over for the duration — both read "open" here, and
   // it is only where a real terminal is not attached on both ends that this
-  // falls back to copying the command instead.
-  const action = current === undefined ? 'open' : 'enter open'
-  const hint = `↑↓ move  ·  ${action}  ·  a add  ·  x remove  ·  r refresh  ·  esc back`
-  const count = fleet.loading ? 'refreshing…' : `${String(fleet.sessions.length)} sessions`
+  // falls back to copying the command instead. The new-session action says
+  // what it does instead.
+  const action =
+    current === undefined ? 'open' : isActionRow(current) ? 'enter new session' : 'enter open'
+  const hint = `↑↓ move  ·  ${action}  ·  k close  ·  a add  ·  x remove  ·  r refresh  ·  esc back`
+  const shown = fleet.sessions.filter((session) => !isActionRow(session)).length
+  const count = fleet.loading ? 'refreshing…' : `${String(shown)} sessions`
   const pad = Math.max(width - displayWidth(hint) - displayWidth(count), 1)
   out.push(muted(hint) + ' '.repeat(pad) + muted(count))
   return out.slice(0, height)

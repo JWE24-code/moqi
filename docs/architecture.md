@@ -130,7 +130,7 @@ regression still would.
   trip through the real screen, decoder, and frame renderer), streaming
   projection, queueing, steering, persistence, the usage ledger and its
   colored dashboard, session storage, cross-session search, the panels
-  (including a running sign-in), the plugin seam, i18n, the fleet, and the
+  (including a running sign-in), the plugin seam, i18n, the Sessions view, and the
   render cache.
 - **The boot-to-model turn is now automated, on demand.** `npm run test:live`
   (`MOQI_LIVE=1`) boots `dsh --profile tui` under `script(1)`, types a

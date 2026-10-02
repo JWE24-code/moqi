@@ -30,7 +30,7 @@ export interface Config {
     /**
      * The view to open in: `stack` tiles every open session on screen at once;
      * anything else — including absent — reads as `tabs`, the default. The view
-     * you switched to with `/stack` or `ctrl+s` is remembered across restarts
+     * you switched to with `/tiled` is remembered across restarts
      * and outranks this.
      */
     view?: string;

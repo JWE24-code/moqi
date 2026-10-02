@@ -15,6 +15,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   result is a one-line success message; the numbers and context come from the
   file as read once the call settles; and the bar's text takes whichever
   palette color measures as the more readable against it.
+- **Start a session from the Sessions list.** The device group carries a
+  `+ Ask the harness in a new session` row; `enter` on it opens a new session,
+  the same as `ctrl+n`, and it is never counted as a session itself.
+- **`k` closes a session in the Sessions list.** On a row this app owns, `k`
+  closes that session, as `/close` does. A session in another process, or on a
+  peer, is left alone: there is no per-session control channel, and the only
+  lever — the owning process — would end every session it holds.
 
 ### Changed
 
@@ -22,6 +29,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ctrl+o` opens the outcome underneath. The choice round-trips either way —
   previously only a collapsed view was stored, so an explicit expansion would
   have been lost across restarts.
+- **The fleet is now Sessions.** The cross-device overview is renamed from
+  "fleet" to **Sessions**: `ctrl+s`, and `/fleet` is now `/sessions`. The list
+  itself is unchanged — local sessions and peers, grouped by device.
+- **`/stack` is now `/tiled` (`ctrl+t`).** The stacked view is the tiled view:
+  `ctrl+t` toggles it, `alt+arrows` move focus and `alt+shift+arrows` move a
+  pane. `ctrl+t` previously toggled reasoner display, which remains available
+  as `/thinking`.
+
+### Removed
+
+- **The ctrl+c sessions menu.** The first `ctrl+c` now only arms the two-step
+  quit; the Sessions view is the one place every session is listed. The
+  redundant open-sessions picker (and its `x`-to-close row action) is gone;
+  `ctrl+n` and `/close` still manage tabs.
 
 ## [0.4.6] — 2026-10-02
 

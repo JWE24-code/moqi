@@ -23,10 +23,12 @@ import {
   fleetSummary,
   formatAge,
   isPresenceRecord,
+  isActionRow,
   isValidPeer,
   jumpArgv,
   jumpCommand,
   mergeFleet,
+  newSessionRow,
   renderFleet,
   type FleetSession,
   type FleetSource,
@@ -204,6 +206,29 @@ check(
 // A narrow window must still produce legal lines.
 const narrow = renderFleet(merged, { width: 24 })
 check('a narrow overview still fits', narrow.every((line) => displayWidth(line) <= 24))
+
+// The new-session action sits at the top of this device's group, where the
+// open-sessions picker's own "+ Ask the harness" row used to be.
+const action = newSessionRow('laptop')
+check('the new-session row is an action, not a session', isActionRow(action))
+const withAction = renderFleet([action, ...merged.filter((row) => row.local)], {
+  width: 70,
+  selectedIndex: 0,
+})
+const actionLines = withAction.map((line) => stripAnsi(line))
+check(
+  'the action row is rendered',
+  actionLines.some((line) => line.includes('Ask the harness in a new session')),
+)
+check(
+  'the action sits directly under this device',
+  actionLines.findIndex((line) => line.includes('Ask the harness')) ===
+    actionLines.findIndex((line) => line.includes('(this device)')) + 1,
+)
+check('the action row is never counted as a session', fleetSummary([action]) === '0 idle across 1 device')
+const selectedActionLine =
+  withAction.find((line) => stripAnsi(line).includes('Ask the harness')) ?? ''
+check('the selected action row fills the width', displayWidth(selectedActionLine) === 70)
 
 // ---------------------------------------------------------------- summary
 
@@ -390,7 +415,7 @@ pane.setResult(
 const paneFrame = render(fleetSnapshot(pane))
 const paneText = paneFrame.lines.map((line) => stripAnsi(line))
 
-check('the pane is titled', paneText.some((line) => line.includes('Fleet')))
+check('the pane is titled', paneText.some((line) => line.includes('Sessions')))
 check('the pane summarises', paneText.some((line) => line.includes('across 2 devices')))
 check('the pane groups by device', paneText.some((line) => line.includes('here  (this device)')))
 check('the pane names the remote device', paneText.some((line) => line.trimStart().startsWith('there')))
@@ -398,6 +423,7 @@ check('the pane lists a local session', paneText.some((line) => line.includes('r
 check('the pane lists a remote session', paneText.some((line) => line.includes('draft the release notes')))
 check('an unreachable device is named', paneText.some((line) => line.includes('gone: Connection refused')))
 check('the pane offers a refresh', paneText.some((line) => line.includes('r refresh')))
+check('the pane offers kill', paneText.some((line) => line.includes('k close')))
 
 // The transcript must be gone while the overview owns the screen, and the
 // cursor with it -- a blinking composer cursor under a full-screen list is a
@@ -437,6 +463,21 @@ check('an empty fleet still fits', emptyFrame.lines.length <= 30)
 // A window barely tall enough must not throw or overflow.
 const tiny = render(fleetSnapshot(pane, { rows: 10, columns: 40 }))
 check('a short window still renders the pane', tiny.lines.length <= 10)
+
+// Closing a session from the list drops its row without waiting for the next
+// collection round.
+const droppable = new FleetView()
+droppable.setResult(
+  [
+    session({ host: 'here', sessionId: 'drop-a', title: 'first', local: true }),
+    session({ host: 'here', sessionId: 'drop-b', title: 'second', local: true }),
+  ],
+  [],
+)
+droppable.selected = 0
+droppable.removeAt(0)
+check('a closed row is dropped from the list', droppable.sessions.length === 1)
+check('the cursor lands on the next row', droppable.current()?.sessionId === 'drop-b')
 check(
   'a short window keeps every line inside the width',
   tiny.lines.every((line) => displayWidth(line) <= 40),

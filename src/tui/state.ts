@@ -199,7 +199,6 @@ export type PickerKind =
   | 'themes'
   | 'plugins'
   | 'panel'
-  | 'open'
   | 'delete'
   | 'rewind'
   | 'stored'

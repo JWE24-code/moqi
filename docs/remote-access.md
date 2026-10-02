@@ -74,6 +74,6 @@ port at all.
 
 ## Cross-device session overview
 
-See [fleet-overview.md](fleet-overview.md). That design deliberately needs no
+See [sessions-overview.md](sessions-overview.md). That design deliberately needs no
 listener: each device publishes small presence records under `$DSH_HOME` and
 peers are read over SSH, so there is nothing extra to secure.

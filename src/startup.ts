@@ -67,7 +67,7 @@ function tuiCommand(): Command {
     .option('--no-restore', 'start with one empty session instead of reopening the last ones')
     .option(
       '--peer <host>',
-      'device to include in the fleet overview; repeatable, anything ssh accepts',
+      'device to include in the sessions overview; repeatable, anything ssh accepts',
       (value: string, previous: string[]) => [...previous, value],
       [],
     )
@@ -81,11 +81,11 @@ Examples:
   dsh --profile tui                      start a new session
   dsh --profile tui --resume session-...  reopen an existing session
   dsh --profile tui --thinking            show the reasoner's chain of thought
-  dsh --profile tui --peer laptop         include another device in ctrl+f
+  dsh --profile tui --peer laptop         include another device in ctrl+s
   dsh --profile tui --no-restore          start clean instead of reopening tabs
 
-Inside the app, type / for the command palette; press ctrl+c for the sessions
-menu and ctrl+c again within 1.5s to quit.
+Inside the app, type / for the command palette; press ctrl+c twice within 1.5s
+to quit.
 `,
     )
 }
