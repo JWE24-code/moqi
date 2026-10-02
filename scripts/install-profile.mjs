@@ -126,22 +126,16 @@ if (!existsSync(patchPath)) {
 
 console.log(`install-profile: wrote ${profileDir}`)
 
-// pnpm is what the Harness itself uses for profiles; npm also works.
-const manager = hasCommand('pnpm') ? 'pnpm' : 'npm'
-try {
-  execFileSync(manager, ['install'], { cwd: profileDir, stdio: 'inherit' })
-} catch (error) {
-  console.error(`install-profile: ${manager} install failed: ${error.message}`)
-  console.error(`install-profile: run it yourself in ${profileDir}`)
-  process.exit(1)
-}
-
 // The profile links this package from wherever it lives, so Node resolves its
 // `@deepseek-ai/*` imports from the package's own directory — where, on a
 // clean machine, those packages do not exist. Linking the harness's own copies
 // in is what makes a freshly installed app boot at all; it is idempotent, and
 // it deliberately keeps the harness's copies rather than installing a second
 // `@deepseek-ai/cordis`, which would be a different Service class.
+//
+// This runs BEFORE the package-manager install: a failed install previously
+// exited here without linking, which left a freshly updated global install
+// unable to boot at all — the exact state a refresh is supposed to prevent.
 const dshRoot = findDshRoot()
 if (dshRoot === undefined) {
   console.warn('install-profile: no `dsh` installation found to link harness packages from.')
@@ -155,6 +149,17 @@ if (dshRoot === undefined) {
     console.warn(`install-profile: could not link ${failed.join(', ')} — the app may fail to boot`)
     console.warn(`install-profile: re-run with permission to write ${repoRoot}/node_modules`)
   }
+}
+
+// pnpm is what the Harness itself uses for profiles; npm also works.
+const manager = hasCommand('pnpm') ? 'pnpm' : 'npm'
+try {
+  execFileSync(manager, ['install'], { cwd: profileDir, stdio: 'inherit' })
+} catch (error) {
+  console.error(`install-profile: ${manager} install failed: ${error.message}`)
+  console.error(`install-profile: run it yourself in ${profileDir}`)
+  console.error('install-profile: the harness packages are already linked, so the app may still boot.')
+  process.exit(1)
 }
 
 console.log(`install-profile: done — run it with:  dsh --profile ${profileName}`)
