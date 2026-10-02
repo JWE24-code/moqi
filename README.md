@@ -20,7 +20,7 @@
  ╭──────────────────────────────────────────────────────────────────────────────╮
  │ Ask the harness…  (/ for commands)                                           │
  ╰──────────────────────────────────────────────────────────────────────────────╯
- deepseek-chat  ·  ctx 1.5K/65K 2%  ·  ↑1.2K ↓312          / commands  ·  ctrl+c menu
+ deepseek-chat  ·  ctx 1.5K/65K 2%  ·  ↑1.2K ↓312          / commands  ·  ctrl+c quit
 ```
 
 A terminal app for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness),
@@ -40,7 +40,7 @@ puts each tool call where it was made, and gets out of the way.
   background turn finishes ([docs/using-moqi.md](docs/using-moqi.md#several-sessions-at-once)).
 - **Sessions across devices** — every dsh session on every device, over plain
   SSH; preview or dispatch to a peer without leaving the terminal
-  ([docs/using-moqi.md](docs/using-moqi.md#one-list-of-every-device)).
+  ([docs/using-moqi.md](docs/using-moqi.md#sessions-across-every-device)).
 - **`/usage`** — plan limits and billed token spend, per provider, in rolling
   5-hour and 7-day windows ([docs/usage.md](docs/usage.md)).
 - **Provider sign-in** — Claude Pro/Max, ChatGPT/Codex, and other OAuth flows,

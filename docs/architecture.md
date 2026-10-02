@@ -73,7 +73,7 @@ checkout has run `npm run link-types` and would otherwise never notice.
 ## Tests
 
 ```sh
-npm test        # render, queue, persist, stream, export, sessions, fleet, theme, patch, pty
+npm test        # render, queue, persist, stream, export, sessions, sessions view, theme, patch, pty
 npm test        # render + queue + persist + stream + pty (370 + 8 + 41 + 20 + 13)
 npm run test:pty   # just the pty round trip, for a quick loop (needs script(1))
 node --experimental-strip-types tests/preview.ts [normal|palette|picker|stream|think]

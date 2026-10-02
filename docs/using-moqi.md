@@ -228,14 +228,20 @@ machine, most urgent first, with a status mark and the age of each heartbeat.
  2 running, 1 ready across 2 devices
 
  workstation  (this device)
+  + Ask the harness in a new session                                 ctrl+n
   ⠹ rebuild the search index   deepseek-chat                            3s
   · draft the release notes    deepseek-chat                           12m
 
  laptop
   ● summarise yesterday        glm-4.7                                  8s
 
- ↑↓ move  ·  enter open  ·  r refresh  ·  esc back            3 sessions
+ ↑↓ move  ·  enter open  ·  k close  ·  a add  ·  x remove  ·  r refresh  ·  esc back            3 sessions
 ```
+
+The group for this device carries a `+ Ask the harness in a new session` row:
+`enter` on it starts a fresh session here, the same as `ctrl+n`. `k` closes
+the highlighted session when this app owns it — a session on a peer, or in
+another process on this machine, has no per-session close channel from here.
 
 Each device writes one small JSON record per open session under
 `$DSH_HOME/tui-presence/`, refreshed on a heartbeat and deleted on exit. Peers

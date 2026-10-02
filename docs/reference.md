@@ -38,7 +38,7 @@ overrides background detection; `NO_COLOR` disables styling.
 | `alt+c` | Copy the selected turn over OSC 52 |
 | `tab` | While a reply streams: queue the prompt for after it |
 | `ctrl+enter` | Interrupt the reply and send now (needs a terminal that reports it) |
-| `ctrl+n` / `ctrl+r` / `ctrl+t` | New session · resume · toggle thinking |
+| `ctrl+n` / `ctrl+r` | New session · resume |
 | `pgup`/`pgdn` | Scroll a page · `ctrl+↑`/`ctrl+↓` half a page |
 | `shift+↑`/`shift+↓` | Scroll one line · `ctrl+g` jumps back to the newest |
 | `ctrl+o` | Show or hide each tool call's outcome, under the call itself |
@@ -46,16 +46,23 @@ overrides background detection; `NO_COLOR` disables styling.
 | `ctrl+b` | Expand or collapse the background-agent strip |
 | `ctrl+y` | Copy the last reply to the clipboard |
 | `ctrl+s` | Sessions: every session, on this device and peers |
+| `ctrl+t` | Toggle the tiled view: every open session tiled on screen (`/tiled`) |
 | `n` / `N` | With a search open and an empty composer, next / previous match |
 | `alt+1`…`alt+9` | Jump to a session · `alt+n`/`alt+p` cycle · `tab` cycles on an empty composer |
 | `ctrl+a`/`ctrl+e`/`home`/`end`, `ctrl+w`, `ctrl+k` | Line start/end, delete word, kill to end |
 | `ctrl+u` | Clear the composer line (readline) |
 | `ctrl+d` | Delete forward · `alt+b`/`alt+f`, `ctrl+←`/`ctrl+→` word motion |
-| `ctrl+c` | Sessions menu · press again within 1.5s to quit |
+| `ctrl+c` | Press twice within 1.5s to quit |
 
 In a list (`/model`, `/theme`, `/resume`): type to filter, `enter` selects, `esc` closes;
 `ctrl+n`/`ctrl+p` or the arrows move, `pgup`/`pgdn` move by ten, `home`/`end`
 jump, and `ctrl+u` clears the filter.
+
+In the **Sessions view** (`ctrl+s`, `/sessions`): `↑`/`↓` move, `enter`
+opens a local session or attaches to a peer, `k` closes a session this app
+owns, `p` previews a peer's log, `d` dispatches the composer's text, `a` adds a
+peer, `x` removes one, `r` refreshes, `esc` leaves. The first row under this
+device, `+ Ask the harness in a new session`, starts one with `enter`.
 
 ## Color palettes
 
@@ -181,7 +188,7 @@ alongside the app's own:
 | Command | Owner |
 |---|---|
 | `/compact`, and any other plugin command | `ctx.commands` (the Harness registry) |
-| `/new`, `/sessions`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
+| `/new`, `/sessions`, `/tiled`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
 
 Unknown commands are dispatched to `ctx.commands.execute()` and only reported
 as unknown if the registry also rejects them.

@@ -34,3 +34,14 @@ _Avoid_: match, result row
 A named switch from the JevLoop service that can be toggled at runtime and
 persists across restarts.
 _Avoid_: flag, toggle
+
+**Sessions view**:
+The cross-device list opened with `ctrl+s` (or `/sessions`): every live session
+on this device and on its peers, grouped by device, with a first row that
+starts a new session here.
+_Avoid_: fleet
+
+**Tiled view**:
+The layout that tiles every open session on screen at once, toggled with
+`ctrl+t` (or `/tiled`).
+_Avoid_: stack, stacked view

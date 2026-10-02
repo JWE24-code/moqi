@@ -74,7 +74,7 @@ no auth.
 | `src/tui/fleet.ts` | Pure: record shape, validation, merge, staleness, ranking, rendering, jump command. No fs, no SSH, no Harness. |
 | `src/presence.ts` | Writes and withdraws this device's records. |
 | `src/fleet-sources.ts` | Reads local records and peers over SSH, in parallel. |
-| `tests/fleet-smoke.ts` | 54 assertions over the pure logic plus a real presence round trip. |
+| `tests/fleet-smoke.ts` | 144 assertions over the pure logic plus a real presence round trip. |
 | `tests/fleet-live.ts` | Manual check against real hosts. |
 
 ## Using it
@@ -99,6 +99,12 @@ dsh --profile tui --peer laptop --peer workstation
 
 Each peer is read with one short, non-interactive SSH command. Nothing is
 installed there beyond `dsh` itself, and nothing listens anywhere.
+
+The first row under this device starts a conversation: `enter` on
+`+ Ask the harness in a new session` opens one here, the same as `ctrl+n`, and
+the row is never counted as a session. `k` closes the highlighted session when
+this app owns it; a session on a peer, or in another process here, is left
+alone because there is no per-session control channel.
 
 ## Status of this work
 
