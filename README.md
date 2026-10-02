@@ -31,7 +31,8 @@ puts each tool call where it was made, and gets out of the way.
 ## Highlights
 
 - **Tool calls, where they happened** — each call renders inline between the
-  prose on either side of it, with its own spinner, status, and outcome
+  prose on either side of it, collapsed to one row with its own spinner and
+  status; `ctrl+o` opens the outcome underneath
   ([docs/using-moqi.md](docs/using-moqi.md#tool-calls-where-they-happened)).
 - **Steer, queue, or interrupt** a running reply — three destinations, one per
   key ([docs/using-moqi.md](docs/using-moqi.md#steering-queueing-and-interrupting-a-running-reply)).

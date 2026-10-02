@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Tool calls start collapsed.** Each call keeps its one-row checklist line;
+  `ctrl+o` opens the outcome underneath. The choice round-trips either way —
+  previously only a collapsed view was stored, so an explicit expansion would
+  have been lost across restarts.
+
 ## [0.4.6] — 2026-10-02
 
 ### Added

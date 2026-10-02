@@ -59,8 +59,9 @@ in the place it was made, between the prose on either side of it:
 ```
 
 The call in flight carries the spinner and its own elapsed time; a settled call
-carries `✓`, or `✗` with its error. `ctrl+o` adds each call's outcome
-underneath the call that produced it:
+carries `✓`, or `✗` with its error. Calls start collapsed — one row each — so a
+long turn stays readable; `ctrl+o` adds each call's outcome underneath the call
+that produced it, and the choice is remembered across restarts:
 
 ```
  ✓ bash  docker ps

@@ -240,7 +240,10 @@ function adoptState(parsed: OnDisk): PersistedState {
     // only lasted as long as the process did.
     lang: typeof parsed.lang === 'string' ? parsed.lang : undefined,
     setupDone: parsed.setupDone === true ? true : undefined,
-    expandTools: parsed.expandTools === false ? false : undefined,
+    // Either explicit choice round-trips. The tool view used to store only the
+    // non-default side, which was harmless while the default was "expanded" —
+    // flipping the default would have silently dropped a chosen expansion.
+    expandTools: typeof parsed.expandTools === 'boolean' ? parsed.expandTools : undefined,
     stackView: parsed.stackView === true ? true : undefined,
     sessions,
     activeSession,

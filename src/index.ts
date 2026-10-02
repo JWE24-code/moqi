@@ -605,8 +605,12 @@ class TuiApp {
   private overlay = ''
   private showThinking: boolean
   private readonly confirmState = new Confirm()
-  /** Expanded by default: the transcript lists every tool call as it happens. */
-  private expandTools = true
+  /**
+   * Collapsed by default: each call keeps its one-line row, and ctrl+o opens
+   * the outcome underneath. A transcript that shows every result by default
+   * buries the conversation the calls were part of.
+   */
+  private expandTools = false
   private expandBackground = false
   /** Live agents other than the foreground one, keyed by session id. */
 

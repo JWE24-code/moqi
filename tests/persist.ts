@@ -99,9 +99,11 @@ try {
   const restored = await loadState(env)
   check('save/load round-trips the history', restored.inputHistory.join(',') === 'first prompt,second prompt')
   check('save/load round-trips the thinking flag', restored.thinking === true)
-  check('an unset tool view reads as the default (expanded)', restored.expandTools === undefined)
+  check('an unset tool view reads as the default (collapsed)', restored.expandTools === undefined)
   await saveState(state({ expandTools: false }), env)
   check('save/load round-trips a collapsed tool view', (await loadState(env)).expandTools === false)
+  await saveState(state({ expandTools: true }), env)
+  check('save/load round-trips an expanded tool view', (await loadState(env)).expandTools === true)
   const dirEntries = await readdir(sandbox)
   check('the atomic write leaves no temp file behind', !dirEntries.some((name) => name.endsWith('.tmp')))
 
