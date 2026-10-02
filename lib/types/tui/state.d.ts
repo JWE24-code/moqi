@@ -75,6 +75,17 @@ export declare function messageTools(message: Message): ToolActivity[];
 export declare function appendText(segments: Segment[], text: string): void;
 /** The tool row for a call id, wherever it sits in the turn. */
 export declare function findTool(segments: readonly Segment[], match: (tool: ToolActivity) => boolean): ToolActivity | undefined;
+/**
+ * One line of a file edit's diff, as the expanded tool row draws it: where it
+ * sits in the file when that could be worked out, whether it went, came, or
+ * stayed, and the text itself.
+ */
+export interface DiffLine {
+    kind: 'add' | 'remove' | 'context';
+    /** 1-based row in the file; absent when the edit could not be located. */
+    line?: number;
+    text: string;
+}
 /** A single tool invocation surfaced in the transcript. */
 export interface ToolActivity {
     /** Provider-issued call id; the only stable handle across argument deltas. */
@@ -84,6 +95,14 @@ export interface ToolActivity {
     detail?: string;
     /** One line of what came back, rendered under the call it belongs to. */
     result?: string;
+    /**
+     * The raw `arguments` JSON, kept on the row so a file edit can be turned
+     * into a diff once it settles — the call's own text is gone by then, and
+     * the tool's result names only the path, not the changed lines.
+     */
+    args?: string;
+    /** Red/green edit diff, attached when the edit settles. */
+    diff?: readonly DiffLine[];
 }
 /**
  * Whether a turn's queued prompts should send once it settles.

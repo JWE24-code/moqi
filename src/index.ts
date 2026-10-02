@@ -127,7 +127,7 @@ import {
 import { activeTheme, applyTheme, listThemes } from './tui/theme.ts'
 import { DEFAULT_THEME, findTheme } from './tui/themes.ts'
 import { projectStreamChunk } from './tui/stream.ts'
-import { applyToolEvent } from './tui/tooldetail.ts'
+import { applyToolEvent, editDiff, editPath, EDIT_TOOL } from './tui/tooldetail.ts'
 import { transcriptMarkdown } from './tui/export.ts'
 import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
@@ -1582,6 +1582,57 @@ class TuiApp {
         | undefined
       if (event !== undefined) applyToolEvent(segmentTools(tab.streamingSegments), event)
       tab.logSyncedSeq += 1
+    }
+    // An edit's lines are not in its result — that is a one-line success
+    // message — so once the call has settled its row is diffed against the
+    // file, off the paint path.
+    void this.annotateEdits(tab)
+  }
+
+  /**
+   * Attach a red/green diff to every settled file edit that lacks one.
+   *
+   * The call's arguments say what changed; the file, read now, says where and
+   * what surrounds it. A file that cannot be read (deleted, out of reach, or
+   * already changed again) still gets the plain hunk, just unplaced.
+   */
+  private async annotateEdits(tab: SessionTab): Promise<void> {
+    const rows = [
+      ...tab.messages.flatMap((message) => [...messageTools(message)]),
+      ...segmentTools(tab.streamingSegments),
+    ]
+    let painted = false
+    for (const tool of rows) {
+      if (tool.name !== EDIT_TOOL || tool.diff !== undefined || tool.status === 'running') continue
+      const path = editPath(tool.args)
+      if (path === undefined) continue
+      // Claim the row before the read: a second sync arriving while the file
+      // is being read must not start a second one. An empty diff means
+      // "attempted, nothing to show", which renders as the plain result.
+      tool.diff = []
+      const text = await this.readWorkspaceFile(path)
+      const diff = editDiff(tool.name, tool.args, text)
+      if (diff !== undefined) {
+        tool.diff = diff
+        painted = true
+      }
+    }
+    if (painted) this.paint()
+  }
+
+  /** A workspace file's text, or undefined when it cannot be read. */
+  private async readWorkspaceFile(path: string): Promise<string | undefined> {
+    const fs = this.ctx.get('fs')
+    try {
+      if (fs !== undefined) {
+        const target = await fs.resolve(path)
+        return await fs.readText(target)
+      }
+      return await readFile(resolve(path), 'utf8')
+    } catch {
+      // An unreadable path is not an error worth a status line: the diff
+      // simply shows the hunk without row numbers or context.
+      return undefined
     }
   }
 

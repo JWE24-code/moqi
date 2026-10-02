@@ -155,12 +155,14 @@ function projectBlockEnd(
         name: block.name ?? 'tool',
         status: 'ok',
         detail: describeToolCall(block.name ?? 'tool', block.arguments),
+        args: block.arguments,
       },
     })
     return
   }
   row.name = block.name ?? row.name
   row.status = 'ok'
+  row.args = block.arguments
   argumentBuffers.delete(row)
   const detail = describeToolCall(row.name, block.arguments)
   if (detail !== '') row.detail = detail

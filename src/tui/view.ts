@@ -29,6 +29,7 @@ import {
   type Picker,
   type Segment,
   type SessionSummary,
+  type DiffLine,
   type ToolActivity,
 } from './state.ts'
 import { displayWidth, padEnd, stripAnsi, truncate, wrap } from './text.ts'
@@ -471,12 +472,43 @@ function renderTool(tool: ToolActivity, width: number, toolStyle: ToolStyle): st
   const head = truncate(`${mark} ${style(tool.name, { fg: colText })}${detail}${elapsed}`, width)
   if (!toolStyle.expand) return [head]
 
+  // A file edit reads as a diff: the rows it took out in red, the rows it put
+  // in green, each with its row number and the context around it. The plain
+  // one-line result underneath would only repeat the path.
+  const diff = tool.diff
+  if (diff !== undefined && diff.length > 0) return [head, ...renderDiff(diff, width)]
+
   const result = tool.result ?? ''
   if (result === '') return [head]
   const under = (tool.status === 'error' ? warn : muted)(
     `  ↳ ${truncate(result, Math.max(width - 4, 8))}`,
   )
   return [head, under]
+}
+
+/**
+ * One edit's diff rows: `NNNN - old` in red, `NNNN + new` in green, the rows
+ * around them dimmed. The row number column is fixed width so the signs line
+ * up even when an unplaced hunk has no numbers at all.
+ */
+function renderDiff(diff: readonly DiffLine[], width: number): string[] {
+  const gutter = Math.max(
+    4,
+    ...diff.map((row) => (row.line === undefined ? 0 : String(row.line).length)),
+  )
+  return diff.map((row) => {
+    const number = row.line === undefined ? ' '.repeat(gutter) : String(row.line).padStart(gutter)
+    const body = truncate(row.text, Math.max(width - gutter - 4, 8))
+    const { sign, painted } = diffPaint(row.kind, body)
+    return `  ${muted(number)} ${sign} ${painted}`
+  })
+}
+
+/** The sign and the body of one diff row, colored by whether it came or went. */
+function diffPaint(kind: DiffLine['kind'], body: string): { sign: string; painted: string } {
+  if (kind === 'remove') return { sign: style('-', { fg: colRose }), painted: style(body, { fg: colRose }) }
+  if (kind === 'add') return { sign: style('+', { fg: colGreen }), painted: style(body, { fg: colGreen }) }
+  return { sign: muted(' '), painted: muted(body) }
 }
 
 /** Seconds as a compact duration: 8s, 1m12s. */

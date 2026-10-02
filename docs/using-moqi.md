@@ -68,6 +68,28 @@ that produced it, and the choice is remembered across restarts:
    ↳ webui postgres
 ```
 
+A file edit does not show its result line — `str_replace_editor` only answers
+"The file … has been edited successfully", which says nothing. Instead the
+expanded row is the change itself: rows taken out in red, rows written in
+green, each with its row number and three rows of context either side, so the
+edit can be read without opening the file:
+
+```
+ ✓ str_replace_editor  src/tui/view.ts
+      10   const before = 1
+      11   const keep = 2
+      12   const also = 3
+      13 - const gone = 4
+      13 + const replaced = 5
+      14   const after = 6
+      15   const more = 7
+      16   const end = 8
+```
+
+The lines come from the call's arguments. The row numbers and the context come
+from the file, read once the call settles; a file that cannot be read (deleted,
+or already changed again) still shows the hunk, just without numbers.
+
 A turn whose calls returned something to show says so once, at the end, rather
 than advertising an expansion that would reveal nothing:
 

@@ -9,7 +9,7 @@
  *
  * @module moqi-tui/tui/tooldetail
  */
-import type { ToolActivity } from './state.ts';
+import type { DiffLine, ToolActivity } from './state.ts';
 /**
  * Summarize what a tool call does from its raw `arguments` JSON — the exact
  * string the model produced, parsed leniently. `bash` becomes
@@ -29,6 +29,23 @@ export declare function summarizeResult(content: readonly unknown[], error?: {
     name?: string;
     code?: string;
 }): string | undefined;
+/** The editor tool whose calls can be shown as a diff. */
+export declare const EDIT_TOOL = "str_replace_editor";
+/** Rows of context kept either side of a change. */
+export declare const DIFF_CONTEXT_ROWS = 3;
+/** The file an edit call names, for reading it back once the edit settles. */
+export declare function editPath(rawArguments: string | undefined): string | undefined;
+/**
+ * A file edit as red/green diff rows with their row numbers and three rows of
+ * context either side.
+ *
+ * The tool's result is a one-line success message, so the change comes from
+ * the call's own arguments; the row numbers and context come from the file as
+ * it now stands, which is why `fileText` is optional — without it the hunk is
+ * still shown, just unplaced. Only `str_replace_editor` edits qualify: another
+ * tool that happens to pass a `path` is not a diff.
+ */
+export declare function editDiff(name: string, rawArguments: string | undefined, fileText?: string): DiffLine[] | undefined;
 /**
  * Fold one session-log event onto the live tool rows of the turn in flight.
  *

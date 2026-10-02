@@ -10,6 +10,7 @@
  * Run with: node --experimental-strip-types tests/render-smoke.ts
  */
 
+import './force-color.ts'
 import assert from 'node:assert/strict'
 
 import {
@@ -26,6 +27,7 @@ import {
   type Message,
 } from '../src/tui/state.ts'
 import { displayWidth, truncate, wrap, stripAnsi, padEnd, sliceColumns } from '../src/tui/text.ts'
+import { style, colGreen, colRose } from '../src/tui/theme.ts'
 import { highlighted, spanText } from '../src/tui/select.ts'
 import { renderMarkdown } from '../src/tui/markdown.ts'
 import { decode } from '../src/tui/keys.ts'
@@ -512,6 +514,54 @@ check(
   'an expanded outcome stays inside its own turn',
   expanded.findIndex((line) => line.trim() === '↳ webui') <
     expanded.findIndex((line) => line.includes('Only webui is up.')),
+)
+
+// A file edit renders as a diff: removals red, additions green, numbered,
+// with the rows around them for context.
+const edit: Message = {
+  role: 'assistant',
+  segments: [
+    {
+      kind: 'tool',
+      tool: {
+        name: 'str_replace_editor',
+        status: 'ok',
+        detail: 'src/tui/view.ts',
+        diff: [
+          { kind: 'context', line: 10, text: 'const before = 1' },
+          { kind: 'context', line: 11, text: 'const keep = 2' },
+          { kind: 'context', line: 12, text: 'const also = 3' },
+          { kind: 'remove', line: 13, text: 'const gone = 4' },
+          { kind: 'add', line: 13, text: 'const replaced = 5' },
+          { kind: 'context', line: 14, text: 'const after = 6' },
+          { kind: 'context', line: 15, text: 'const more = 7' },
+          { kind: 'context', line: 16, text: 'const end = 8' },
+        ],
+      },
+    },
+  ],
+}
+const editFrame = render(snapshot({ messages: [edit], expandTools: true })).lines
+const editText = editFrame.map((line) => stripAnsi(line))
+check('a diff numbers every row', editText.some((line) => /^\s*13 - const gone = 4$/.test(line.trim())))
+check(
+  'a removed row is painted red',
+  editFrame.some((line) => line.includes(style('const gone = 4', { fg: colRose }))),
+)
+check(
+  'an added row is painted green',
+  editFrame.some((line) => line.includes(style('const replaced = 5', { fg: colGreen }))),
+)
+check(
+  'context rows surround the change',
+  editText.some((line) => line.includes('const keep = 2')) &&
+    editText.some((line) => line.includes('const after = 6')),
+)
+check(
+  'a collapsed edit hides the diff',
+  !render(snapshot({ messages: [edit], expandTools: false }))
+    .lines.map((line) => stripAnsi(line))
+    .some((line) => line.includes('const gone = 4')),
 )
 
 // Every call in a long run gets its own row, in place.
