@@ -6,6 +6,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.6] — 2026-10-02
+
+### Added
+
+- **Attention in the stacked view.** A session that raises an approval or
+  question hosts its panel inside its own tile, and any tile waiting on you or
+  finished-unseen blinks its border (warn for input, ok for done) until focused
+  or answered.
+
+## [0.4.5] — 2026-10-02
+
+### Fixed
+
+- **An open picker draws over the stacked view.** `/model`, `/theme`,
+  `/resume` and every other picker command opened invisibly: the picker took
+  the keys but the stack still painted the tiles over it. An open picker now
+  outranks the stack tiling.
+
+## [0.4.4] — 2026-10-02
+
+### Fixed
+
+- **The harness packages are linked before the profile's package-manager
+  install.** A failed `pnpm install` used to exit `install-profile` before the
+  harness's `@deepseek-ai` packages were linked into the app, leaving a
+  freshly updated global install unable to boot at all. Linking now happens
+  first, and a failed install says the app may still boot.
+
+## [0.4.3] — 2026-10-02
+
+### Added
+
+- **The stacked view** tiles every open session on screen at once, each pane
+  boxed with the focused pane's whole border highlighted.
+- **Mouse text selection**: hold the left button, drag, release; and copy a
+  transcript turn by clicking it twice.
+- **`ctrl+s` switches views** and remembers the last view across restarts.
+
+### Fixed
+
+- The profile installer no longer deletes added plugins.
+
 ## [0.4.2]
 
 ### Security
