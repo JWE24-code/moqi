@@ -7,6 +7,7 @@
  */
 
 import { Composer, Palette, Picker, textMessage } from '../src/tui/state.ts'
+import { editDiff } from '../src/tui/tooldetail.ts'
 import { render, type Snapshot } from '../src/tui/view.ts'
 
 const state = process.argv[2] ?? 'normal'
@@ -56,13 +57,66 @@ if (state === 'models' || state === 'models-filtered') {
   if (state === 'models-filtered') picker.setQuery('g53')
 }
 
+/**
+ * The file the edit scenario runs against, post-edit — exactly what the app
+ * reads back after a call settles.
+ */
+const EDITED_FILE = [
+  'import { Composer, Palette, Picker } from \'./state.ts\'',
+  '',
+  '/** How many rows the popup may take. */',
+  'const POPUP_ROWS = 8',
+  '',
+  'export function measure(columns: number): number {',
+  '  const inner = columns - 4',
+  '  if (inner < 20) return 1',
+  '  return Math.min(POPUP_ROWS, Math.ceil(inner / 12))',
+  '}',
+  '',
+  'export function clamp(rows: number): number {',
+  '  return Math.max(rows, 1)',
+  '}',
+].join('\n')
+
+/** The call the model made, as the app receives it. */
+const EDIT_CALL = JSON.stringify({
+  command: 'str_replace',
+  path: 'src/tui/popup.ts',
+  old_str: 'const POPUP_ROWS = 6\n',
+  new_str: 'const POPUP_ROWS = 8\n',
+})
+
 const snapshot: Snapshot = {
   columns: process.stdout.columns ?? 92,
   rows: process.stdout.rows ?? 26,
   title: state === 'normal' ? 'tail docker logs' : 'new conversation',
   host: 'local harness',
   modelName: 'deepseek-chat',
-  messages: [
+  messages: state === 'edit' || state === 'edit-closed'
+    ? [
+        textMessage('user', 'bump the popup to eight rows'),
+        {
+          role: 'assistant',
+          segments: [
+            { kind: 'text', text: 'Bumping it — the constant is the only place that number lives.' },
+            {
+              kind: 'tool',
+              tool: {
+                name: 'str_replace_editor',
+                status: 'ok',
+                detail: 'src/tui/popup.ts',
+                result: 'The file src/tui/popup.ts has been edited successfully.',
+                args: EDIT_CALL,
+                // The real builder, against the real post-edit file: this is
+                // the same call the app makes once a tool result settles.
+                diff: editDiff('str_replace_editor', EDIT_CALL, EDITED_FILE) ?? [],
+              },
+            },
+            { kind: 'text', text: 'Done — the popup now takes up to eight rows.' },
+          ],
+        },
+      ]
+    : [
     textMessage('user', 'how do i tail the last 50 lines of a container log?'),
     {
       role: 'assistant',
@@ -104,7 +158,7 @@ const snapshot: Snapshot = {
   palette,
   picker,
   scrollBack: 0,
-  expandTools: false,
+  expandTools: state === 'edit',
   sessions: [],
   background: [],
   expandBackground: false,
