@@ -10,6 +10,8 @@ export declare function listSessions(query: SessionQueryLike): Promise<PickerIte
 /**
  * Rebuild the transcript from a session's durable log. Only user and assistant
  * text is projected; everything else the log carries belongs to other surfaces.
+ * The per-event extraction is `session-log.ts`'s, so the live and restored
+ * transcripts read the log through one rule.
  */
 export declare function readHistory(session: Session): Message[];
 /**

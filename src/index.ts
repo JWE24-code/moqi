@@ -103,6 +103,7 @@ import {
   sessionEvents,
   type SessionQueryLike,
 } from './session-list.ts'
+import { noticeTextOf } from './session-log.ts'
 import {
   ApprovalPanel,
   LoginPanel,
@@ -1580,6 +1581,12 @@ class TuiApp {
         | { type?: string; data?: Record<string, unknown> }
         | undefined
       if (event !== undefined) applyToolEvent(segmentTools(tab.streamingSegments), event)
+      // A plugin notice (the PII shield's 🔒, for one) is injected at
+      // pre-step, after the user turn is already on screen: the walk is the
+      // only place the live transcript can still pick it up. It rides in the
+      // message flow, like a tool result, rather than a detached status line.
+      const notice = event === undefined ? undefined : noticeTextOf(event)
+      if (notice !== undefined) tab.messages.push(textMessage('user', notice))
       tab.logSyncedSeq += 1
     }
     // An edit's lines are not in its result — that is a one-line success

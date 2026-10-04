@@ -8,6 +8,7 @@
  */
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { messageTextOf, type MessageEventLike } from './session-log.ts'
 import { textMessage, type Message, type PickerItem } from './tui/state.ts'
 
 /** The shape of the harness session-query service this build can rely on. */
@@ -70,24 +71,16 @@ export async function listSessions(query: SessionQueryLike): Promise<PickerItem[
 /**
  * Rebuild the transcript from a session's durable log. Only user and assistant
  * text is projected; everything else the log carries belongs to other surfaces.
+ * The per-event extraction is `session-log.ts`'s, so the live and restored
+ * transcripts read the log through one rule.
  */
 export function readHistory(session: Session): Message[] {
   const out: Message[] = []
   const length = session.seq
   for (let seq = 0; seq < length; seq += 1) {
-    const event = session.eventAt(SessionSeq(seq)) as
-      | { type?: string; data?: Record<string, unknown> }
-      | undefined
+    const event = session.eventAt(SessionSeq(seq)) as MessageEventLike | undefined
     if (event === undefined) continue
-    const message = (event.data as { message?: { content?: unknown[] } } | undefined)?.message
-    const blocks = Array.isArray(message?.content) ? message.content : []
-    const text = blocks
-      .filter((block): block is { type: string; text: string } => {
-        const candidate = block as { type?: unknown; text?: unknown }
-        return candidate.type === 'text' && typeof candidate.text === 'string'
-      })
-      .map((block) => block.text)
-      .join('')
+    const text = messageTextOf(event)
     if (text === '') continue
     if (event.type === 'assistant/message') out.push(textMessage('assistant', text))
     else if (event.type === 'user/message') out.push(textMessage('user', text))
