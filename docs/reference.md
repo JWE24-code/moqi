@@ -27,6 +27,7 @@ overrides background detection; `NO_COLOR` disables styling.
 | Key | Action |
 |---|---|
 | `enter` | Send · steers into a running reply · a menu on top chooses with `enter` too |
+| `shift+tab` | Next session mode: read-only → workspace-write → plan → read-only; the footer badges anything but workspace-write ([details](using-moqi.md#session-modes)) |
 | `1`–`4` (approval panel) | Allow once · allow for this session · always allow · deny — `tab` flips "always" between this project and everywhere, `esc` denies ([details](using-moqi.md#approvals-and-permission-rules)) |
 | `shift+enter` | Insert a newline · `ctrl+j` does the same · multi-line pastes land whole |
 | `↑` / `↓` | On the first / last composer row, recall earlier prompts |

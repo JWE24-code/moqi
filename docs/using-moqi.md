@@ -81,6 +81,24 @@ approval, so an edit is live the moment you save. A file that no longer reads
 as rules is reported, and its rules are off until it is fixed — never guessed
 at.
 
+## Session modes
+
+`shift+tab` steps the session through three modes, each built from the
+Harness's own permission presets and plan mode:
+
+| Mode | The agent… | Footer |
+|---|---|---|
+| `read-only` | reads, but cannot change files | `read-only` |
+| `workspace-write` | changes files in its workspace — the everyday default | (nothing) |
+| `plan` | explores and proposes a plan you approve before it acts | `plan` |
+
+Plan mode keeps the workspace-write sandbox, so a plan you approve can be
+carried out straight away. Full access is never a `shift+tab` step: it takes
+`/permission danger-full-access`, the footer then shows `⚠ full access`, and
+the next `shift+tab` goes back to read-only. A switch made mid-reply takes
+effect from the agent's next step. The mode belongs to the session: other
+tabs keep theirs.
+
 ## Memory
 
 The agent can keep facts across sessions with three tools: `memory_save`,

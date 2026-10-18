@@ -89,6 +89,8 @@ export interface Snapshot {
   modelName: string
   /** The branch the session's directory has checked out; absent outside a repo. */
   branch?: string
+  /** The session mode when it differs from the everyday default: `read-only`, `plan`, `⚠ full access`. */
+  modeBadge?: string
   messages: readonly Message[]
   /** The turn streaming in, prose and calls in arrival order. */
   streamingSegments: readonly Segment[]
@@ -1215,6 +1217,10 @@ function footerLeft(snapshot: Snapshot): string {
 
   const separator = muted('  ·  ')
   const segments: string[] = [muted(snapshot.modelName)]
+  if (snapshot.modeBadge !== undefined) {
+    // Wider than usual is a warning; narrower (read-only, plan) is just worth seeing.
+    segments.unshift(snapshot.modeBadge.startsWith('⚠') ? warn(snapshot.modeBadge) : accent(snapshot.modeBadge))
+  }
   if (snapshot.branch !== undefined) segments.push(muted(`⎇ ${snapshot.branch}`))
   segments.push(percent >= 80 ? warn(context) : muted(context))
   if (snapshot.haveUsage) {

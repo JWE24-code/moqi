@@ -33,6 +33,8 @@ const CSI_NAMES: Record<string, string> = {
   D: 'left',
   H: 'home',
   F: 'end',
+  // Back-tab: what xterm-alikes send for shift+tab without a key protocol.
+  Z: 'shift+tab',
 }
 
 /** `ESC [ n ~` tilde codes mapped to key names. */

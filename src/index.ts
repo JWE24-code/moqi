@@ -138,6 +138,9 @@ import { planRename, snapshotTitle } from './rename.ts'
 import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
 import { callArguments, describeRule, PermissionRules, type Ask, type Rule, type ScopedRule } from './permissions.ts'
 import { MemoryStore, quickNote } from './memory.ts'
+import { currentMode, modeBadge, nextMode, type SessionMode } from './session-mode.ts'
+import type {} from '@deepseek-ai/dsh-permission-presets' // NOSONAR — types `ctx.get('permissionPresets')` with no runtime import.
+import type {} from '@deepseek-ai/dsh-plan-mode' // NOSONAR — types `ctx.get('planMode')` with no runtime import.
 import { memoryTools } from './memory-tools.ts'
 import {
   activeProfileName,
@@ -512,6 +515,11 @@ interface SessionTab {
   permissions: PermissionRules
   /** This session's memory: the project scope of its directory, plus global. */
   memory: MemoryStore
+  /**
+   * The session mode (preset, or plan), as last read — cached so painting
+   * never folds the session log; see `refreshMode`.
+   */
+  mode?: SessionMode
 }
 
 /** Create an empty session record. */
@@ -755,6 +763,8 @@ class TuiApp {
       void this.flush(tab as SessionTab)
       // The model may have switched or created a branch during the turn.
       void this.refreshBranch(tab as SessionTab)
+      // …and may have left plan mode (an approved plan) or been switched.
+      this.refreshMode(tab as SessionTab)
     },
     persist: () => {
       this.persistSoon()
@@ -965,6 +975,7 @@ class TuiApp {
 
     // Leftovers from sessions that never came back: empty moqi branches and
     // idle worktrees nothing open is using. Rule as /close: nothing with work goes.
+    for (const tab of this.tabs) this.refreshMode(tab)
     void pruneLeftovers(this.cwd, this.tabs.map((tab) => tab.workspace.cwd))
       .then((pruned) => {
         if (pruned.length === 0) return
@@ -1512,6 +1523,7 @@ class TuiApp {
     const header = tab.agent?.session.header as { cwd?: string } | undefined
     const cwd = header?.cwd !== undefined && header.cwd !== '' ? header.cwd : this.cwd
     setWorkspace(tab, await Workspace.adopt(cwd))
+    this.refreshMode(tab)
   }
 
   /** Re-read a session's branch, repainting when it moved. */
@@ -2171,6 +2183,7 @@ class TuiApp {
       host: hostLabel(process.env['DSH_HOST'] ?? 'local harness'),
       modelName: tab.modelName,
       branch: tab.workspace.branch,
+      modeBadge: modeBadge(tab.mode),
       messages: tab.messages,
       streamingSegments: tab.streamingSegments,
       streamingReasoning: tab.streamingReasoning,
@@ -3225,6 +3238,70 @@ class TuiApp {
     }
   }
 
+  // -------------------------------------------------------------- session mode
+
+  /**
+   * Re-read a session's mode from the Harness: its permission preset, and
+   * plan mode — a selection still pending counts, since that is what the next
+   * step will run under. Repaints when it moved.
+   */
+  private refreshMode(tab: SessionTab): void {
+    const agent = tab.agent
+    const presets = this.ctx.get('permissionPresets')
+    if (agent === undefined || presets === undefined) return
+    let mode: SessionMode
+    try {
+      const plan = this.ctx.get('planMode')?.get(agent)
+      mode = currentMode(presets.current(agent.session), plan?.pending ?? plan?.active ?? false)
+    } catch {
+      return
+    }
+    if (mode === tab.mode) return
+    tab.mode = mode
+    this.paint()
+  }
+
+  /**
+   * `shift+tab` — the next session mode: read-only → workspace-write → plan
+   * → read-only. Full access is never a step (see `session-mode.ts`). A plan
+   * switch made mid-turn takes effect at the next step, and says so.
+   */
+  private cycleMode(): void {
+    const tab = this.tab
+    const agent = tab.agent
+    const presets = this.ctx.get('permissionPresets')
+    if (agent === undefined || presets === undefined) {
+      this.setStatus('this profile has no permission presets to switch between', true)
+      this.paint()
+      return
+    }
+    this.refreshMode(tab)
+    const target = nextMode(tab.mode ?? 'workspace-write')
+    const planMode = this.ctx.get('planMode')
+    if (!presets.names.includes(target.preset) || (target.plan && planMode === undefined)) {
+      this.setStatus(`this profile has no ${target.mode} mode`, true)
+      this.paint()
+      return
+    }
+    let later = false
+    try {
+      presets.set(agent.session, target.preset)
+      if (planMode !== undefined) later = planMode.set(agent, target.plan) === 'queued'
+    } catch (error) {
+      this.setStatus(`mode switch failed: ${describeError(error)}`, true)
+      this.paint()
+      return
+    }
+    this.refreshMode(tab)
+    const meaning = {
+      'read-only': 'the agent can read, not change, files',
+      'workspace-write': 'the agent can change files in this workspace',
+      plan: 'the agent explores and proposes a plan for you to approve',
+    }[target.mode]
+    this.setStatus(`mode: ${target.mode} — ${meaning}${later ? ' (from its next step)' : ''} · shift+tab cycles`)
+    this.paint()
+  }
+
   // ------------------------------------------------------------------- memory
 
   /**
@@ -3857,6 +3934,9 @@ class TuiApp {
     switch (key.name) {
       case 'alt+e':
         void this.editDraft()
+        return 'handled'
+      case 'shift+tab':
+        this.cycleMode()
         return 'handled'
       case 'alt+up':
       case 'alt+down':
@@ -4974,6 +5054,7 @@ class TuiApp {
       // A new session is an additional one: the conversation that was open
       // keeps running, and its reply will still arrive and ring.
       tab.agent = created.agent
+      this.refreshMode(tab)
       this.adoptForeground(tab)
       this.tabs.push(tab)
       this.active = this.tabs.length - 1
@@ -5103,6 +5184,7 @@ class TuiApp {
         setup: this.selectionSetupFor(tab),
       })
       tab.agent = created.agent
+      this.refreshMode(tab)
       this.adoptForeground(tab)
       this.tabs.push(tab)
       this.active = this.tabs.length - 1
