@@ -91,6 +91,11 @@ remembers across sessions, and works on a branch or worktree of its own.
   asked, so a background session's approval showed no command.
 - **`$DSH_HOME` is resolved one way everywhere**, the Harness's own way (blank
   means `~/.dsh`); a blank value no longer sends sessions or rules elsewhere.
+- **A non-interactive run touches nothing.** `dsh --profile tui` without a
+  terminal refused only after starting a session — which rewrote the shared
+  open-sessions list and, with 0.5's isolation, switched the repository onto a
+  `moqi/` branch. It now refuses before any of that, and moqi never saves a
+  state it did not load.
 
 ## [0.4.8] — 2026-10-02
 
