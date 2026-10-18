@@ -73,6 +73,14 @@ every part is — anything with a substitution, a redirect other than
 stated (a chained command, say), the panel offers once or deny only. A spoken
 answer only ever allows once.
 
+**`/permissions`** lists every rule in force for the session you're in,
+grouped under *This session*, *This project*, and *Everywhere*. `enter` on a
+rule asks before revoking it; the two rows at the end open the project or
+everywhere rules file in `$VISUAL`/`$EDITOR`. Rules are read fresh at every
+approval, so an edit is live the moment you save. A file that no longer reads
+as rules is reported, and its rules are off until it is fixed — never guessed
+at.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something

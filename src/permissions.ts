@@ -812,6 +812,11 @@ export class PermissionRules {
     return true
   }
 
+  /** The file a scope's rules are kept in — what `/permissions` opens in `$EDITOR`. */
+  file(scope: FileScope): string {
+    return rulesPath(scope, this.cwd)
+  }
+
   /** Every rule in force here, scope-tagged, plus any rules file that could not be read. */
   async list(): Promise<{ rules: ScopedRule[]; errors: string[] }> {
     const { rules, errors } = await loadAllRules(this.cwd, this.sessionRules)

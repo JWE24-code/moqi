@@ -442,6 +442,8 @@ try {
     await otherTab.grant({ tool: 'read' }, 'global')
     check('global grant seen everywhere', (await tab.decide({ toolName: 'read', args: { path: '/x' } }))?.scope === 'global')
 
+    check('file(project) is the project rules path', tab.file('project') === rulesPath('project', cwd))
+    check('file(global) is the global rules path', tab.file('global') === rulesPath('global', cwd))
     const listed = await tab.list()
     check('list has every scope', ['session', 'project', 'global'].every((scope) => listed.rules.some((r) => r.scope === scope)))
     check('list reports no errors', listed.errors.length === 0)

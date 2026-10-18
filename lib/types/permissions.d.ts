@@ -209,6 +209,8 @@ export declare class PermissionRules {
     grant(rule: Rule, scope: Scope): Promise<boolean>;
     /** Remove a rule from a scope. @returns false when no equal rule was there. */
     revoke(rule: Rule, scope: Scope): Promise<boolean>;
+    /** The file a scope's rules are kept in — what `/permissions` opens in `$EDITOR`. */
+    file(scope: FileScope): string;
     /** Every rule in force here, scope-tagged, plus any rules file that could not be read. */
     list(): Promise<{
         rules: ScopedRule[];

@@ -190,7 +190,7 @@ alongside the app's own:
 | Command | Owner |
 |---|---|
 | `/compact`, and any other plugin command | `ctx.commands` (the Harness registry) |
-| `/new`, `/sessions`, `/tiled`, `/close`, `/branch`, `/worktree`, `/isolation`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
+| `/new`, `/sessions`, `/tiled`, `/close`, `/branch`, `/worktree`, `/isolation`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/permissions`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
 
 Unknown commands are dispatched to `ctx.commands.execute()` and only reported
 as unknown if the registry also rejects them.
