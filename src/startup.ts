@@ -39,6 +39,8 @@ export interface TuiStartupValues {
   vim: boolean
   /** How new sessions in a git repository isolate their changes; absent defers to the stored choice. */
   isolation: string | undefined
+  /** `false` turns agent memory off for this run; absent defers to the stored `/memory` choice. */
+  memory: false | undefined
   /** Bring back the sessions that were open at the last exit; on by default. */
   restore: boolean
   /** Devices to include in the fleet overview; empty means this one only. */
@@ -70,6 +72,7 @@ function tuiCommand(): Command {
       '--isolation <mode>',
       'where a new session in a git repo works: branch (its own branch, in place), worktree, or off',
     )
+    .option('--no-memory', 'run without agent memory: no memory list, no memory tools (saved memories are kept)')
     .option('--no-restore', 'start with one empty session instead of reopening the last ones')
     .option(
       '--peer <host>',
@@ -112,6 +115,7 @@ export function apply(ctx: Context): void {
       bell?: boolean
       vim?: boolean
       isolation?: string
+      memory?: boolean
       restore?: boolean
       peer?: string[]
       voiceModel?: string
@@ -154,6 +158,8 @@ export function apply(ctx: Context): void {
       bell: options.bell !== false,
       vim: options.vim === true,
       isolation,
+      // commander maps --no-memory to memory: false; MOQI_MEMORY=off does the same.
+      memory: options.memory === false || process.env['MOQI_MEMORY'] === 'off' ? false : undefined,
       restore: options.restore !== false,
       peers: options.peer ?? [],
       // Left undefined the app reads MOQI_WHISPER_MODEL / _BIN, then falls

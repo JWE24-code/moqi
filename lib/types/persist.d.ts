@@ -56,6 +56,8 @@ export interface PersistedState {
      * the default.
      */
     isolation?: string;
+    /** `off` when agent memory was switched off with `/memory off`; absent means on. */
+    memory?: string;
     /** Devices to include in the fleet overview, as `ssh` destinations. */
     peers: string[];
     /** Sessions that were open at the last exit, in tab order. */
@@ -109,6 +111,7 @@ export declare function assembleState(input: {
     expandTools: boolean | undefined;
     stackView: boolean | undefined;
     isolation: string | undefined;
+    memory: string | undefined;
     peers: string[];
     sessions: PersistedSession[];
     activeSession: number;

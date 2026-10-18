@@ -23,6 +23,8 @@ export interface Snapshot {
     branch?: string;
     /** The session mode when it differs from the everyday default: `read-only`, `plan`, `⚠ full access`. */
     modeBadge?: string;
+    /** Agent memory is switched off (`/memory off`, `--no-memory`). */
+    memoryOff?: boolean;
     messages: readonly Message[];
     /** The turn streaming in, prose and calls in arrival order. */
     streamingSegments: readonly Segment[];

@@ -33,6 +33,8 @@ export interface Config {
      * stored from an earlier run.
      */
     isolation?: string;
+    /** `false` turns agent memory off for this run (`--no-memory`); absent defers to `/memory on|off`. */
+    memory?: boolean;
     /**
      * The view to open in: `stack` tiles every open session on screen at once;
      * anything else — including absent — reads as `tabs`, the default. The view

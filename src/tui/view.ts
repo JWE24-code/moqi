@@ -91,6 +91,8 @@ export interface Snapshot {
   branch?: string
   /** The session mode when it differs from the everyday default: `read-only`, `plan`, `⚠ full access`. */
   modeBadge?: string
+  /** Agent memory is switched off (`/memory off`, `--no-memory`). */
+  memoryOff?: boolean
   messages: readonly Message[]
   /** The turn streaming in, prose and calls in arrival order. */
   streamingSegments: readonly Segment[]
@@ -1222,6 +1224,8 @@ function footerLeft(snapshot: Snapshot): string {
     segments.unshift(snapshot.modeBadge.startsWith('⚠') ? warn(snapshot.modeBadge) : accent(snapshot.modeBadge))
   }
   if (snapshot.branch !== undefined) segments.push(muted(`⎇ ${snapshot.branch}`))
+  // Off is never silent: a session that cannot remember should say so.
+  if (snapshot.memoryOff === true) segments.push(accent('memory off'))
   segments.push(percent >= 80 ? warn(context) : muted(context))
   if (snapshot.haveUsage) {
     segments.push(

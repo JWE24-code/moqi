@@ -126,6 +126,14 @@ Memory is separate from the instruction files the Harness already loads
 yours to write; memory is the agent's notebook. Both are plain files you can
 edit or delete.
 
+**Switching memory off.** `/memory off` turns memory off for every session at
+once and is remembered across restarts; `/memory on` brings it back. While
+off, no session gets the memory list or the memory tools (from each one's next
+request), a `# ` note offers only the `AGENTS.md` rows, and the footer says
+`memory off`. Nothing is deleted — saved memories wait on disk, and `/memory`
+still opens them. `--no-memory` (or `MOQI_MEMORY=off`) does the same for one
+run without changing the stored choice.
+
 **`/memory`** shows both side by side for the session you're in: the
 instruction files the Harness actually loads here (with a `+ create` row for
 a missing global or project-root `AGENTS.md`), the memories for this project

@@ -17,9 +17,10 @@ Flags, keys, commands, palettes, vim mode, interface language, and MCP.
 | `--peer <host>` | Device to include in the Sessions list; repeatable |
 | `--no-restore` | Start with one empty session instead of reopening the last ones |
 | `--isolation <mode>` | Where a new session in a git repo works: `branch` (the default: its own `moqi/` branch, in place), `worktree`, or `off` |
+| `--no-memory` | Run without agent memory — no memory list, no memory tools — for this run only; `/memory on\|off` is the lasting switch |
 | `--version` | Print the app version |
 
-`MOQI_ISOLATION` sets the same choice; `MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
+`MOQI_ISOLATION` sets the same choice; `MOQI_MEMORY=off` is `--no-memory`; `MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
 overrides background detection; `NO_COLOR` disables styling.
 
 ## Keys

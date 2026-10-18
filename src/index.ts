@@ -226,6 +226,8 @@ export interface Config {
    * stored from an earlier run.
    */
   isolation?: string
+  /** `false` turns agent memory off for this run (`--no-memory`); absent defers to `/memory on|off`. */
+  memory?: boolean
   /**
    * The view to open in: `stack` tiles every open session on screen at once;
    * anything else — including absent — reads as `tabs`, the default. The view
@@ -260,6 +262,7 @@ export const Config: z<Config> = z.object({
   bell: z.boolean(),
   vim: z.boolean(),
   isolation: z.string(),
+  memory: z.boolean(),
   view: z.string(),
   peers: z.array(z.string()),
   restore: z.boolean(),
@@ -352,8 +355,8 @@ const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
   { name: 'mcp', args: '', description: 'MCP servers whose tools are mounted here' },
   {
     name: 'memory',
-    args: '[forget <name>]',
-    description: 'What the agent remembers and the instruction files it reads: open in $EDITOR, or forget one',
+    args: '[on | off | forget <name>]',
+    description: 'What the agent remembers and the instructions it reads: open in $EDITOR, forget one, or switch memory on/off',
   },
   {
     name: 'permissions',
@@ -521,6 +524,8 @@ interface SessionTab {
    * never folds the session log; see `refreshMode`.
    */
   mode?: SessionMode
+  /** Register or unregister this session's memory tools; set when its agent is set up. */
+  setMemoryTools?: (on: boolean) => void
 }
 
 /** Create an empty session record. */
@@ -685,6 +690,10 @@ class TuiApp {
   private readonly fileIndexes = new Map<string, FileIndex>()
   /** Where new sessions in a git repository work; see {@link Config.isolation}. */
   private isolation: Isolation = 'branch'
+  /** Whether agent memory is on right now, in every session. */
+  private memoryOn = true
+  /** The stored `/memory on|off` choice — what persists, which `--no-memory` does not change. */
+  private memoryPreference: 'on' | 'off' = 'on'
   /** The token esc dismissed, so typing more reopens the menu but esc stays. */
   private atDismissed: string | undefined
   /** Images staged for the next send, numbered as they were picked. */
@@ -930,6 +939,9 @@ class TuiApp {
     // A launch flag (or MOQI_ISOLATION) outranks the stored choice for this run.
     const isolation = this.config.isolation ?? this.persisted.isolation
     if (isolation !== undefined && isIsolation(isolation)) this.isolation = isolation
+    // --no-memory is for this run only; the stored /memory choice is left as it was.
+    this.memoryOn = this.config.memory === false ? false : this.persisted.memory !== 'off'
+    this.memoryPreference = this.persisted.memory === 'off' ? 'off' : 'on'
     // Flags and remembered devices are one list from here on; a duplicate
     // between them should not make a peer appear twice in the overview.
     this.peers.replaceAll([...new Set([...(this.config.peers ?? []), ...this.persisted.peers])])
@@ -1653,12 +1665,21 @@ class TuiApp {
       // cached history — so a memory saved in any session (or edited by hand)
       // reaches every open session at its next request, an unchanged index
       // costs nothing, and the system prompt and its cache are never touched.
+      // `/memory off` hides both: the tools are unregistered (a tool mask
+      // would not reach these agent-scoped registrations) and the list reads
+      // empty, which the next context snapshot reflects.
       const tools = agentCtx.get('tools')
-      for (const tool of memoryTools(() => tab.memory)) tools?.register(tool)
+      let registered: (() => void)[] = []
+      tab.setMemoryTools = (on) => {
+        for (const dispose of registered) dispose()
+        registered = []
+        if (on && tools !== undefined) registered = memoryTools(() => tab.memory).map((tool) => tools.register(tool))
+      }
+      tab.setMemoryTools(this.memoryOn)
       agentCtx.get('systemPrompt')?.context({
         name: 'moqi:memory',
         order: MEMORY_CONTEXT_ORDER,
-        text: () => tab.memory.promptIndex(),
+        text: () => (this.memoryOn ? tab.memory.promptIndex() : ''),
       })
     }
   }
@@ -2186,6 +2207,7 @@ class TuiApp {
       modelName: tab.modelName,
       branch: tab.workspace.branch,
       modeBadge: modeBadge(tab.mode),
+      memoryOff: !this.memoryOn,
       messages: tab.messages,
       streamingSegments: tab.streamingSegments,
       streamingReasoning: tab.streamingReasoning,
@@ -3320,9 +3342,14 @@ class TuiApp {
     this.persistSoon()
     this.pendingNote = note
     const preview = note.length > 50 ? `${note.slice(0, 50)}…` : note
+    const memoryRows: PickerItem[] = this.memoryOn
+      ? [
+          { id: 'memory:project', title: 'Remember for this project', subtitle: 'Memory — the agent’s notebook' },
+          { id: 'memory:global', title: 'Remember everywhere', subtitle: 'Memory — the agent’s notebook' },
+        ]
+      : []
     this.picker.show('quickadd', `Keep “${preview}”`, [
-      { id: 'memory:project', title: 'Remember for this project', subtitle: 'Memory — the agent’s notebook' },
-      { id: 'memory:global', title: 'Remember everywhere', subtitle: 'Memory — the agent’s notebook' },
+      ...memoryRows,
       { id: 'instructions:project', title: 'Add to this project’s AGENTS.md', subtitle: 'Instructions — yours, always loaded' },
       { id: 'instructions:global', title: 'Add to ~/.dsh/AGENTS.md', subtitle: 'Instructions — yours, always loaded' },
     ], { grouped: true })
@@ -3351,6 +3378,24 @@ class TuiApp {
     this.paint()
   }
 
+  /**
+   * `/memory on|off` — for every session at once, and remembered. Off hides
+   * the memory list and unregisters the memory tools in each open session
+   * from its next request; saved memories stay on disk for when it is back on.
+   */
+  private setMemory(on: boolean): void {
+    this.memoryOn = on
+    this.memoryPreference = on ? 'on' : 'off'
+    for (const tab of this.tabs) tab.setMemoryTools?.(on)
+    this.persistSoon()
+    this.setStatus(
+      on
+        ? 'memory on — every session sees its memory list and tools from its next request'
+        : 'memory off — no memory list or tools in any session; saved memories are kept · /memory on to restore',
+    )
+    this.paint()
+  }
+
   /** `/memory` opens the panel; `/memory forget <name>` forgets one memory, after asking. */
   private memoryCommand(rawInput: string): void {
     const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')
@@ -3358,8 +3403,12 @@ class TuiApp {
       this.showMemory()
       return
     }
+    if ((words[0] === 'on' || words[0] === 'off') && words.length === 1) {
+      this.setMemory(words[0] === 'on')
+      return
+    }
     if (words[0] !== 'forget' || words.length < 2) {
-      this.setStatus('usage: /memory  ·  /memory forget <name>', true)
+      this.setStatus('usage: /memory  ·  /memory on|off  ·  /memory forget <name>', true)
       this.paint()
       return
     }
@@ -3417,10 +3466,11 @@ class TuiApp {
     add(store.indexFile('global'), 'MEMORY.md — everywhere', 'Index files')
     this.memoryRows = targets
     const count = store.list('project').length + store.list('global').length
-    this.picker.show('memory', count === 0 ? 'Memory — nothing saved yet' : `Memory — ${String(count)} saved`, rows, {
+    const state = this.memoryOn ? '' : ' — OFF, the agent does not see these'
+    this.picker.show('memory', `${count === 0 ? 'Memory — nothing saved yet' : `Memory — ${String(count)} saved`}${state}`, rows, {
       grouped: true,
     })
-    this.setStatus('enter opens in $EDITOR · /memory forget <name> · type to filter · esc closes')
+    this.setStatus(`enter opens in $EDITOR · /memory forget <name> · /memory ${this.memoryOn ? 'off' : 'on'} · esc closes`)
     this.paint()
   }
 
@@ -4231,6 +4281,7 @@ class TuiApp {
       expandTools: this.expandTools,
       stackView: this.stackMode,
       isolation: this.isolation,
+      memory: this.memoryPreference === 'off' ? 'off' : undefined,
       peers: this.peers.all(),
       sessions: this.openSessions(),
       activeSession: this.activeSessionIndex(),

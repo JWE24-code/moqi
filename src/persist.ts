@@ -63,6 +63,8 @@ export interface PersistedState {
    * the default.
    */
   isolation?: string
+  /** `off` when agent memory was switched off with `/memory off`; absent means on. */
+  memory?: string
   /** Devices to include in the fleet overview, as `ssh` destinations. */
   peers: string[]
   /** Sessions that were open at the last exit, in tab order. */
@@ -249,6 +251,7 @@ function adoptState(parsed: OnDisk): PersistedState {
     expandTools: typeof parsed.expandTools === 'boolean' ? parsed.expandTools : undefined,
     stackView: parsed.stackView === true ? true : undefined,
     isolation: typeof parsed.isolation === 'string' ? parsed.isolation : undefined,
+    memory: parsed.memory === 'off' ? 'off' : undefined,
     sessions,
     activeSession,
     usage: readUsage(parsed.usage),
@@ -292,6 +295,7 @@ export function assembleState(input: {
   expandTools: boolean | undefined
   stackView: boolean | undefined
   isolation: string | undefined
+  memory: string | undefined
   peers: string[]
   sessions: PersistedSession[]
   activeSession: number
@@ -307,6 +311,7 @@ export function assembleState(input: {
     expandTools: input.expandTools,
     stackView: input.stackView,
     isolation: input.isolation,
+    memory: input.memory,
     peers: input.peers,
     sessions: input.sessions,
     activeSession: input.activeSession,
