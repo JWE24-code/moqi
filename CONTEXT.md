@@ -45,3 +45,31 @@ _Avoid_: fleet
 The layout that tiles every open session on screen at once, toggled with
 `ctrl+t` (or `/tiled`).
 _Avoid_: stack, stacked view
+
+**Permission rule**:
+An allow rule — a tool, optionally a command pattern and the widest sandbox
+mode it may grant — that answers a matching approval without the panel. Kept
+for this session, this project, or everywhere.
+_Avoid_: grant, whitelist, permission (alone: that is the Harness preset)
+
+**Session mode**:
+What the agent may do in a session, as `shift+tab` cycles it: read-only,
+workspace-write, or plan. Built from the Harness's permission preset and plan
+mode.
+_Avoid_: permission mode, sandbox (alone)
+
+**Memory**:
+A fact the agent keeps across sessions, one file each, listed in a `MEMORY.md`
+index — for this project or everywhere. The agent's notebook, as opposed to
+the instruction files, which are the user's.
+_Avoid_: notes, knowledge base, AGENTS.md
+
+**Quick note**:
+A one-line `# ` composer entry that is kept — as a memory or an instruction
+line — instead of being sent.
+_Avoid_: comment, heading
+
+**Workspace**:
+Where one session works — the launch directory, a `moqi/` branch there, or a
+worktree — together with the rules for closing it.
+_Avoid_: checkout (for the whole idea), sandbox

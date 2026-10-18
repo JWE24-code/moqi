@@ -45,6 +45,21 @@ with the bundle order the profile composes:
 
 Pass a name to install under a different profile: `npm run install-profile -- chat`.
 
+**A global install shadows the checkout's bundle patch.** dsh resolves a
+profile's bundles from its own installation first, so with `moqi-tui` also
+installed globally (`npm install -g moqi-tui`), a checkout profile runs the
+checkout's code but the *global* package's `cordis.patch.yml`. A config key
+added in the checkout then never arrives. Either remove the global install
+while developing, or copy the checkout's complete `tui-app` entry into the
+profile's own `$DSH_HOME/profiles/<name>/cordis.patch.yml` — complete, because
+a patch replaces an entry's whole `config`, and a partial block silently drops
+every other key. `dsh --profile <name> --dump-config` shows what composed.
+
+**Profiles share one state file.** Open sessions and preferences live in
+`$DSH_HOME/tui-state.json` for every profile, and quitting writes it. An older
+moqi rewrites it without the fields it does not know, so running an old and a
+new build side by side loses the newer one's preferences.
+
 ### Typechecking against your installed Harness
 
 The `@deepseek-ai/*` imports are optional peers: the Harness resolves them from

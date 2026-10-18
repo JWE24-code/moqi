@@ -34,6 +34,20 @@ puts each tool call where it was made, and gets out of the way.
   prose on either side of it, collapsed to one row with its own spinner and
   status; `ctrl+o` opens the outcome underneath
   ([docs/using-moqi.md](docs/using-moqi.md#tool-calls-where-they-happened)).
+- **Approvals that remember** — allow a command once, for this session, or
+  always (per project or everywhere); a rule like `bash(git log *)` then
+  answers matching calls without asking, and `/permissions` reviews them
+  ([docs/using-moqi.md](docs/using-moqi.md#approvals-and-permission-rules)).
+- **Memory across sessions** — the agent saves facts with `memory_save`, every
+  session sees the list, `/memory` opens it in `$EDITOR`, `# note` keeps a
+  line without sending it, and `/memory off` switches it all off
+  ([docs/using-moqi.md](docs/using-moqi.md#memory)).
+- **A branch of its own** — a new session in a git repo works on a `moqi/`
+  branch in place, or in a worktree with `/worktree`; untouched ones are
+  tidied up, and the agent is told the rules
+  ([docs/using-moqi.md](docs/using-moqi.md#branches-and-worktrees)).
+- **`shift+tab` modes** — read-only, workspace-write, or plan, on the
+  Harness's own sandbox ([docs/using-moqi.md](docs/using-moqi.md#session-modes)).
 - **Steer, queue, or interrupt** a running reply — three destinations, one per
   key ([docs/using-moqi.md](docs/using-moqi.md#steering-queueing-and-interrupting-a-running-reply)).
 - **Several sessions at once** — tabs with live status, a bell when a

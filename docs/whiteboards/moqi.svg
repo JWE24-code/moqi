@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="3054" height="2808" viewBox="-48 -256 3054 2808">
-<title>/home/joeri/Projects/moqi/src</title>
+<title>src</title>
 <rect x="-48" y="-256" width="3054" height="2808" fill="#ffffff"/>
 <rect x="0" y="0" width="1456" height="2504" rx="18" fill="#f8f9fa" stroke="#e67700" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
 <text font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16" fill="#7a3d00" text-anchor="start"><tspan x="20" y="25.12">root</tspan></text>
