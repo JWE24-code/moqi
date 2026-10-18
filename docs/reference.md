@@ -16,9 +16,11 @@ Flags, keys, commands, palettes, vim mode, interface language, and MCP.
 | `--vim` | Modal vim editing in the composer: `esc` for normal mode, `i` to insert |
 | `--peer <host>` | Device to include in the Sessions list; repeatable |
 | `--no-restore` | Start with one empty session instead of reopening the last ones |
+| `--isolation <mode>` | Where a new session in a git repo works: `branch` (the default: its own `moqi/` branch, in place), `worktree`, or `off` |
+| `--no-memory` | Run without agent memory — no memory list, no memory tools — for this run only; `/memory on\|off` is the lasting switch |
 | `--version` | Print the app version |
 
-`MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
+`MOQI_ISOLATION` sets the same choice; `MOQI_MEMORY=off` is `--no-memory`; `MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
 overrides background detection; `NO_COLOR` disables styling.
 
 ## Keys
@@ -26,6 +28,8 @@ overrides background detection; `NO_COLOR` disables styling.
 | Key | Action |
 |---|---|
 | `enter` | Send · steers into a running reply · a menu on top chooses with `enter` too |
+| `shift+tab` | Next session mode: read-only → workspace-write → plan → read-only; the footer badges anything but workspace-write ([details](using-moqi.md#session-modes)) |
+| `1`–`4` (approval panel) | Allow once · allow for this session · always allow · deny — `tab` flips "always" between this project and everywhere, `esc` denies ([details](using-moqi.md#approvals-and-permission-rules)) |
 | `shift+enter` | Insert a newline · `ctrl+j` does the same · multi-line pastes land whole |
 | `↑` / `↓` | On the first / last composer row, recall earlier prompts |
 | `/` | Command palette, 3 rows at a time and scrolling past that · `tab` accepts · `esc` dismisses |
@@ -188,7 +192,7 @@ alongside the app's own:
 | Command | Owner |
 |---|---|
 | `/compact`, and any other plugin command | `ctx.commands` (the Harness registry) |
-| `/new`, `/sessions`, `/tiled`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
+| `/new`, `/sessions`, `/tiled`, `/close`, `/branch`, `/worktree`, `/isolation`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/permissions`, `/memory`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
 
 Unknown commands are dispatched to `ctx.commands.execute()` and only reported
 as unknown if the registry also rejects them.

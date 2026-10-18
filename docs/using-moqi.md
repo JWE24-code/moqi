@@ -42,6 +42,127 @@ the token leaves the text and the image goes along as a content block, with a
 `🖼 name WxH` line in the transcript. Without the attachment service the path
 is inserted as plain text instead.
 
+## Approvals and permission rules
+
+When the agent needs your say-so — most often a command the sandbox refused,
+retried with an escalation — the approval panel shows the exact command (read
+from the session log, newlines and all) and the reason, with up to four rows:
+
+```
+ Allow bash?
+ escalate sandbox to danger-full-access: the path lies outside the workspace…
+   │ touch /tmp/outside/one.txt
+ ❯ Allow once
+   Allow for this session  bash(touch *) @ danger-full-access
+   Always allow            bash(touch *) @ danger-full-access · this project (tab: everywhere)
+   Deny
+```
+
+`1`–`4` pick a row, `tab` flips "always" between this project and everywhere,
+`esc` denies. "This session" lasts as long as the session (a fork keeps it);
+"always" is written to `$DSH_HOME/moqi/permissions/` — per project, keyed like
+the session store, or `global.yaml` — never into the repository, so a cloned
+repo can't ship its own grants.
+
+The next call a rule covers is answered without a panel, and the status line
+names the rule: `allowed by rule bash(touch *) @ danger-full-access · session`.
+The Harness still audits every decision. A rule only answers an escalation to
+the mode it names or a narrower one, and a compound command is covered only if
+every part is — anything with a substitution, a redirect other than
+`/dev/null`, or input redirection always asks. When no exact rule can be
+stated (a chained command, say), the panel offers once or deny only. A spoken
+answer only ever allows once.
+
+**`/permissions`** lists every rule in force for the session you're in,
+grouped under *This session*, *This project*, and *Everywhere*. `enter` on a
+rule asks before revoking it; the two rows at the end open the project or
+everywhere rules file in `$VISUAL`/`$EDITOR`. Rules are read fresh at every
+approval, so an edit is live the moment you save. A file that no longer reads
+as rules is reported, and its rules are off until it is fixed — never guessed
+at.
+
+## Session modes
+
+`shift+tab` steps the session through three modes, each built from the
+Harness's own permission presets and plan mode:
+
+| Mode | The agent… | Footer |
+|---|---|---|
+| `read-only` | reads, but cannot change files | `read-only` |
+| `workspace-write` | changes files in its workspace — the everyday default | (nothing) |
+| `plan` | explores and proposes a plan you approve before it acts | `plan` |
+
+Plan mode keeps the workspace-write sandbox, so a plan you approve can be
+carried out straight away. Full access is never a `shift+tab` step: it takes
+`/permission danger-full-access`, the footer then shows `⚠ full access`, and
+the next `shift+tab` goes back to read-only. A switch made mid-reply takes
+effect from the agent's next step. The mode belongs to the session: other
+tabs keep theirs.
+
+## Memory
+
+The agent can keep facts across sessions with three tools: `memory_save`,
+`memory_read`, and `memory_forget`. A memory is one fact — who you are and how
+you like to work, a correction (with why), a project decision not in the code,
+a pointer to an outside resource — saved as a small markdown file with an
+index line in `MEMORY.md`:
+
+```
+$DSH_HOME/memory/                         everywhere
+$DSH_HOME/memory/projects/<project>/      this project only
+```
+
+Every session carries the index of both, so the agent knows what it knows
+without reading anything, and opens a memory with `memory_read` when it is
+relevant. The index is runtime context, read fresh for every request: a memory
+saved in any session — or added with `# `, or edited in `$EDITOR` — reaches
+every open session at its next request. The Harness appends a new copy to the
+conversation only when the list actually changed, after the cached history, so
+an unchanged list costs nothing and the system prompt and its cache are never
+rewritten.
+
+Memory is separate from the instruction files the Harness already loads
+(`$DSH_HOME/AGENTS.md`, the project's `AGENTS.md`/`CLAUDE.md`): those are
+yours to write; memory is the agent's notebook. Both are plain files you can
+edit or delete.
+
+**Switching memory off.** `/memory off` turns memory off for every session at
+once and is remembered across restarts; `/memory on` brings it back. While
+off, no session gets the memory list or the memory tools (from each one's next
+request), a `# ` note offers only the `AGENTS.md` rows, and the footer says
+`memory off`. Nothing is deleted — saved memories wait on disk, and `/memory`
+still opens them. `--no-memory` (or `MOQI_MEMORY=off`) does the same for one
+run without changing the stored choice.
+
+**`/memory`** shows both side by side for the session you're in: the
+instruction files the Harness actually loads here (with a `+ create` row for
+a missing global or project-root `AGENTS.md`), the memories for this project
+and for everywhere, and the two `MEMORY.md` index files. `enter` opens the
+file in `$VISUAL`/`$EDITOR`; type to filter. `/memory forget <name>` removes
+a memory after asking. An edited memory reaches every new session; an edited
+instruction file is picked up by the Harness after the agent's next file
+action, or on resume.
+
+**`# ` quick-add.** A one-line entry that starts with `# ` is a note to keep,
+not a prompt — it never reaches the model, whether you press `enter`, `tab`,
+or `ctrl+enter`. A small picker asks where it goes:
+
+```
+ Keep “tests run with make check”
+ Memory — the agent’s notebook
+    Remember for this project
+    Remember everywhere
+ Instructions — yours, always loaded
+    Add to this project’s AGENTS.md
+    Add to ~/.dsh/AGENTS.md
+```
+
+Memory saves it as its own memory (a note whose title matches an existing
+one gets a numbered name, never replacing it); instructions append it as a
+`- ` bullet to the project root's `AGENTS.md` or the global one, creating the
+file if needed. `esc` keeps nothing — `↑` brings the line back. A bare `#`,
+`#tag`, or a multi-line paste that opens with a heading is sent as usual.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something
@@ -335,6 +456,58 @@ rather than nagged about. A background job that finishes rings the same bell
 with a status line naming it, and so does a dispatch returning from a
 peer — anything the user has stopped waiting for gets announced, never just
 the turns. `--no-bell` turns the sound off.
+
+## Branches and worktrees
+
+A session's working directory is fixed when it opens, so moqi decides *where*
+its changes land at that moment.
+
+**Branch, the default.** A new session in a git repository starts on a branch
+of its own — `moqi/2026-10-18-f354` — created in place from whatever branch
+you were on. Nothing is copied: the same files, the same `node_modules`, which
+is what you want for a one-file fix. Uncommitted changes travel with the
+switch. The footer shows the branch (`⎇ moqi/…`) and follows it when the model
+switches branches itself. A checkout has one HEAD, so a second session opened
+in the same checkout **shares** that branch rather than switching it under the
+first. `/branch <name>` creates or switches to `moqi/<name>` for the current
+session; it is refused while another session in the same checkout is
+replying. No branch is started on a detached HEAD or mid-rebase, merge,
+cherry-pick, revert, or bisect — the status line says why.
+
+**Worktree, for real isolation.** `/worktree <name> [--base <ref>]` opens a new
+session in a separate checkout on `moqi/<name>`, under
+`$DSH_HOME/worktrees/<project>/<name>` — outside the repository, so Node never
+walks up into the main checkout's `node_modules`. The base is your current
+HEAD, unpushed commits included, unless `--base` names another ref. A worktree
+is a full checkout: install dependencies there if the task needs them.
+
+**Closing cleans up only what changed nothing.** `/close` on a session whose
+branch has no commits of its own switches back to the branch it came from
+(recorded in the repo's config, so this survives a restart) and deletes it; a
+worktree goes when it is also clean. Anything with commits or uncommitted work
+is kept and the status line says where. Quitting never cleans up — open
+sessions come back on the next launch, on the branch or worktree they had.
+
+**The model is told, so you don't have to.** Every isolated session carries
+its own workspace rules in the system prompt — an AGENTS.md block moqi writes
+from the session's real state: the branch to commit to, the base not to touch,
+and either "this checkout is shared: never switch branches, stash, reset, or
+rebase" or "this is a fresh worktree: install dependencies before building".
+It is scoped to that one session and stays byte-identical for the life of the
+branch, so it costs no prompt-cache misses. Sessions that are not isolated get
+nothing.
+
+**Leftovers tidy themselves.** On launch moqi removes its own branches and
+worktrees that hold no work and that no open session uses — sessions that
+were quit and never resumed. The rule is the same as `/close`: no commit of
+its own, and for a worktree nothing uncommitted. Worktrees are locked with
+the owning process's pid, so a second moqi running elsewhere never has a live
+worktree pruned from under it.
+
+`/isolation off|branch|worktree` changes what new sessions do and remembers it;
+`--isolation` (or `MOQI_ISOLATION`) overrides it for one run. The Harness
+sandbox still confines writes to the session's directory, so a worktree
+session cannot write into the main checkout.
 
 ## Background agents
 

@@ -87,6 +87,12 @@ export interface Snapshot {
   title: string
   host: string
   modelName: string
+  /** The branch the session's directory has checked out; absent outside a repo. */
+  branch?: string
+  /** The session mode when it differs from the everyday default: `read-only`, `plan`, `⚠ full access`. */
+  modeBadge?: string
+  /** Agent memory is switched off (`/memory off`, `--no-memory`). */
+  memoryOff?: boolean
   messages: readonly Message[]
   /** The turn streaming in, prose and calls in arrival order. */
   streamingSegments: readonly Segment[]
@@ -1213,6 +1219,13 @@ function footerLeft(snapshot: Snapshot): string {
 
   const separator = muted('  ·  ')
   const segments: string[] = [muted(snapshot.modelName)]
+  if (snapshot.modeBadge !== undefined) {
+    // Wider than usual is a warning; narrower (read-only, plan) is just worth seeing.
+    segments.unshift(snapshot.modeBadge.startsWith('⚠') ? warn(snapshot.modeBadge) : accent(snapshot.modeBadge))
+  }
+  if (snapshot.branch !== undefined) segments.push(muted(`⎇ ${snapshot.branch}`))
+  // Off is never silent: a session that cannot remember should say so.
+  if (snapshot.memoryOff === true) segments.push(accent('memory off'))
   segments.push(percent >= 80 ? warn(context) : muted(context))
   if (snapshot.haveUsage) {
     segments.push(

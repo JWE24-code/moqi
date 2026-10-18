@@ -206,6 +206,9 @@ export type PickerKind =
   | 'login'
   | 'login-method'
   | 'setup'
+  | 'permissions'
+  | 'memory'
+  | 'quickadd'
   | 'none'
 
 /** One row in the picker. */

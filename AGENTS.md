@@ -1,5 +1,13 @@
 # AGENTS.md — moqi (moqi-tui)
 
+`CLAUDE.md` is a symlink to this file: edit here, and every agent (Claude Code,
+dsh, Codex, OpenCode) reads the same instructions.
+
+This file is public and project-only. Anything about one person's machine,
+tools, or infrastructure goes in `AGENTS.local.md` (with `CLAUDE.local.md`
+symlinked to it), which is gitignored and loaded alongside this file by dsh
+and Claude Code.
+
 ## What this is
 
 A terminal app for DeepSeek Harness: bordered composer, live token counter,
@@ -38,7 +46,10 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   reads stored sessions lives in `src/session-list.ts`, desktop bridges in
   `src/local-platform.ts`, harness→surface adapters in `src/tui-adapt.ts`,
   cross-session search in `src/cross-find.ts`, the session store layout in
-  `src/sessions-store.ts`. Sonar issues are mirrored into GitHub issues by
+  `src/sessions-store.ts`, session branches/worktrees in
+  `src/git-workspace.ts`, permission rules in `src/permissions.ts`, and agent
+  memory in `src/memory.ts` (all three Harness-free and tested offline).
+  Sonar issues are mirrored into GitHub issues by
   `scripts/sync-sonar-issues.ts`; de-duplication is the `<!-- sonar-key:… -->`
   marker each synced issue body carries.
 
@@ -46,12 +57,9 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
 
 - Follow the repo's existing choices; do not switch package manager, branch
   model, or test runner without asking.
-- Design each module before writing it (`codebase-design`); write to the bar
-  (`programming-principles`).
-- Read a dependency's real source (`opensrc-source-access`) before adding or
-  trusting one.
-- Verify generated or untrusted code in `agent-sandbox` (`c-sandbox-1`), not on
-  the laptop.
+- Design each module before writing it: a small interface in front of a deep
+  implementation, tested through that interface.
+- Read a dependency's real source before adding or trusting one.
 - `CONTEXT.md` is a glossary of resolved domain terms only; ADRs in `docs/adr/`
   only for hard-to-reverse, surprising decisions.
-- Map code shape with exdraw into `docs/whiteboards/` after meaningful changes.
+- Code maps that are worth keeping live in `docs/whiteboards/`.

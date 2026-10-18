@@ -43,22 +43,46 @@ export interface PanelView {
  * the panel waiting. Both shipped interface languages are accepted.
  */
 export declare function interpretApproval(text: string): ApprovalDecision | undefined;
-/** What the user decided about one approval request. */
+/** What the Harness is told about one approval request. */
 export type ApprovalDecision = 'allowed-once' | 'rejected';
+/** Where a granted rule is kept: this session only, this project, or everywhere. */
+export type GrantScope = 'session' | 'project' | 'global';
+/**
+ * What the user chose: the Harness outcome, plus — for "this session" and
+ * "always" — the scope the app should keep the offered rule in. The Harness
+ * protocol itself has no lasting grant; the app's rules answer later asks.
+ */
+export interface ApprovalChoice {
+    decision: ApprovalDecision;
+    grant?: GrantScope;
+}
 /**
  * One pending tool approval.
  *
- * There is no persistent grant in the protocol — "allow once" or deny — so the
- * panel offers exactly those two rows and no "always" temptation.
+ * With a rule to offer (`always` is its label, e.g. `bash(git log *)`) the
+ * panel has four rows — once, this session, always, deny — and `tab` flips
+ * "always" between this project and everywhere. Without one (a compound
+ * command, an unreadable call) only once and deny: the app never offers a
+ * grant it cannot state exactly.
  */
 export declare class ApprovalPanel {
     selected: number;
+    /** Where "always" keeps the rule; `tab` toggles it. */
+    alwaysScope: 'project' | 'global';
     readonly toolName: string;
     readonly reason: string | undefined;
     private readonly command;
-    constructor(toolName: string, reason: string | undefined, command: string | undefined);
+    private readonly always;
+    constructor(toolName: string, reason: string | undefined, command: string | undefined, always?: string);
+    /** The rows in order; the grant rows only exist when there is a rule to offer. */
+    private choices;
     move(delta: number): void;
-    decision(): ApprovalDecision;
+    /** Flip where "always" keeps the rule. */
+    toggleScope(): void;
+    /** The choice under the cursor. */
+    choice(): ApprovalChoice;
+    /** The choice a number key picks (1-based), or undefined past the last row. */
+    choiceAt(number: number): ApprovalChoice | undefined;
     view(): PanelView;
 }
 /** One question as the answerer receives it. */

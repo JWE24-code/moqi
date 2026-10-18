@@ -19,3 +19,12 @@ export declare function timestampForFile(date?: Date): string;
 export declare function mediaTypeOf(path: string): 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | undefined;
 /** A one-line, human-readable form of anything thrown. */
 export declare function describeError(error: unknown): string;
+/**
+ * How to run `$VISUAL`/`$EDITOR` on a file: through `sh -c`, the way git and
+ * most tools do, because the variable is a command line, not a program name —
+ * `code --wait`, `omarchy-launch-editor --inline`, `emacsclient -t` all carry
+ * arguments. The file goes in as `$1`, never spliced into the command text,
+ * so a path with spaces or quotes reaches the editor as one argument.
+ * @returns the program and its arguments, for `spawn`.
+ */
+export declare function editorInvocation(editor: string, file: string): [string, string[]];

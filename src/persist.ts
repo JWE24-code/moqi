@@ -12,7 +12,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { homedir } from 'node:os'
+import { dshHome } from './sessions-store.ts'
 import type { ProviderUsage, TokenBuckets, UsageEntry, UsageLedger } from './usage.ts'
 
 /**
@@ -57,6 +57,14 @@ export interface PersistedState {
    * view you switched to wins.
    */
   stackView?: boolean
+  /**
+   * How a new session in a git repository isolates its changes — `off`,
+   * `branch`, or `worktree` — as last chosen with `/isolation`; absent means
+   * the default.
+   */
+  isolation?: string
+  /** `off` when agent memory was switched off with `/memory off`; absent means on. */
+  memory?: string
   /** Devices to include in the fleet overview, as `ssh` destinations. */
   peers: string[]
   /** Sessions that were open at the last exit, in tab order. */
@@ -177,10 +185,7 @@ function readUsageEntries(value: unknown): UsageEntry[] {
 
 /** Where the state file lives: `$DSH_HOME/tui-state.json`, default `~/.dsh`. */
 export function statePath(env: NodeJS.ProcessEnv = process.env): string {
-  const home = env['DSH_HOME'] !== undefined && env['DSH_HOME'] !== ''
-    ? env['DSH_HOME']
-    : join(homedir(), '.dsh')
-  return join(home, 'tui-state.json')
+  return join(dshHome(env), 'tui-state.json')
 }
 
 /** Coerce one on-disk session entry, or reject it outright. */
@@ -245,6 +250,8 @@ function adoptState(parsed: OnDisk): PersistedState {
     // flipping the default would have silently dropped a chosen expansion.
     expandTools: typeof parsed.expandTools === 'boolean' ? parsed.expandTools : undefined,
     stackView: parsed.stackView === true ? true : undefined,
+    isolation: typeof parsed.isolation === 'string' ? parsed.isolation : undefined,
+    memory: parsed.memory === 'off' ? 'off' : undefined,
     sessions,
     activeSession,
     usage: readUsage(parsed.usage),
@@ -287,6 +294,8 @@ export function assembleState(input: {
   setupDone: boolean | undefined
   expandTools: boolean | undefined
   stackView: boolean | undefined
+  isolation: string | undefined
+  memory: string | undefined
   peers: string[]
   sessions: PersistedSession[]
   activeSession: number
@@ -301,6 +310,8 @@ export function assembleState(input: {
     setupDone: input.setupDone,
     expandTools: input.expandTools,
     stackView: input.stackView,
+    isolation: input.isolation,
+    memory: input.memory,
     peers: input.peers,
     sessions: input.sessions,
     activeSession: input.activeSession,
