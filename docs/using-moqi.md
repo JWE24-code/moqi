@@ -81,6 +81,31 @@ approval, so an edit is live the moment you save. A file that no longer reads
 as rules is reported, and its rules are off until it is fixed — never guessed
 at.
 
+## Memory
+
+The agent can keep facts across sessions with three tools: `memory_save`,
+`memory_read`, and `memory_forget`. A memory is one fact — who you are and how
+you like to work, a correction (with why), a project decision not in the code,
+a pointer to an outside resource — saved as a small markdown file with an
+index line in `MEMORY.md`:
+
+```
+$DSH_HOME/memory/                         everywhere
+$DSH_HOME/memory/projects/<project>/      this project only
+```
+
+Every session starts with the index of both in its prompt, so the agent knows
+what it knows without reading anything, and opens a memory with `memory_read`
+when it is relevant. The index is taken when a session first asks the model
+anything and then held still: something saved mid-session is confirmed by the
+tool, and every *new* session sees it. That keeps the prompt identical from
+request to request, so the provider's prompt cache keeps hitting.
+
+Memory is separate from the instruction files the Harness already loads
+(`$DSH_HOME/AGENTS.md`, the project's `AGENTS.md`/`CLAUDE.md`): those are
+yours to write; memory is the agent's notebook. Both are plain files you can
+edit or delete.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something

@@ -137,6 +137,8 @@ import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey
 import { planRename, snapshotTitle } from './rename.ts'
 import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
 import { callArguments, describeRule, PermissionRules, type Ask, type Rule, type ScopedRule } from './permissions.ts'
+import { MemoryStore } from './memory.ts'
+import { memoryTools } from './memory-tools.ts'
 import {
   activeProfileName,
   forgetPlugin,
@@ -271,6 +273,9 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
  * persona suffix at 10200.
  */
 const WORKSPACE_SECTION_ORDER = 10150
+
+/** The memory index sits just before the workspace rules. */
+const MEMORY_SECTION_ORDER = 10100
 
 /** Context budget assumed when the provider publishes no capacity. */
 const DEFAULT_CONTEXT_LIMIT = 65536
@@ -500,6 +505,8 @@ interface SessionTab {
    * with `workspace` (see `setWorkspace`); a fork shares its parent's.
    */
   permissions: PermissionRules
+  /** This session's memory: the project scope of its directory, plus global. */
+  memory: MemoryStore
 }
 
 /** Create an empty session record. */
@@ -534,13 +541,15 @@ function newTab(id: string): SessionTab {
     background: new Map(),
     workspace: Workspace.unplaced(process.cwd()),
     permissions: new PermissionRules(process.cwd()),
+    memory: new MemoryStore(process.cwd()),
   }
 }
 
-/** Give a session its workspace, and the permission rules for that directory. */
+/** Give a session its workspace, and the permission rules and memory for that directory. */
 function setWorkspace(tab: SessionTab, workspace: Workspace): void {
   tab.workspace = workspace
   tab.permissions = new PermissionRules(workspace.cwd)
+  tab.memory = new MemoryStore(workspace.cwd)
 }
 
 
@@ -1614,6 +1623,19 @@ class TuiApp {
         // Read at assembly time: a resumed session's workspace is adopted
         // after its agent was set up.
         text: () => tab.workspace.guidance(),
+      })
+      // Memory: the save/read/forget tools, reading the tab's store at call
+      // time, and the index of what is saved. The index is captured on the
+      // session's first request and then frozen, so a save mid-session never
+      // rewrites the prompt (the tool result reports it instead) and the
+      // prompt cache keeps hitting. A new session sees everything saved.
+      const tools = agentCtx.get('tools')
+      for (const tool of memoryTools(() => tab.memory)) tools?.register(tool)
+      let index: string | undefined
+      agentCtx.get('systemPrompt')?.section({
+        name: 'moqi:memory',
+        order: MEMORY_SECTION_ORDER,
+        text: () => (index ??= tab.memory.promptIndex()),
       })
     }
   }
@@ -4902,6 +4924,7 @@ class TuiApp {
     // …and with its "this session" grants: a fork continues the same work.
     tab.workspace = this.tab.workspace
     tab.permissions = this.tab.permissions
+    tab.memory = this.tab.memory
     if (carried !== undefined) {
       tab.selection.current = carried
       tab.modelName = String(carried.model)
