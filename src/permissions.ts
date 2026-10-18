@@ -16,6 +16,11 @@
  * control characters, unbalanced quotes — makes the whole command unmatched,
  * so the panel opens as it always did.
  *
+ * Callers use {@link PermissionRules} (at the end of this file): raw call
+ * arguments in, a decision out. The functions before it are its
+ * implementation, exported so this module's own tests can reach the lexer,
+ * file format, and store directly.
+ *
  * Node builtins only: the offline test suites load this module, so it must
  * never reach the Harness.
  * @module moqi-tui/permissions
@@ -682,5 +687,101 @@ async function writeRules(path: string, rules: readonly Rule[]): Promise<void> {
   } catch (error) {
     await rm(scratch, { force: true })
     throw error
+  }
+}
+
+// --------------------------------------------------------- PermissionRules
+
+/**
+ * One approval request, as the approval listener has it: the tool, the call's
+ * raw arguments (the `tool/call` event's JSON string, or already parsed), and
+ * the asker's reason. Never a display summary — see {@link matches}.
+ */
+export interface Ask {
+  toolName: string
+  args?: unknown
+  reason?: string
+}
+
+/**
+ * The shell command a call runs, read from its arguments. Shell tools take
+ * it as `command` (`dsh-tool-bash`, `dsh-tool-pwsh`). Anything unreadable is
+ * `undefined`, which never matches a shell rule.
+ */
+function commandOf(ask: Ask): string | undefined {
+  if (!isShellTool(ask.toolName)) return undefined
+  let args = ask.args
+  if (typeof args === 'string') {
+    try {
+      args = JSON.parse(args) as unknown
+    } catch {
+      return undefined
+    }
+  }
+  if (typeof args !== 'object' || args === null) return undefined
+  const command = (args as Record<string, unknown>)['command']
+  return typeof command === 'string' ? command : undefined
+}
+
+/**
+ * The permission rules one session answers approvals with. This is the
+ * interface callers use; the functions above are its implementation.
+ *
+ * It holds the session's own rules in memory and reads the project and global
+ * files on every question — they are tiny, approvals are already async, and
+ * it means a rule granted in another tab or edited by hand applies at once,
+ * with no cache to go stale. A malformed file contributes nothing (fail
+ * closed) and is reported by {@link list}.
+ */
+export class PermissionRules {
+  /** The directory the session works in; picks the project rules file. */
+  readonly cwd: string
+  private sessionRules: Rule[] = []
+
+  constructor(cwd: string) {
+    this.cwd = cwd
+  }
+
+  /** The rule that allows this call without asking, or undefined to ask. */
+  async decide(ask: Ask): Promise<ScopedRule | undefined> {
+    const { rules } = await loadAllRules(this.cwd, this.sessionRules)
+    const escalation = parseEscalation(ask.reason)
+    if (escalation?.mode === 'unknown') return undefined
+    return matches(rules, ask.toolName, commandOf(ask), escalation)
+  }
+
+  /** The "always allow" rule the panel should offer for this call, or undefined to offer none. */
+  suggest(ask: Ask): Rule | undefined {
+    return suggestPattern(ask.toolName, commandOf(ask), ask.reason)
+  }
+
+  /**
+   * Allow a rule in a scope, normalized. `session` lasts as long as this
+   * object; the others are written to their file.
+   * @returns false when an equal rule was already there.
+   * @throws when the rule is malformed, or its file is and so cannot be safely rewritten.
+   */
+  async grant(rule: Rule, scope: Scope): Promise<boolean> {
+    if (scope !== 'session') return await addRule(scope, this.cwd, rule)
+    const normalized = normalizeRule(rule)
+    if (this.sessionRules.some((r) => sameRule(r, normalized))) return false
+    this.sessionRules.push(normalized)
+    return true
+  }
+
+  /** Remove a rule from a scope. @returns false when no equal rule was there. */
+  async revoke(rule: Rule, scope: Scope): Promise<boolean> {
+    if (scope !== 'session') return await removeRule(scope, this.cwd, rule)
+    const normalized = normalizeRule(rule)
+    const kept = this.sessionRules.filter((r) => !sameRule(r, normalized))
+    if (kept.length === this.sessionRules.length) return false
+    this.sessionRules = kept
+    return true
+  }
+
+  /** Every rule in force here, scope-tagged, plus any rules file that could not be read. */
+  async list(): Promise<{ rules: ScopedRule[]; errors: string[] }> {
+    const { rules, errors } = await loadAllRules(this.cwd, this.sessionRules)
+    return { rules, errors: errors.map((error) => error.message) }
   }
 }

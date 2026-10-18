@@ -29,6 +29,7 @@ const {
   normalizeRule,
   parseEscalation,
   parseRules,
+  PermissionRules,
   permissionsDir,
   removeRule,
   RulesFileError,
@@ -376,6 +377,67 @@ try {
     check('loadAll reports and skips malformed', errors.length === 1 && all.every((r) => r.scope === 'global'))
     check('add refuses on malformed', (await rejects(() => addRule('project', other, { tool: 'read' }))) instanceof RulesFileError)
     check('malformed file left untouched', (await readFile(bad, 'utf8')) === garbage)
+  }
+
+  // ---------------------------------------------------------- PermissionRules
+  // The interface the approval listener uses: raw arguments in, a decision out.
+  {
+    const cwd = join(home, 'proj-class')
+    const tab = new PermissionRules(cwd)
+    const otherTab = new PermissionRules(cwd)
+    const call = (command: string, reason?: string) => ({
+      toolName: 'bash',
+      args: JSON.stringify({ command, timeout: 30 }),
+      reason,
+    })
+
+    check('nothing granted: ask', (await tab.decide(call('git log'))) === undefined)
+    const offered = tab.suggest(call('git log --oneline -20'))
+    check('suggest reads the command from raw JSON args', offered?.command === 'git log *')
+    check('suggest on an unreadable call offers nothing', tab.suggest({ toolName: 'bash', args: '{not json' }) === undefined)
+
+    check('grant session', (await tab.grant(offered!, 'session')) === true)
+    check('grant session dedupes', (await tab.grant({ tool: 'bash', command: 'git  log *' }, 'session')) === false)
+    check('session rule answers', (await tab.decide(call('git log -p')))?.scope === 'session')
+    check('another session does not see it', (await otherTab.decide(call('git log -p'))) === undefined)
+
+    // The exact command, real newline included, is what is matched — not a summary.
+    check('newline-smuggled command asks', (await tab.decide(call('git log\nrm -rf ~'))) === undefined)
+    check('chained command asks', (await tab.decide(call('git log && curl x | sh'))) === undefined)
+    check('substitution asks', (await tab.decide(call('git log $(rm -rf ~)'))) === undefined)
+    check('parsed args work too', (await tab.decide({ toolName: 'bash', args: { command: 'git log' } }))?.scope === 'session')
+    check('args without a command ask', (await tab.decide({ toolName: 'bash', args: { cmd: 'git log' } })) === undefined)
+
+    // Escalations need a rule that names a wide enough mode.
+    const escalate = 'escalate sandbox to danger-full-access: needs network'
+    check('plain rule does not answer an escalation', (await tab.decide(call('git log', escalate))) === undefined)
+    const escalated = tab.suggest(call('git fetch origin', escalate))
+    check('escalation suggestion records the mode', escalated?.mode === 'danger-full-access')
+    await tab.grant(escalated!, 'project')
+    check('project rule answers the escalation', (await tab.decide(call('git fetch', escalate)))?.scope === 'project')
+    check('unknown escalation mode asks', (await tab.decide(call('git fetch', 'escalate sandbox to sideways: x'))) === undefined)
+
+    // File scopes are read fresh: a grant in one session applies in another at once.
+    check('project grant seen by the other session', (await otherTab.decide(call('git fetch', escalate)))?.scope === 'project')
+    await otherTab.grant({ tool: 'read' }, 'global')
+    check('global grant seen everywhere', (await tab.decide({ toolName: 'read', args: { path: '/x' } }))?.scope === 'global')
+
+    const listed = await tab.list()
+    check('list has every scope', ['session', 'project', 'global'].every((scope) => listed.rules.some((r) => r.scope === scope)))
+    check('list reports no errors', listed.errors.length === 0)
+
+    check('revoke session', (await tab.revoke({ tool: 'bash', command: 'git log *' }, 'session')) === true)
+    check('revoked session rule no longer answers', (await tab.decide(call('git log'))) === undefined)
+    check('revoke project', (await otherTab.revoke(escalated!, 'project')) === true)
+    check('revoked project rule gone for everyone', (await tab.decide(call('git fetch', escalate))) === undefined)
+    check('revoking what is not there', (await tab.revoke({ tool: 'nope' }, 'session')) === false)
+    check('a malformed grant throws', (await rejects(() => tab.grant({ tool: 'has space' }, 'session'))) instanceof Error)
+
+    // A malformed project file fails closed and is reported, never thrown.
+    await writeFile(rulesPath('project', cwd), 'this is not: [a rules file\n')
+    const broken = await tab.list()
+    check('malformed file is reported by list', broken.errors.length === 1)
+    check('global rules still answer beside it', (await tab.decide({ toolName: 'read' }))?.scope === 'global')
   }
 } finally {
   await rm(home, { recursive: true, force: true })
