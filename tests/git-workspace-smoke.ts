@@ -152,6 +152,56 @@ try {
   assert.equal(sh(w, 'branch', '--list', 'moqi/idle'), '')
   assert.equal((await ws.finishWorktree(idle.cwd)).kind, 'none')
 
+  // ---------------------------------------------------------------- guidance
+  const inPlace = ws.workspaceGuidance({ isolation: 'branch', branch: 'moqi/x', base: 'main', cwd: '/repo' })
+  assert.match(inPlace, /on branch `moqi\/x`, which moqi created for this session from `main`/)
+  assert.match(inPlace, /Do not switch branches/)
+  assert.match(inPlace, /push `main` unless the user asks/)
+  assert.doesNotMatch(inPlace, /fresh checkout/)
+  const isolated = ws.workspaceGuidance({ isolation: 'worktree', branch: 'moqi/y', base: 'main', cwd: '/wt/y' })
+  assert.match(isolated, /dedicated git worktree at \/wt\/y/)
+  assert.match(isolated, /fresh checkout/)
+  assert.doesNotMatch(isolated, /Do not switch branches/)
+  // Not moqi's branch, or no isolation: nothing at all.
+  assert.equal(ws.workspaceGuidance({ isolation: 'branch', branch: 'main', base: undefined, cwd: '/r' }), '')
+  assert.equal(ws.workspaceGuidance({ isolation: undefined, branch: 'moqi/x', base: 'main', cwd: '/r' }), '')
+  // Unknown base still reads as a sentence, and the text is stable call to call.
+  assert.match(ws.workspaceGuidance({ isolation: 'branch', branch: 'moqi/x', base: undefined, cwd: '/r' }), /push the branch it was started from/)
+  assert.equal(inPlace, ws.workspaceGuidance({ isolation: 'branch', branch: 'moqi/x', base: 'main', cwd: '/repo' }))
+  assert.equal(await ws.recordedBase(r, 'moqi/one-file'), 'main')
+
+  // ---------------------------------------------------------------- pruning
+  const p = repo('prune')
+  sh(p, 'branch', 'moqi/empty')            // no work: pruned
+  sh(p, 'branch', 'moqi/kept-by-session')  // no work, but checked out below by a live session
+  sh(p, 'switch', '-q', '-c', 'moqi/has-work')
+  sh(p, 'commit', '-q', '--allow-empty', '-m', 'work')
+  sh(p, 'switch', '-q', 'main')
+  sh(p, 'branch', 'feature')               // not moqi's: never touched
+  const idleTree = await ws.startWorktree(p, 'idle-tree')
+  const liveTree = await ws.startWorktree(p, 'live-tree')
+  if (idleTree.kind !== 'worktree' || liveTree.kind !== 'worktree') throw new Error('expected worktrees')
+  sh(p, 'switch', '-q', 'moqi/kept-by-session')
+  const prunedNames = await ws.pruneLeftovers(p, [p, liveTree.cwd])
+  assert.deepEqual(prunedNames.sort(), ['moqi/empty', 'moqi/idle-tree'])
+  assert.ok(!existsSync(idleTree.cwd))
+  assert.ok(existsSync(liveTree.cwd), 'a worktree an open session uses is left alone')
+  const left = sh(p, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/').split('\n').sort()
+  assert.deepEqual(left, ['feature', 'main', 'moqi/has-work', 'moqi/kept-by-session', 'moqi/live-tree'])
+  assert.deepEqual(await ws.pruneLeftovers(plain, []), [], 'outside a repository there is nothing to prune')
+
+  // A worktree locked by another moqi that is still running is not ours to prune;
+  // one whose owner is gone is.
+  const elsewhere = await ws.startWorktree(p, 'elsewhere')
+  const orphan = await ws.startWorktree(p, 'orphan')
+  if (elsewhere.kind !== 'worktree' || orphan.kind !== 'worktree') throw new Error('expected worktrees')
+  sh(p, 'worktree', 'unlock', elsewhere.cwd)
+  sh(p, 'worktree', 'lock', '--reason', `moqi session pid ${String(process.ppid)}`, elsewhere.cwd)
+  sh(p, 'worktree', 'unlock', orphan.cwd)
+  sh(p, 'worktree', 'lock', '--reason', 'moqi session pid 2147483646', orphan.cwd)
+  assert.deepEqual(await ws.pruneLeftovers(p, [p, liveTree.cwd]), ['moqi/orphan'])
+  assert.ok(existsSync(elsewhere.cwd))
+
   console.log('git-workspace-smoke: ok')
 } finally {
   rmSync(home, { recursive: true, force: true })

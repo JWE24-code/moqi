@@ -367,6 +367,22 @@ worktree goes when it is also clean. Anything with commits or uncommitted work
 is kept and the status line says where. Quitting never cleans up — open
 sessions come back on the next launch, on the branch or worktree they had.
 
+**The model is told, so you don't have to.** Every isolated session carries
+its own workspace rules in the system prompt — an AGENTS.md block moqi writes
+from the session's real state: the branch to commit to, the base not to touch,
+and either "this checkout is shared: never switch branches, stash, reset, or
+rebase" or "this is a fresh worktree: install dependencies before building".
+It is scoped to that one session and stays byte-identical for the life of the
+branch, so it costs no prompt-cache misses. Sessions that are not isolated get
+nothing.
+
+**Leftovers tidy themselves.** On launch moqi removes its own branches and
+worktrees that hold no work and that no open session uses — sessions that
+were quit and never resumed. The rule is the same as `/close`: no commit of
+its own, and for a worktree nothing uncommitted. Worktrees are locked with
+the owning process's pid, so a second moqi running elsewhere never has a live
+worktree pruned from under it.
+
 `/isolation off|branch|worktree` changes what new sessions do and remembers it;
 `--isolation` (or `MOQI_ISOLATION`) overrides it for one run. The Harness
 sandbox still confines writes to the session's directory, so a worktree

@@ -115,6 +115,7 @@ import {
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
 import type {} from '@deepseek-ai/dsh-user-approval' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
+import type {} from '@deepseek-ai/dsh-system-prompt' // NOSONAR — same: types `ctx.get('systemPrompt')` with no runtime import.
 import {
   keyReference,
   hostLabel,
@@ -141,9 +142,12 @@ import {
   finishWorktree,
   isIsolation,
   isMoqiWorktree,
+  pruneLeftovers,
+  recordedBase,
   repoRoot,
   startBranch,
   startWorktree,
+  workspaceGuidance,
   type FinishResult,
   type Isolation,
   type StartResult,
@@ -275,6 +279,13 @@ export const Config: z<Config> = z.object({
 
 /** Spinner frames for the streaming indicator. */
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+/**
+ * Where the session's workspace rules sit in the system prompt: after the
+ * Harness's own guidance and instruction files, just before the deployment
+ * persona suffix at 10200.
+ */
+const WORKSPACE_SECTION_ORDER = 10150
 
 /** Context budget assumed when the provider publishes no capacity. */
 const DEFAULT_CONTEXT_LIMIT = 65536
@@ -495,6 +506,8 @@ interface SessionTab {
    * sessions are cleaned up on `/close` when they changed nothing.
    */
   isolation?: 'branch' | 'worktree'
+  /** The branch an isolated session's branch was started from, for the model's workspace rules. */
+  base?: string
 }
 
 /** Create an empty session record. */
@@ -932,6 +945,17 @@ class TuiApp {
       await this.tab.agent.whenIdle()
     }
 
+    // Leftovers from sessions that never came back: empty moqi branches and
+    // idle worktrees nothing open is using. Rule as /close: nothing with work goes.
+    void pruneLeftovers(this.cwd, this.tabs.map((tab) => tab.cwd))
+      .then((pruned) => {
+        if (pruned.length === 0) return
+        this.setStatus(`tidied ${String(pruned.length)} unused moqi branch${pruned.length === 1 ? '' : 'es'}`)
+        this.paint()
+      })
+      .catch(() => {
+        // Housekeeping only; a failure here must never disturb the session.
+      })
     this.subscribeToStream()
     this.subscribeToAgents()
     // Publishing is what makes this device visible to every other one.
@@ -1422,6 +1446,7 @@ class TuiApp {
     await this.refreshBranch(tab)
     if (isMoqiWorktree(tab.cwd)) tab.isolation = 'worktree'
     else if (tab.branch?.startsWith(BRANCH_PREFIX) === true) tab.isolation = 'branch'
+    if (tab.branch !== undefined) tab.base = await recordedBase(tab.cwd, tab.branch)
   }
 
   /**
@@ -1454,8 +1479,11 @@ class TuiApp {
     }
     tab.isolation = placed.kind
     tab.branch = placed.branch
+    tab.base = placed.base
     if (placed.kind === 'worktree') this.setStatus(`worktree ${placed.cwd} on ${placed.branch}`)
-    else if (placed.created) this.setStatus(`on ${placed.branch} (from ${placed.base})`)
+    else if (placed.created) {
+      this.setStatus(`on ${placed.branch} (from ${placed.base}) — removed on close if unused · /isolation off to work in place`)
+    }
   }
 
   /** Re-read the branch checked out in a session's directory. */
@@ -1613,6 +1641,14 @@ class TuiApp {
   private selectionSetupFor(tab: SessionTab): (agentCtx: Context) => void {
     return (agentCtx: Context): void => {
       installModelSelection(agentCtx, tab.selection)
+      // The session's workspace rules — the AGENTS.md block for its branch or
+      // worktree — resolved per assembly from this tab's live state, and
+      // scoped to this one agent. Empty when the session is not isolated.
+      agentCtx.get('systemPrompt')?.section({
+        name: 'moqi:workspace',
+        order: WORKSPACE_SECTION_ORDER,
+        text: () => workspaceGuidance(tab),
+      })
     }
   }
 
@@ -4799,6 +4835,7 @@ class TuiApp {
     tab.cwd = this.tab.cwd
     tab.branch = this.tab.branch
     tab.isolation = this.tab.isolation
+    tab.base = this.tab.base
     if (carried !== undefined) {
       tab.selection.current = carried
       tab.modelName = String(carried.model)

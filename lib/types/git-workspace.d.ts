@@ -67,6 +67,8 @@ export declare function defaultBranchName(now?: Date, random?: () => number): st
 export declare function worktreesDir(root: string): string;
 /** Whether `cwd` is inside one of moqi's worktrees. */
 export declare function isMoqiWorktree(cwd: string): boolean;
+/** The branch a moqi branch was started from, as recorded when it was created. */
+export declare function recordedBase(cwd: string, branch: string): Promise<string | undefined>;
 /**
  * Put the session at `cwd` on a branch of its own, in place.
  *
@@ -82,6 +84,32 @@ export declare function startBranch(cwd: string, name?: string): Promise<StartRe
  * rather than the remote's default branch.
  */
 export declare function startWorktree(cwd: string, name: string, base?: string): Promise<StartResult>;
+/**
+ * Remove moqi's own leftovers in the repository at `cwd`: worktrees and
+ * branches that hold no work and that no open session is using.
+ *
+ * Quitting keeps a session's branch so the session can come back on it; a
+ * session that never comes back would otherwise leave an empty `moqi/` branch
+ * behind forever. "Holds no work" is the same rule `/close` uses — no commit
+ * of its own, and for a worktree, nothing uncommitted — so a pruned branch
+ * loses nothing. `inUse` is every directory an open session works in.
+ */
+export declare function pruneLeftovers(cwd: string, inUse: readonly string[]): Promise<string[]>;
+/**
+ * The working rules the model gets for an isolated session — an AGENTS.md
+ * block written from the session's real state rather than by hand.
+ *
+ * Empty unless the session is on one of moqi's own branches, so a session the
+ * user put on their own branch (or ran with isolation off) gets nothing. The
+ * text depends only on mode, branch, base, and directory, so it stays
+ * byte-stable for the life of a branch and never disturbs the prompt cache.
+ */
+export declare function workspaceGuidance(input: {
+    isolation?: 'branch' | 'worktree' | undefined;
+    branch?: string | undefined;
+    base?: string | undefined;
+    cwd: string;
+}): string;
 /**
  * Close out the branch a session worked on in place.
  *
