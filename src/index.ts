@@ -278,8 +278,8 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
  */
 const WORKSPACE_SECTION_ORDER = 10150
 
-/** The memory index sits just before the workspace rules. */
-const MEMORY_SECTION_ORDER = 10100
+/** Where the memory index sits among the runtime-context contributions: after the Harness's own facts. */
+const MEMORY_CONTEXT_ORDER = 10100
 
 /** Context budget assumed when the provider publishes no capacity. */
 const DEFAULT_CONTEXT_LIMIT = 65536
@@ -1647,17 +1647,18 @@ class TuiApp {
         text: () => tab.workspace.guidance(),
       })
       // Memory: the save/read/forget tools, reading the tab's store at call
-      // time, and the index of what is saved. The index is captured on the
-      // session's first request and then frozen, so a save mid-session never
-      // rewrites the prompt (the tool result reports it instead) and the
-      // prompt cache keeps hitting. A new session sees everything saved.
+      // time, and the index of what is saved as *runtime context*, read fresh
+      // for every request. The agent loop appends a context snapshot only when
+      // its text differs from the last one, as a user message after the
+      // cached history — so a memory saved in any session (or edited by hand)
+      // reaches every open session at its next request, an unchanged index
+      // costs nothing, and the system prompt and its cache are never touched.
       const tools = agentCtx.get('tools')
       for (const tool of memoryTools(() => tab.memory)) tools?.register(tool)
-      let index: string | undefined
-      agentCtx.get('systemPrompt')?.section({
+      agentCtx.get('systemPrompt')?.context({
         name: 'moqi:memory',
-        order: MEMORY_SECTION_ORDER,
-        text: () => (index ??= tab.memory.promptIndex()),
+        order: MEMORY_CONTEXT_ORDER,
+        text: () => tab.memory.promptIndex(),
       })
     }
   }
@@ -3339,7 +3340,7 @@ class TuiApp {
     try {
       if (id.startsWith('memory:')) {
         const saved = this.tab.memory.saveNote(scope, note)
-        this.setStatus(`remembered “${saved.title}” (${scope === 'global' ? 'everywhere' : 'this project'}) — new sessions see it`)
+        this.setStatus(`remembered “${saved.title}” (${scope === 'global' ? 'everywhere' : 'this project'}) — every session sees it from its next request`)
       } else {
         const file = this.tab.memory.addInstruction(scope, note)
         this.setStatus(`added to ${file.replace(homedir(), '~')} — picked up after the agent's next file action, or on resume`)
@@ -3373,7 +3374,7 @@ class TuiApp {
     const where = memory.scope === 'project' ? 'this project' : 'everywhere'
     this.confirm(`Forget "${memory.title}" (${where})?`, () => {
       store.forget(memory.scope, memory.name)
-      this.setStatus(`forgot "${memory.title}" — new sessions no longer see it`)
+      this.setStatus(`forgot "${memory.title}" — gone from every session's memory list from its next request`)
       this.paint()
     })
   }
@@ -3391,7 +3392,7 @@ class TuiApp {
     // An instruction file is read by the Harness, which picks up an edit after
     // the next file-tool call or on resume — say so, or it looks ignored.
     const instructionsSaved = 'instructions saved — the agent picks them up after its next file action, or on resume'
-    const memorySaved = 'saved — new sessions see the change'
+    const memorySaved = 'saved — every session sees the change from its next request'
     const add = (path: string, title: string, subtitle: string, done = memorySaved): void => {
       rows.push({ id: `file:${String(targets.length)}`, title, subtitle })
       targets.push({ path, done })

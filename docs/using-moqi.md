@@ -112,12 +112,14 @@ $DSH_HOME/memory/                         everywhere
 $DSH_HOME/memory/projects/<project>/      this project only
 ```
 
-Every session starts with the index of both in its prompt, so the agent knows
-what it knows without reading anything, and opens a memory with `memory_read`
-when it is relevant. The index is taken when a session first asks the model
-anything and then held still: something saved mid-session is confirmed by the
-tool, and every *new* session sees it. That keeps the prompt identical from
-request to request, so the provider's prompt cache keeps hitting.
+Every session carries the index of both, so the agent knows what it knows
+without reading anything, and opens a memory with `memory_read` when it is
+relevant. The index is runtime context, read fresh for every request: a memory
+saved in any session — or added with `# `, or edited in `$EDITOR` — reaches
+every open session at its next request. The Harness appends a new copy to the
+conversation only when the list actually changed, after the cached history, so
+an unchanged list costs nothing and the system prompt and its cache are never
+rewritten.
 
 Memory is separate from the instruction files the Harness already loads
 (`$DSH_HOME/AGENTS.md`, the project's `AGENTS.md`/`CLAUDE.md`): those are

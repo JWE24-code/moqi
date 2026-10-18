@@ -67,7 +67,7 @@ export function memoryTools(store: () => MemoryStore): ToolDefinition[] {
         type: args.type,
         body: args.body,
       })
-      return `saved "${saved.title}" (${saved.scope}) — future sessions see it in the memory index`
+      return `saved "${saved.title}" (${saved.scope}) — every session sees it in its memory list from its next request`
     },
   })
 

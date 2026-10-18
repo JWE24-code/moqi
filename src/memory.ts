@@ -287,7 +287,8 @@ export interface IndexBudget {
 }
 
 const PROMPT_INSTRUCTION =
-  'These are the titles of saved memories; call memory_read with a memory\'s name to read it in full when it is relevant.'
+  'Saved memories (current list — it replaces any earlier memory list in this conversation). ' +
+  'Call memory_read with a memory\'s name to read it in full when it is relevant.'
 
 function renderSections(global: Memory[], project: Memory[], omitted: number): string {
   const parts: string[] = [PROMPT_INSTRUCTION]
