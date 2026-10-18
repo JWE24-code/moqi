@@ -134,24 +134,7 @@ import { applyToolEvent, editDiff, editPath, EDIT_TOOL } from './tui/tooldetail.
 import { transcriptMarkdown } from './tui/export.ts'
 import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
-import {
-  BRANCH_PREFIX,
-  currentBranch,
-  defaultBranchName,
-  finishBranch,
-  finishWorktree,
-  isIsolation,
-  isMoqiWorktree,
-  pruneLeftovers,
-  recordedBase,
-  repoRoot,
-  startBranch,
-  startWorktree,
-  workspaceGuidance,
-  type FinishResult,
-  type Isolation,
-  type StartResult,
-} from './git-workspace.ts'
+import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
 import {
   activeProfileName,
   forgetPlugin,
@@ -495,19 +478,11 @@ interface SessionTab {
    */
   background: Map<string, BackgroundAgent>
   /**
-   * The directory this session works in, fixed when the Harness created it:
-   * the launch directory, or one of moqi's worktrees.
+   * Where this session works — the launch directory, its own branch there, or
+   * one of moqi's worktrees — and the rules for closing it. A fork shares its
+   * parent's instance.
    */
-  cwd: string
-  /** The branch checked out at `cwd`, refreshed after each turn; absent outside a repo. */
-  branch?: string
-  /**
-   * How this session was isolated when it opened. `worktree` and `branch`
-   * sessions are cleaned up on `/close` when they changed nothing.
-   */
-  isolation?: 'branch' | 'worktree'
-  /** The branch an isolated session's branch was started from, for the model's workspace rules. */
-  base?: string
+  workspace: Workspace
 }
 
 /** Create an empty session record. */
@@ -540,7 +515,7 @@ function newTab(id: string): SessionTab {
     theme: DEFAULT_THEME,
     contextLimit: 0,
     background: new Map(),
-    cwd: process.cwd(),
+    workspace: Workspace.unplaced(process.cwd()),
   }
 }
 
@@ -915,7 +890,6 @@ class TuiApp {
     const fs = this.ctx.get('fs')
     const cwd = fs === undefined ? process.cwd() : fs.processPath(await fs.resolve('.'))
     this.cwd = cwd
-    this.tab.cwd = cwd
 
     // An explicit --resume names exactly one session, so it outranks whatever
     // happened to be open last time: the user has already said what they want.
@@ -936,9 +910,9 @@ class TuiApp {
       applyTheme(this.tab.theme)
     } else {
       const sessionId = brandString<SessionId>(`session-${randomUUID()}`)
-      const placed = await this.placeSession(cwd)
-      this.applyPlacement(this.tab, placed)
-      const created = await agents.create({ sessionId, meta: { cwd: placed.cwd }, agentOptions, setup })
+      this.tab.workspace = await Workspace.place(cwd, this.isolation)
+      this.announce(this.tab.workspace)
+      const created = await agents.create({ sessionId, meta: { cwd: this.tab.workspace.cwd }, agentOptions, setup })
       this.tab.agent = created.agent
       this.adoptForeground(this.tab)
       this.tab.id = String(sessionId)
@@ -947,7 +921,7 @@ class TuiApp {
 
     // Leftovers from sessions that never came back: empty moqi branches and
     // idle worktrees nothing open is using. Rule as /close: nothing with work goes.
-    void pruneLeftovers(this.cwd, this.tabs.map((tab) => tab.cwd))
+    void pruneLeftovers(this.cwd, this.tabs.map((tab) => tab.workspace.cwd))
       .then((pruned) => {
         if (pruned.length === 0) return
         this.setStatus(`tidied ${String(pruned.length)} unused moqi branch${pruned.length === 1 ? '' : 'es'}`)
@@ -1434,125 +1408,67 @@ class TuiApp {
   }
 
   // ---------------------------------------------------------------- isolation
+  //
+  // Where each session works, and what happens to it on close, is decided by
+  // its `Workspace` (src/git-workspace.ts); the app only shows what it says
+  // and hands it the other open sessions' workspaces.
 
-  /**
-   * Take a resumed session's directory from its own header and work out how it
-   * was isolated, without creating anything: a resumed session keeps the
-   * branch or worktree it had.
-   */
+  /** Show a workspace's placement notice, if it has one. */
+  private announce(workspace: Workspace): void {
+    if (workspace.notice !== undefined) this.setStatus(workspace.notice)
+  }
+
+  /** A resumed session keeps the directory in its own header, and whatever isolation it had there. */
   private async adoptWorkspace(tab: SessionTab): Promise<void> {
     const header = tab.agent?.session.header as { cwd?: string } | undefined
-    if (header?.cwd !== undefined && header.cwd !== '') tab.cwd = header.cwd
-    await this.refreshBranch(tab)
-    if (isMoqiWorktree(tab.cwd)) tab.isolation = 'worktree'
-    else if (tab.branch?.startsWith(BRANCH_PREFIX) === true) tab.isolation = 'branch'
-    if (tab.branch !== undefined) tab.base = await recordedBase(tab.cwd, tab.branch)
+    const cwd = header?.cwd !== undefined && header.cwd !== '' ? header.cwd : this.cwd
+    tab.workspace = await Workspace.adopt(cwd)
   }
 
-  /**
-   * Decide where a fresh session in `cwd` works, per the isolation choice.
-   * Never throws: a git failure falls back to working in place, with the
-   * reason on the status line.
-   */
-  private async placeSession(cwd: string, mode: Isolation = this.isolation): Promise<StartResult> {
-    try {
-      if (mode === 'branch') return await startBranch(cwd)
-      if (mode === 'worktree') {
-        return await startWorktree(cwd, defaultBranchName().slice(BRANCH_PREFIX.length))
-      }
-    } catch (error) {
-      return { kind: 'skipped', cwd, reason: describeError(error) }
-    }
-    return { kind: 'skipped', cwd, reason: 'isolation is off' }
-  }
-
-  /** Record a placement on the tab and say what happened. */
-  private applyPlacement(tab: SessionTab, placed: StartResult): void {
-    tab.cwd = placed.cwd
-    if (placed.kind === 'skipped') {
-      // Outside a repository there is nothing to say; anything else is worth knowing.
-      if (placed.reason !== 'not a git repository' && placed.reason !== 'isolation is off') {
-        this.setStatus(`working in place: ${placed.reason}`)
-      }
-      void this.refreshBranch(tab)
-      return
-    }
-    tab.isolation = placed.kind
-    tab.branch = placed.branch
-    tab.base = placed.base
-    if (placed.kind === 'worktree') this.setStatus(`worktree ${placed.cwd} on ${placed.branch}`)
-    else if (placed.created) {
-      this.setStatus(`on ${placed.branch} (from ${placed.base}) — removed on close if unused · /isolation off to work in place`)
-    }
-  }
-
-  /** Re-read the branch checked out in a session's directory. */
+  /** Re-read a session's branch, repainting when it moved. */
   private async refreshBranch(tab: SessionTab): Promise<void> {
-    const branch = await currentBranch(tab.cwd)
-    if (branch === tab.branch) return
-    tab.branch = branch
-    this.paint()
+    if (await tab.workspace.refresh()) this.paint()
   }
 
   /** The `@` completion index for a session's own directory. */
   private fileIndexFor(tab: SessionTab): FileIndex {
-    let index = this.fileIndexes.get(tab.cwd)
+    const { cwd } = tab.workspace
+    let index = this.fileIndexes.get(cwd)
     if (index === undefined) {
-      index = new FileIndex(tab.cwd)
-      this.fileIndexes.set(tab.cwd, index)
+      index = new FileIndex(cwd)
+      this.fileIndexes.set(cwd, index)
     }
     return index
   }
 
-  /** Other open sessions working in the same checkout as `tab`. */
-  private async sharingCheckout(tab: SessionTab): Promise<SessionTab[]> {
-    const root = await repoRoot(tab.cwd)
-    if (root === undefined) return []
-    const others: SessionTab[] = []
-    for (const other of this.tabs) {
-      if (other !== tab && (await repoRoot(other.cwd)) === root) others.push(other)
-    }
-    return others
-  }
-
   /**
    * `/branch [name]` — put this session on a `moqi/` branch in place, or say
-   * which branch it is on. Refused while another session in the same checkout
-   * is mid-reply, since switching moves the files under it.
+   * which branch it is on. Refused while a session in the same checkout is
+   * mid-reply, since switching moves the files under it.
    */
   private async branchCommand(rawInput: string): Promise<void> {
     const name = rawInput.trim()
     const tab = this.tab
+    const { workspace } = tab
     if (name === '') {
-      await this.refreshBranch(tab)
-      this.setStatus(tab.branch === undefined ? 'not on a branch' : `on ${tab.branch}`)
+      await workspace.refresh()
+      this.setStatus(workspace.branch === undefined ? 'not on a branch' : `on ${workspace.branch}`)
       this.paint()
       return
     }
-    const sharing = await this.sharingCheckout(tab)
-    if (sharing.some((other) => other.streaming)) {
-      this.setStatus('another session in this checkout is replying — try again when it settles, or use /worktree', true)
-      this.paint()
-      return
-    }
-    if (tab.streaming) {
-      this.setStatus('this session is replying — switch branches when it settles', true)
+    const sharing = this.tabs.filter((other) => other !== tab && workspace.sharesCheckoutWith(other.workspace))
+    if (tab.streaming || sharing.some((other) => other.streaming)) {
+      this.setStatus('a session in this checkout is replying — switch branches when it settles, or use /worktree', true)
       this.paint()
       return
     }
     try {
-      const placed = await startBranch(tab.cwd, name)
-      if (placed.kind === 'skipped') {
-        this.setStatus(`cannot branch: ${placed.reason}`, true)
-      } else {
-        tab.isolation ??= 'branch'
-        const verb = placed.kind === 'branch' && placed.created ? 'created' : 'switched to'
-        this.setStatus(`${verb} ${placed.branch}${sharing.length > 0 ? ` — shared with ${String(sharing.length)} other session(s)` : ''}`)
-      }
+      const said = await workspace.useBranch(name)
+      this.setStatus(sharing.length > 0 ? `${said} — shared with ${String(sharing.length)} other session(s)` : said)
     } catch (error) {
       this.setStatus(describeError(error), true)
     }
-    for (const other of [tab, ...sharing]) await this.refreshBranch(other)
+    for (const other of sharing) await other.workspace.refresh()
     this.paint()
   }
 
@@ -1572,13 +1488,7 @@ class TuiApp {
       return
     }
     try {
-      const placed = await startWorktree(this.cwd, name, base)
-      if (placed.kind === 'skipped') {
-        this.setStatus(`cannot create a worktree: ${placed.reason}`, true)
-        this.paint()
-        return
-      }
-      await this.newSession(placed)
+      await this.newSession(await Workspace.worktree(this.cwd, name, base))
     } catch (error) {
       this.setStatus(describeError(error), true)
       this.paint()
@@ -1600,32 +1510,15 @@ class TuiApp {
     this.paint()
   }
 
-  /**
-   * Close out a closed session's branch or worktree. A branch shared with a
-   * session still open is left alone; nothing with commits or uncommitted
-   * work is ever removed.
-   */
+  /** Close out a closed session's branch or worktree; its `Workspace` decides what is safe. */
   private async finishWorkspace(tab: SessionTab): Promise<void> {
-    let result: FinishResult = { kind: 'none' }
-    // A fork, or a restored twin, may still be working right there.
-    if (this.tabs.some((other) => other !== tab && other.cwd === tab.cwd && tab.isolation === 'worktree')) return
     try {
-      if (tab.isolation === 'worktree') {
-        result = await finishWorktree(tab.cwd)
-      } else if (tab.isolation === 'branch' && tab.branch !== undefined) {
-        if ((await this.sharingCheckout(tab)).length > 0) return
-        result = await finishBranch(tab.cwd, tab.branch)
-      }
+      const said = describeFinish(await tab.workspace.finish(this.tabs.map((other) => other.workspace)))
+      if (said !== undefined) this.setStatus(said)
     } catch (error) {
       this.setStatus(`cleanup: ${describeError(error)}`, true)
-      this.paint()
-      return
     }
-    if (result.kind === 'removed') this.setStatus(`removed ${result.branch} — it changed nothing`)
-    else if (result.kind === 'kept') {
-      this.setStatus(`kept ${result.branch}${result.path === undefined ? '' : ` at ${result.path}`} — ${result.reason}`)
-    }
-    for (const other of this.tabs) await this.refreshBranch(other)
+    for (const other of this.tabs) await other.workspace.refresh()
     this.paint()
   }
 
@@ -1647,7 +1540,9 @@ class TuiApp {
       agentCtx.get('systemPrompt')?.section({
         name: 'moqi:workspace',
         order: WORKSPACE_SECTION_ORDER,
-        text: () => workspaceGuidance(tab),
+        // Read at assembly time: a resumed session's workspace is adopted
+        // after its agent was set up.
+        text: () => tab.workspace.guidance(),
       })
     }
   }
@@ -2164,7 +2059,7 @@ class TuiApp {
       title: tab.title,
       host: hostLabel(process.env['DSH_HOST'] ?? 'local harness'),
       modelName: tab.modelName,
-      branch: tab.branch,
+      branch: tab.workspace.branch,
       messages: tab.messages,
       streamingSegments: tab.streamingSegments,
       streamingReasoning: tab.streamingReasoning,
@@ -2427,7 +2322,7 @@ class TuiApp {
         title: tab.title,
         status: sessionStatusLabel(tab),
         model: tab.modelName === '' ? undefined : tab.modelName,
-        cwd: tab.cwd,
+        cwd: tab.workspace.cwd,
       }))
     const key = JSON.stringify(
       sessions.map((session) => [session.sessionId, session.title, session.status]),
@@ -3832,7 +3727,7 @@ class TuiApp {
     }
     let data: Uint8Array
     try {
-      data = new Uint8Array(await readFile(join(this.tab.cwd, path)))
+      data = new Uint8Array(await readFile(join(this.tab.workspace.cwd, path)))
     } catch (error) {
       this.composer.adopt(plainEdit.text, plainEdit.cursor)
       this.setStatus(describeError(error), true)
@@ -4690,7 +4585,7 @@ class TuiApp {
    * `placed` is where it works when the caller already decided (`/worktree`);
    * otherwise the isolation choice decides, from the launch directory.
    */
-  private async newSession(placed?: StartResult): Promise<void> {
+  private async newSession(placed?: Workspace): Promise<void> {
     const agents = this.ctx.get('agents')
     const defaultModel = this.ctx.get('agentDefaultModel')
     if (agents === undefined || defaultModel === undefined) return
@@ -4710,12 +4605,13 @@ class TuiApp {
     // Same rule as the model just above: the theme of the conversation it was
     // opened from, not the stored default, then diverges independently.
     tab.theme = this.tab.theme
-    this.applyPlacement(tab, placed ?? (await this.placeSession(this.cwd)))
+    tab.workspace = placed ?? (await Workspace.place(this.cwd, this.isolation))
+    this.announce(tab.workspace)
 
     try {
       const created = await agents.create({
         sessionId,
-        meta: { cwd: tab.cwd },
+        meta: { cwd: tab.workspace.cwd },
         agentOptions: { provider: seed.provider, model: seed.model },
         setup: this.selectionSetupFor(tab),
       })
@@ -4832,10 +4728,7 @@ class TuiApp {
     const tab = newTab(String(sessionId))
     tab.theme = this.tab.theme
     // A fork works where its parent works, on the same branch or worktree.
-    tab.cwd = this.tab.cwd
-    tab.branch = this.tab.branch
-    tab.isolation = this.tab.isolation
-    tab.base = this.tab.base
+    tab.workspace = this.tab.workspace
     if (carried !== undefined) {
       tab.selection.current = carried
       tab.modelName = String(carried.model)
@@ -4843,7 +4736,7 @@ class TuiApp {
     try {
       const created = await agents.create({
         sessionId,
-        meta: { cwd: tab.cwd, parentSession: session.header.id, isSeeded: true },
+        meta: { cwd: tab.workspace.cwd, parentSession: session.header.id, isSeeded: true },
         inheritedEventCount: SessionLogOffset(cut),
         seed,
         agentOptions:

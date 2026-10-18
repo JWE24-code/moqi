@@ -152,6 +152,72 @@ try {
   assert.equal(sh(w, 'branch', '--list', 'moqi/idle'), '')
   assert.equal((await ws.finishWorktree(idle.cwd)).kind, 'none')
 
+  // ---------------------------------------------------------------- Workspace
+  const { Workspace, describeFinish } = ws
+
+  // Placement and its notices: quiet outside a repo or with isolation off.
+  const outside = await Workspace.place(plain, 'branch')
+  assert.equal(outside.isolation, undefined)
+  assert.equal(outside.notice, undefined)
+  assert.equal(outside.guidance(), '')
+  const s = repo('session')
+  const offWs = await Workspace.place(s, 'off')
+  assert.equal(offWs.notice, undefined)
+  assert.equal(offWs.branch, 'main', 'in place still knows the branch, for the footer')
+  const first = await Workspace.place(s, 'branch')
+  assert.equal(first.isolation, 'branch')
+  assert.match(first.notice ?? '', /^on moqi\/.+ \(from main\) — removed on close if unused/)
+  assert.match(first.guidance(), /Do not switch branches/)
+  const detachedWs = await Workspace.place(d, 'branch')
+  assert.equal(detachedWs.notice, 'working in place: HEAD is detached')
+
+  // A second session in the same checkout shares the branch, and says nothing new.
+  const second = await Workspace.place(s, 'branch')
+  assert.equal(second.branch, first.branch)
+  assert.equal(second.notice, undefined)
+  assert.ok(first.sharesCheckoutWith(second) && !first.sharesCheckoutWith(first))
+
+  // Finishing while another open session shares the checkout leaves it alone…
+  assert.equal((await first.finish([second])).kind, 'none')
+  // …as does a fork, which holds the very same instance.
+  assert.equal((await first.finish([first])).kind, 'none')
+  assert.equal(await ws.currentBranch(s), first.branch)
+  // …and the last one out removes the untouched branch.
+  const last = await second.finish([])
+  assert.equal(last.kind, 'removed')
+  assert.match(describeFinish(last) ?? '', /^removed moqi\/.+ — it changed nothing$/)
+  assert.equal(describeFinish({ kind: 'none' }), undefined)
+  assert.equal(await ws.currentBranch(s), 'main')
+
+  // A fork shares its parent's instance: closing either keeps the worktree.
+  const tree2 = await Workspace.worktree(s, 'forked')
+  assert.equal(tree2.isolation, 'worktree')
+  assert.match(tree2.guidance(), /fresh checkout/)
+  assert.equal((await tree2.finish([tree2])).kind, 'none', 'its fork is still open')
+  const twin = await Workspace.adopt(tree2.cwd)
+  assert.equal(twin.isolation, 'worktree', 'a resumed worktree session is recognized')
+  assert.equal(twin.base, 'main')
+  assert.equal((await tree2.finish([twin])).kind, 'none', 'a resumed twin in the same worktree keeps it')
+  assert.equal((await tree2.finish([])).kind, 'removed')
+  await assert.rejects(Workspace.worktree(plain, 'x'), /not a git repository/)
+
+  // Adopt infers a branch session; useBranch switches and reports.
+  const placed = await Workspace.place(s, 'branch')
+  const adopted = await Workspace.adopt(s)
+  assert.equal(adopted.isolation, 'branch')
+  assert.equal(adopted.branch, placed.branch)
+  assert.equal(adopted.base, 'main')
+  assert.equal(await adopted.useBranch('topic'), 'created moqi/topic')
+  assert.equal(adopted.branch, 'moqi/topic')
+  assert.equal(await placed.refresh(), true, 'the other session notices the switch')
+  assert.equal(placed.branch, 'moqi/topic')
+  assert.equal(await placed.refresh(), false)
+  assert.equal(await adopted.useBranch(placed.branch === 'moqi/topic' ? 'topic' : 'x'), 'switched to moqi/topic')
+  await assert.rejects(Workspace.unplaced(plain).useBranch('x'), /cannot branch: not a git repository/)
+  // Adopting a plain checkout on a non-moqi branch isolates nothing.
+  sh(s, 'switch', '-q', 'main')
+  assert.equal((await Workspace.adopt(s)).isolation, undefined)
+
   // ---------------------------------------------------------------- guidance
   const inPlace = ws.workspaceGuidance({ isolation: 'branch', branch: 'moqi/x', base: 'main', cwd: '/repo' })
   assert.match(inPlace, /on branch `moqi\/x`, which moqi created for this session from `main`/)

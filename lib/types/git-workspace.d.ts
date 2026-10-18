@@ -111,6 +111,64 @@ export declare function workspaceGuidance(input: {
     cwd: string;
 }): string;
 /**
+ * Where one session works, and every rule about it.
+ *
+ * The app holds one of these per session and only ever asks it questions or
+ * hands it the other open workspaces; the git commands, the "which failures
+ * are worth saying" choices, the shared-checkout rule, and the fork guard all
+ * live here, so they are tested here. A fork shares its parent's instance:
+ * same directory, same branch, and `finish` sees the twin and keeps it.
+ */
+export declare class Workspace {
+    /** The directory the session works in; fixed for the session's life. */
+    readonly cwd: string;
+    /** The checkout `cwd` belongs to (a worktree is its own); undefined outside a repo. */
+    readonly root: string | undefined;
+    /** How moqi isolated this session; undefined when it works where it was opened. */
+    isolation: 'branch' | 'worktree' | undefined;
+    /** The branch checked out at `cwd`, as of the last `refresh`. */
+    branch: string | undefined;
+    /** The branch an isolated session's branch was started from. */
+    base: string | undefined;
+    /** What to tell the user about how the session was placed, if anything. */
+    readonly notice: string | undefined;
+    private constructor();
+    /** A placeholder for a session not yet placed: `cwd`, nothing known. */
+    static unplaced(cwd: string): Workspace;
+    /**
+     * Place a new session opened in `cwd` per the isolation choice. Never
+     * throws: a git failure means working in place, with the reason as the notice.
+     */
+    static place(cwd: string, mode: Isolation): Promise<Workspace>;
+    /** A new session in its own worktree, by request: failures throw rather than fall back. */
+    static worktree(cwd: string, name: string, base?: string): Promise<Workspace>;
+    /** A resumed session's workspace, inferred from disk; creates nothing. */
+    static adopt(cwd: string): Promise<Workspace>;
+    private static from;
+    /** Re-read the checked-out branch; true when it changed. */
+    refresh(): Promise<boolean>;
+    /** Whether `other` works in the same checkout, so a branch switch here moves its files too. */
+    sharesCheckoutWith(other: Workspace): boolean;
+    /**
+     * `/branch <name>`: create or switch to `moqi/<name>` here. Returns what to
+     * say; throws with git's message when git refuses. The caller decides
+     * whether switching is safe right now (who is mid-reply is app state).
+     */
+    useBranch(name: string): Promise<string>;
+    /** The model's workspace rules for this session; see {@link workspaceGuidance}. */
+    guidance(): string;
+    /**
+     * Close out this session's branch or worktree, given the workspaces of the
+     * sessions still open — not including the one closing. Left alone while any
+     * of them works in the same place: a second tab, or a fork, which holds this
+     * very instance. Otherwise removed only when it changed nothing, per
+     * {@link finishBranch} / {@link finishWorktree}.
+     */
+    finish(stillOpen: readonly Workspace[]): Promise<FinishResult>;
+}
+/** The status line for a finish, or undefined when there is nothing to say. */
+export declare function describeFinish(result: FinishResult): string | undefined;
+/**
  * Close out the branch a session worked on in place.
  *
  * Removed only when it is still checked out at `cwd`, carries no commit of its
