@@ -154,7 +154,7 @@ export interface PaletteCommand {
     description: string;
 }
 /** Which list the picker is currently showing. */
-export type PickerKind = 'sessions' | 'models' | 'themes' | 'plugins' | 'panel' | 'delete' | 'rewind' | 'stored' | 'lang' | 'login' | 'login-method' | 'setup' | 'permissions' | 'none';
+export type PickerKind = 'sessions' | 'models' | 'themes' | 'plugins' | 'panel' | 'delete' | 'rewind' | 'stored' | 'lang' | 'login' | 'login-method' | 'setup' | 'permissions' | 'memory' | 'none';
 /** One row in the picker. */
 export interface PickerItem {
     id: string;

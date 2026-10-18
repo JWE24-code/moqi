@@ -106,6 +106,15 @@ Memory is separate from the instruction files the Harness already loads
 yours to write; memory is the agent's notebook. Both are plain files you can
 edit or delete.
 
+**`/memory`** shows both side by side for the session you're in: the
+instruction files the Harness actually loads here (with a `+ create` row for
+a missing global or project-root `AGENTS.md`), the memories for this project
+and for everywhere, and the two `MEMORY.md` index files. `enter` opens the
+file in `$VISUAL`/`$EDITOR`; type to filter. `/memory forget <name>` removes
+a memory after asking. An edited memory reaches every new session; an edited
+instruction file is picked up by the Harness after the agent's next file
+action, or on resume.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something

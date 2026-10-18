@@ -347,6 +347,11 @@ const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
   { name: 'jobs', args: '[kill <id>]', description: 'Background jobs: what is running and what finished' },
   { name: 'mcp', args: '', description: 'MCP servers whose tools are mounted here' },
   {
+    name: 'memory',
+    args: '[forget <name>]',
+    description: 'What the agent remembers and the instruction files it reads: open in $EDITOR, or forget one',
+  },
+  {
     name: 'permissions',
     args: '',
     description: 'Rules that allow tool calls without asking: review, revoke, or edit them',
@@ -663,6 +668,8 @@ class TuiApp {
   private storedHits: SessionHit[] = []
   /** Rules behind the `/permissions` rows, indexed by row id. */
   private permissionRows: ScopedRule[] = []
+  /** Files behind the `/memory` rows, indexed by row id, with what to say once saved. */
+  private memoryRows: { path: string; done: string }[] = []
   /** Workspace file listings for `@` completion, one per session directory, built lazily. */
   private readonly fileIndexes = new Map<string, FileIndex>()
   /** Where new sessions in a git repository work; see {@link Config.isolation}. */
@@ -3211,7 +3218,106 @@ class TuiApp {
       login: (item) => this.chooseLoginEntry(item.id),
       'login-method': (item) => this.beginLoginWithMethod(item.id),
       permissions: (item) => this.choosePermissionRow(item.id),
+      memory: (item) => this.chooseMemoryRow(item.id),
     }
+  }
+
+  // ------------------------------------------------------------------- memory
+
+  /** `/memory` opens the panel; `/memory forget <name>` forgets one memory, after asking. */
+  private memoryCommand(rawInput: string): void {
+    const words = rawInput.trim().split(/\s+/).filter((word) => word !== '')
+    if (words[0] === undefined) {
+      this.showMemory()
+      return
+    }
+    if (words[0] !== 'forget' || words.length < 2) {
+      this.setStatus('usage: /memory  ·  /memory forget <name>', true)
+      this.paint()
+      return
+    }
+    const name = words.slice(1).join(' ')
+    const store = this.tab.memory
+    const memory = store.read('project', name) ?? store.read('global', name)
+    if (memory === undefined) {
+      this.setStatus(`no memory named "${name}" — /memory lists them`, true)
+      this.paint()
+      return
+    }
+    const where = memory.scope === 'project' ? 'this project' : 'everywhere'
+    this.confirm(`Forget "${memory.title}" (${where})?`, () => {
+      store.forget(memory.scope, memory.name)
+      this.setStatus(`forgot "${memory.title}" — new sessions no longer see it`)
+      this.paint()
+    })
+  }
+
+  /**
+   * `/memory` — the instruction files the Harness loads here, then the
+   * agent's memories by scope, then the two index files. `enter` opens the
+   * file in `$EDITOR`. Missing instruction files are offered only where they
+   * matter — the global one and the project root's — not every candidate.
+   */
+  private showMemory(): void {
+    const store = this.tab.memory
+    const rows: PickerItem[] = []
+    const targets: { path: string; done: string }[] = []
+    // An instruction file is read by the Harness, which picks up an edit after
+    // the next file-tool call or on resume — say so, or it looks ignored.
+    const instructionsSaved = 'instructions saved — the agent picks them up after its next file action, or on resume'
+    const memorySaved = 'saved — new sessions see the change'
+    const add = (path: string, title: string, subtitle: string, done = memorySaved): void => {
+      rows.push({ id: `file:${String(targets.length)}`, title, subtitle })
+      targets.push({ path, done })
+    }
+    const home = homedir()
+    const shorten = (path: string): string => (path.startsWith(home) ? `~${path.slice(home.length)}` : path)
+    const instructions = store.instructions()
+    const firstMissing = (scope: 'global' | 'project') =>
+      instructions.find((file) => file.scope === scope && !file.exists && file.path.endsWith('/AGENTS.md'))
+    const offered = new Set([firstMissing('global'), firstMissing('project')])
+    for (const file of instructions) {
+      if (file.exists) add(file.path, shorten(file.path), 'Instructions — yours to write', instructionsSaved)
+      else if (offered.has(file)) {
+        add(file.path, `+ create ${shorten(file.path)}`, 'Instructions — yours to write', instructionsSaved)
+      }
+    }
+    for (const scope of ['project', 'global'] as const) {
+      const label = scope === 'project' ? 'Memory — this project' : 'Memory — everywhere'
+      for (const memory of store.list(scope)) add(memory.path, `${memory.title} — ${memory.description}`, label)
+    }
+    add(store.indexFile('project'), 'MEMORY.md — this project', 'Index files')
+    add(store.indexFile('global'), 'MEMORY.md — everywhere', 'Index files')
+    this.memoryRows = targets
+    const count = store.list('project').length + store.list('global').length
+    this.picker.show('memory', count === 0 ? 'Memory — nothing saved yet' : `Memory — ${String(count)} saved`, rows, {
+      grouped: true,
+    })
+    this.setStatus('enter opens in $EDITOR · /memory forget <name> · type to filter · esc closes')
+    this.paint()
+  }
+
+  /** A `/memory` row was chosen: open its file in `$EDITOR`, creating it if it is new. */
+  private chooseMemoryRow(id: string): void {
+    const target = this.memoryRows[Number.parseInt(id.slice('file:'.length), 10)]
+    if (target !== undefined) void this.openInEditor(target.path, target.done)
+  }
+
+  /** Open a file in `$EDITOR` (creating its directory), then report `done`. */
+  private async openInEditor(path: string, done: string): Promise<void> {
+    if (this.editorCommand() === undefined) {
+      this.setStatus(`set $VISUAL or $EDITOR — or open ${path} yourself`, true)
+      this.paint()
+      return
+    }
+    try {
+      await mkdir(dirname(path), { recursive: true })
+      const code = await this.runEditor(path)
+      this.setStatus(code === 0 ? done : 'editor exited non-zero')
+    } catch (error) {
+      this.setStatus(describeError(error), true)
+    }
+    this.paint()
   }
 
   // -------------------------------------------------------------- permissions
@@ -4685,6 +4791,9 @@ class TuiApp {
         return true
       case 'permissions':
         void this.showPermissions()
+        return true
+      case 'memory':
+        this.memoryCommand(rawInput)
         return true
       case 'tools': {
         const tools = this.ctx.get('tools')
