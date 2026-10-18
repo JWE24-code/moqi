@@ -91,6 +91,7 @@ import { LoginFlow, type AuthorizationLike } from './login-flow.ts'
 import {
   copyWithLocalHelper,
   describeError,
+  editorInvocation,
   mediaTypeOf,
   openUrlWithLocalHelper,
   timestampForFile,
@@ -4548,7 +4549,8 @@ class TuiApp {
     return await this.withTerminalHandedOver(
       () =>
         new Promise<number>((resolve, reject) => {
-          const child = spawn(editor, [file], { stdio: 'inherit' })
+          const [program, args] = editorInvocation(editor, file)
+          const child = spawn(program, args, { stdio: 'inherit' })
           child.on('error', reject)
           child.on('exit', (exitCode) => {
             resolve(exitCode ?? 0)

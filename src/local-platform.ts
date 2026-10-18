@@ -102,3 +102,15 @@ export function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
   return String(error)
 }
+
+/**
+ * How to run `$VISUAL`/`$EDITOR` on a file: through `sh -c`, the way git and
+ * most tools do, because the variable is a command line, not a program name —
+ * `code --wait`, `omarchy-launch-editor --inline`, `emacsclient -t` all carry
+ * arguments. The file goes in as `$1`, never spliced into the command text,
+ * so a path with spaces or quotes reaches the editor as one argument.
+ * @returns the program and its arguments, for `spawn`.
+ */
+export function editorInvocation(editor: string, file: string): [string, string[]] {
+  return ['/bin/sh', ['-c', `${editor} "$1"`, 'moqi-editor', file]]
+}
