@@ -786,6 +786,8 @@ class TuiApp {
   private get search(): { query: string; cursor: number } | undefined {
     return this.searchState.view()
   }
+  /** Whether `persisted` came from disk this run; nothing is saved until it has. */
+  private stateLoaded = false
   /** Persisted state as last loaded or saved, and a write debounce. */
   private persisted: PersistedState = {
     inputHistory: [],
@@ -914,6 +916,15 @@ class TuiApp {
   /** Boot the app: resolve the agent, open the screen, and paint. */
   async start(): Promise<void> {
     await this.ctx.get('loader')?.await()
+    // Refuse a non-interactive run before anything with a side effect: a new
+    // session's workspace placement switches the repo onto a `moqi/` branch,
+    // and persistence rewrites the open-sessions list every profile shares.
+    // Checked late, a scripted `dsh --profile tui` did both, then exited.
+    if (!Screen.isInteractive()) {
+      throw new Error(
+        'the tui profile needs an interactive terminal; use --profile headless for scripted runs',
+      )
+    }
 
     const agents = this.ctx.get('agents')
     const defaultModel = this.ctx.get('agentDefaultModel')
@@ -922,6 +933,7 @@ class TuiApp {
     // Adopt whatever survived the last run before deciding what to show: the
     // composer history and the thinking preference, both best-effort.
     this.persisted = await loadState()
+    this.stateLoaded = true
     this.usage.restore(this.persisted.usage, this.persisted.usageEntries)
     this.history.load(this.persisted.inputHistory)
     if (this.config.thinking === undefined) this.showThinking = this.persisted.thinking
@@ -1005,11 +1017,6 @@ class TuiApp {
     this.publishPresence()
     for (const tab of this.tabs) void this.refreshContextLimit(tab)
 
-    if (!Screen.isInteractive()) {
-      throw new Error(
-        'the tui profile needs an interactive terminal; use --profile headless for scripted runs',
-      )
-    }
     this.screen.start()
     this.installSignalHandlers()
     this.registerTrustSurfaces()
@@ -4272,6 +4279,10 @@ class TuiApp {
 
   /** Write the durable state immediately, ignoring a failing backend. */
   private persistNow(): void {
+    // Never save a state this run did not load: a run that stopped before
+    // loading (the non-interactive refusal) would overwrite the user's
+    // history, preferences, and open sessions with the empty defaults.
+    if (!this.stateLoaded) return
     this.persisted = assembleState({
       inputHistory: [...this.history.snapshot()],
       thinking: this.showThinking,

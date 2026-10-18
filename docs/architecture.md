@@ -38,7 +38,18 @@ src/
   persist.ts       durable history, preferences, and open sessions under $DSH_HOME
   usage.ts         billed-token ledger, rolling windows, and DeepSeek's peak hours
   credits.ts       asking each provider what its plan has left (credentials + network)
-  sessions-store.ts  session storage paths and deletion under $DSH_HOME
+  sessions-store.ts  session storage paths and deletion under $DSH_HOME, and dshHome(),
+                   the one $DSH_HOME resolver every moqi path uses
+  permissions.ts   PermissionRules: session/project/global allow rules, the
+                   fail-closed command matcher, the rules-file format
+  memory.ts        MemoryStore: one file per memory plus a MEMORY.md index, the
+                   instruction-file chain, `# ` quick notes
+  memory-tools.ts  memory_save / memory_read / memory_forget over a MemoryStore
+                   (the one module here that imports dsh-tools)
+  git-workspace.ts Workspace: a session's branch or worktree, its cleanup rules,
+                   the model's workspace guidance, leftover pruning
+  session-mode.ts  the shift+tab cycle over permission presets and plan mode
+  local-platform.ts  clipboard/URL bridges and the $EDITOR invocation
   version.ts       reads the package version for --version and /update
   tui/
     screen.ts      raw mode, alternate screen, per-line diffed painting
@@ -126,12 +137,21 @@ regression still would.
     provider parses the real command line.
   - `dsh --profile tui </dev/null` boots the bundle and exits on the non-TTY
     guard.
-- **34 suites, 2722 assertions**, covering rendering (including a pty round
+- **44 suites**, covering rendering (including a pty round
   trip through the real screen, decoder, and frame renderer), streaming
   projection, queueing, steering, persistence, the usage ledger and its
   colored dashboard, session storage, cross-session search, the panels
-  (including a running sign-in), the plugin seam, i18n, the Sessions view, and the
-  render cache.
+  (including a running sign-in), the plugin seam, i18n, the Sessions view, the
+  render cache — and, since 0.5, the permission matcher (an adversarial table
+  of commands that try to smuggle a second one past a rule), the memory store,
+  session isolation against real throwaway git repositories, the session-mode
+  cycle, and the `$EDITOR` invocation run against fake editors.
+- **How 0.5 reaches the model, by Harness seam:** approvals through the
+  `approval/request` waterfall (arguments read from the `tool/call` event),
+  memory tools through `ctx.tools.register`, the memory list through
+  `ctx.systemPrompt.context` (runtime context — appended only when it
+  changes), the workspace rules through `ctx.systemPrompt.section`, and modes
+  through `permissionPresets` and `planMode`. All are registered per agent.
 - **The boot-to-model turn is now automated, on demand.** `npm run test:live`
   (`MOQI_LIVE=1`) boots `dsh --profile tui` under `script(1)`, types a
   prompt, and asserts that the model's answer reaches a painted frame before

@@ -6,6 +6,99 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-18
+
+Permission rules, agent memory, and session isolation — the agent asks less,
+remembers across sessions, and works on a branch or worktree of its own.
+
+### Added
+
+- **Approvals remember your answer.** The approval panel shows the exact
+  command (read from the session log, never a display summary) and offers
+  `1` allow once, `2` allow for this session, `3` always allow — for this
+  project or, with `tab`, everywhere — and `4` deny. A rule such as
+  `bash(git log *)` then answers the matching calls without a panel, naming
+  itself on the status line; the Harness still audits every decision. Rules
+  are kept under `$DSH_HOME/moqi/permissions/`, never in the repository.
+  Matching fails closed: a compound command must match in every part, and
+  substitutions, redirects (other than `/dev/null`), and input redirection
+  always ask; a rule from a sandbox escalation names the mode it may grant.
+- **`/permissions`** lists the rules in force by scope, revokes one after a
+  y/n, and opens the project or global rules file in `$EDITOR`; a file that no
+  longer parses is reported and its rules are off, never guessed at.
+- **`shift+tab` cycles the session mode**: read-only → workspace-write → plan,
+  using the Harness's own permission presets and plan mode. Plan keeps the
+  workspace-write sandbox so an approved plan can be carried out; full access
+  is never a step. The footer badges anything but workspace-write.
+- **Agent memory.** `memory_save`, `memory_read` and `memory_forget` keep
+  facts across sessions under `$DSH_HOME/memory/` (everywhere) and
+  `$DSH_HOME/memory/projects/<project>/`, one file per fact plus a `MEMORY.md`
+  index. Every session carries the index as runtime context: a memory saved
+  anywhere reaches every open session at its next request, an unchanged list
+  costs nothing, and the system prompt is never rewritten.
+- **`/memory`** shows the instruction files the Harness loads here beside the
+  memories and index files, opens any of them in `$EDITOR`, and forgets one
+  with `/memory forget <name>`. **`/memory off|on`** switches memory for every
+  session and is remembered; `--no-memory` (or `MOQI_MEMORY=off`) does it for
+  one run. Off hides the list and the tools; nothing is deleted.
+- **`# ` quick-add.** A one-line `# note` is never sent to the model: a picker
+  keeps it as a project or global memory, or appends it to the project's or
+  the global `AGENTS.md`.
+- **Sessions work on their own branch.** A new session in a git repository
+  starts on `moqi/<date>-<id>`, in place — no copy. `/worktree <name>` opens a
+  session in a separate checkout under `$DSH_HOME/worktrees/`, outside the
+  repository; `/branch <name>` switches the current one; `/isolation
+  off|branch|worktree` and `--isolation` choose the default. `/close` removes
+  only a branch with no commits of its own and a clean worktree, and launch
+  tidies leftovers nothing open is using. The footer shows the branch.
+- **The agent knows its workspace.** An isolated session gets rules written
+  from its real state: commit to this branch, leave the base alone, and either
+  "this checkout is shared — never switch, stash, reset, or rebase" or "this
+  is a fresh worktree — install dependencies first".
+- **`k` closes a session in the Sessions list.** On a row this app owns, `k`
+  closes that session, as `/close` does. A session in another process, or on a
+  peer, is left alone: there is no per-session control channel, and the only
+  lever — the owning process — would end every session it holds.
+
+### Changed
+
+- **The fleet is now Sessions.** The cross-device overview is renamed from
+  "fleet" to **Sessions**: `ctrl+s`, and `/fleet` is now `/sessions`. The list
+  itself is unchanged — local sessions and peers, grouped by device.
+- **`/stack` is now `/tiled` (`ctrl+t`).** The stacked view is the tiled view:
+  `ctrl+t` toggles it, `alt+arrows` move focus and `alt+shift+arrows` move a
+  pane. `ctrl+t` previously toggled reasoner display, which remains available
+  as `/thinking`.
+- **`@` completion, attachments, and `/fork` follow the session's own
+  directory**, so a worktree session completes and attaches its own files.
+
+### Removed
+
+- **The ctrl+c sessions menu.** The first `ctrl+c` now only arms the two-step
+  quit; the Sessions view is the one place every session is listed. The
+  redundant open-sessions picker (and its `x`-to-close row action) is gone;
+  `ctrl+n` and `/close` still manage tabs.
+
+### Fixed
+
+- **Approval panels were invisible in the tiled view with one session.** With
+  the tiled view saved and a single session open, every approval panel was
+  dropped and the agent waited on an answer no one could see.
+- **`$EDITOR` with arguments.** A value like `omarchy-launch-editor --inline`
+  or `code --wait` was run as one program name and failed; it now runs as a
+  command line, with the file passed safely as one argument.
+- **An approval's command came from the session on screen**, not the one that
+  asked, so a background session's approval showed no command.
+- **`$DSH_HOME` is resolved one way everywhere**, the Harness's own way (blank
+  means `~/.dsh`); a blank value no longer sends sessions or rules elsewhere.
+- **A non-interactive run touches nothing.** `dsh --profile tui` without a
+  terminal refused only after starting a session — which rewrote the shared
+  open-sessions list and, with 0.5's isolation, switched the repository onto a
+  `moqi/` branch. It now refuses before any of that, and moqi never saves a
+  state it did not load.
+
+## [0.4.8] — 2026-10-02
+
 ### Added
 
 - **A file edit reads as a diff.** With tool calls expanded, a
@@ -18,10 +111,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Start a session from the Sessions list.** The device group carries a
   `+ Ask the harness in a new session` row; `enter` on it opens a new session,
   the same as `ctrl+n`, and it is never counted as a session itself.
-- **`k` closes a session in the Sessions list.** On a row this app owns, `k`
-  closes that session, as `/close` does. A session in another process, or on a
-  peer, is left alone: there is no per-session control channel, and the only
-  lever — the owning process — would end every session it holds.
 
 ### Changed
 
@@ -29,20 +118,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ctrl+o` opens the outcome underneath. The choice round-trips either way —
   previously only a collapsed view was stored, so an explicit expansion would
   have been lost across restarts.
-- **The fleet is now Sessions.** The cross-device overview is renamed from
-  "fleet" to **Sessions**: `ctrl+s`, and `/fleet` is now `/sessions`. The list
-  itself is unchanged — local sessions and peers, grouped by device.
-- **`/stack` is now `/tiled` (`ctrl+t`).** The stacked view is the tiled view:
-  `ctrl+t` toggles it, `alt+arrows` move focus and `alt+shift+arrows` move a
-  pane. `ctrl+t` previously toggled reasoner display, which remains available
-  as `/thinking`.
 
-### Removed
+## [0.4.7] — 2026-10-02
 
-- **The ctrl+c sessions menu.** The first `ctrl+c` now only arms the two-step
-  quit; the Sessions view is the one place every session is listed. The
-  redundant open-sessions picker (and its `x`-to-close row action) is gone;
-  `ctrl+n` and `/close` still manage tabs.
+### Added
+
+- **A complete pty-driven functionality suite**, and the Sonar findings
+  cleared across src, tests, and scripts. No user-facing change.
 
 ## [0.4.6] — 2026-10-02
 

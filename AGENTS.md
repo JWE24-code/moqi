@@ -18,7 +18,7 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
 
 - `npm ci` — install (npm + lockfile; no other package manager).
 - `npm run typecheck` — `tsc` against the linked Harness types.
-- `npm test` — the full smoke suite (~35 suites; must pass before every commit).
+- `npm test` — the full smoke suite (~45 suites; must pass before every commit).
 - `npm run test:pty` — the pty-driven suite (CI runs it too).
 - `npm run build` — emit to `lib/`.
 - `npm run sonar:sync` — reconcile open Sonar issues into GitHub issues (reads
