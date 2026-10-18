@@ -15,3 +15,8 @@ node_modules
 
 # Scratch code maps; kept maps live in docs/whiteboards.
 .exdraw
+
+# Personal agent instructions: one person's machine, tools, and infrastructure.
+# AGENTS.md is the public, project-only half.
+AGENTS.local.md
+CLAUDE.local.md
