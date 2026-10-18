@@ -10,6 +10,13 @@
  * `$DSH_HOME/sessions/<projectKey(cwd)>/<encodeSegment(id)>/`.
  * @module
  */
+/**
+ * `$DSH_HOME`, resolved exactly as the Harness does (`resolveDshHome` in
+ * `dsh-home-paths`): unset, empty, or whitespace-only means `~/.dsh`. Every
+ * moqi path under the Harness home goes through this one function, so moqi
+ * never looks somewhere the Harness does not.
+ */
+export declare function dshHome(env?: NodeJS.ProcessEnv): string;
 /** The sessions root: `$DSH_HOME/sessions`, defaulting to `~/.dsh/sessions`. */
 export declare function sessionsRoot(): string;
 /**

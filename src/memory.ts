@@ -21,6 +21,11 @@
  * tool handler, a panel render, the prompt-section snapshot — all want the
  * answer before they continue.
  *
+ * Callers use {@link MemoryStore} (at the end of this file), bound to one
+ * session directory; the functions before it are its implementation, exported
+ * for this module's own tests. `$DSH_HOME` comes from `dshHome` in
+ * `sessions-store.ts`, the one resolver every moqi path shares.
+ *
  * Instruction discovery ({@link instructionChain}) mirrors the defaults of
  * `@deepseek-ai/dsh-agent-instructions` (`discoverInstructionFiles` in its
  * `lib/index.js`) without importing it.
@@ -28,9 +33,8 @@
  */
 
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { projectKey } from './sessions-store.ts'
+import { dshHome, projectKey } from './sessions-store.ts'
 
 /** Where a memory lives: shared by every project, or tied to one. */
 export type MemoryScope = 'global' | 'project'
@@ -72,12 +76,6 @@ export interface InstructionFile {
 const INDEX_FILE = 'MEMORY.md'
 const MAX_SLUG = 64
 const INDEX_LINE = /^- \[[^\]]*\]\(([a-z0-9-]+)\.md\)/
-
-/** `$DSH_HOME`, resolved exactly as the Harness does: trimmed-empty means unset. */
-export function dshHome(env: NodeJS.ProcessEnv = process.env): string {
-  const configured = env['DSH_HOME']
-  return resolve(configured !== undefined && configured.trim() !== '' ? configured : join(homedir(), '.dsh'))
-}
 
 /** The directory one scope's memories live in. */
 export function memoryDir(scope: MemoryScope, cwd: string): string {
@@ -451,4 +449,69 @@ export function appendInstruction(path: string, line: string): void {
     // New file: the default mode applies.
   }
   writeAtomic(path, `${existing}${separator}${text}\n`, mode)
+}
+
+// ------------------------------------------------------------- MemoryStore
+
+/** A memory as the store hands it out: with the file it lives in, for `$EDITOR`. */
+export interface StoredMemory extends Memory {
+  path: string
+}
+
+/**
+ * Memory and instructions as one session sees them. This is the interface
+ * callers use — the memory tools, the `/memory` panel, the prompt section, the
+ * `# ` quick-add; the functions above are its implementation.
+ *
+ * Bound to the session's directory once, so no caller passes `cwd` again or
+ * learns where anything lives: every memory comes back with its `path`, and
+ * {@link indexFile} names the index to open.
+ */
+export class MemoryStore {
+  /** The directory the session works in; picks the project scope. */
+  readonly cwd: string
+
+  constructor(cwd: string) {
+    this.cwd = cwd
+  }
+
+  /** Create or replace a memory; see {@link save}. */
+  save(scope: MemoryScope, input: MemoryInput): StoredMemory {
+    return this.located(save(scope, this.cwd, input))
+  }
+
+  /** One memory by title or slug, or undefined. */
+  read(scope: MemoryScope, name: string): StoredMemory | undefined {
+    const memory = read(scope, this.cwd, name)
+    return memory === undefined ? undefined : this.located(memory)
+  }
+
+  /** Remove a memory and its index line; false when there was none. */
+  forget(scope: MemoryScope, name: string): boolean {
+    return forget(scope, this.cwd, name)
+  }
+
+  /** Every memory in a scope, in index order. */
+  list(scope: MemoryScope): StoredMemory[] {
+    return list(scope, this.cwd).map((memory) => this.located(memory))
+  }
+
+  /** The index text for the `moqi:memory` prompt section; '' when there is no memory. */
+  promptIndex(budget?: IndexBudget): string {
+    return renderIndexForPrompt(this.cwd, budget)
+  }
+
+  /** The instruction files the Harness loads here, including ones not yet created. */
+  instructions(): InstructionFile[] {
+    return instructionChain(this.cwd)
+  }
+
+  /** The `MEMORY.md` a scope's index lives in — what `/memory` opens in `$EDITOR`. */
+  indexFile(scope: MemoryScope): string {
+    return indexPath(scope, this.cwd)
+  }
+
+  private located(memory: Memory): StoredMemory {
+    return { ...memory, path: memoryPath(memory.scope, this.cwd, memory.name) }
+  }
 }

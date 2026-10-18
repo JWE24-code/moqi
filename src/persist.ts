@@ -12,7 +12,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { homedir } from 'node:os'
+import { dshHome } from './sessions-store.ts'
 import type { ProviderUsage, TokenBuckets, UsageEntry, UsageLedger } from './usage.ts'
 
 /**
@@ -183,10 +183,7 @@ function readUsageEntries(value: unknown): UsageEntry[] {
 
 /** Where the state file lives: `$DSH_HOME/tui-state.json`, default `~/.dsh`. */
 export function statePath(env: NodeJS.ProcessEnv = process.env): string {
-  const home = env['DSH_HOME'] !== undefined && env['DSH_HOME'] !== ''
-    ? env['DSH_HOME']
-    : join(homedir(), '.dsh')
-  return join(home, 'tui-state.json')
+  return join(dshHome(env), 'tui-state.json')
 }
 
 /** Coerce one on-disk session entry, or reject it outright. */

@@ -229,6 +229,34 @@ try {
   assert.equal(readFileSync(fresh, 'utf8'), 'made\n')
   assert.throws(() => appendInstruction(fresh, '   '), /nothing to append/)
 
+  // ---------------------------------------------------------------- MemoryStore
+  // The interface callers use: bound to one directory, paths handed back.
+  const store = new memory.MemoryStore(project)
+  const kept = store.save('project', { name: 'Deploy excludes env', description: 'tar must skip .env', type: 'feedback', body: 'Why: outage.' })
+  assert.equal(kept.path, join(memoryDir('project', project), 'deploy-excludes-env.md'))
+  assert.equal(readFileSync(kept.path, 'utf8').includes('tar must skip .env'), true, 'the path is the real file')
+  assert.equal(store.read('project', 'Deploy excludes env')?.path, kept.path)
+  assert.equal(store.read('project', 'nope'), undefined)
+  assert.deepEqual(store.list('project').map((m) => m.name).includes('deploy-excludes-env'), true)
+  assert.ok(store.list('project').every((m) => m.path.endsWith(`${m.name}.md`)))
+  assert.equal(store.indexFile('project'), indexPath('project', project))
+  assert.match(store.promptIndex(), /Deploy excludes env/)
+  assert.deepEqual(store.instructions(), instructionChain(project))
+  // A store for another directory sees its own project scope and the shared global one.
+  const elsewhereStore = new memory.MemoryStore(other)
+  assert.equal(elsewhereStore.read('project', 'deploy-excludes-env'), undefined)
+  assert.equal(store.forget('project', 'deploy-excludes-env'), true)
+  assert.equal(store.forget('project', 'deploy-excludes-env'), false)
+
+  // One $DSH_HOME rule for every moqi path, the Harness's own.
+  const { dshHome } = await import('../src/sessions-store.ts')
+  const { homedir } = await import('node:os')
+  assert.equal(dshHome({ DSH_HOME: '   ' }), join(homedir(), '.dsh'), 'whitespace means unset')
+  assert.equal(dshHome({ DSH_HOME: '' }), join(homedir(), '.dsh'))
+  assert.equal(dshHome({}), join(homedir(), '.dsh'))
+  assert.equal(dshHome({ DSH_HOME: 'rel/dir' }), resolve('rel/dir'), 'relative paths are resolved')
+  assert.equal(dshHome(), resolve(home))
+
   console.log('memory-smoke: ok')
 } finally {
   rmSync(home, { recursive: true, force: true })

@@ -14,12 +14,22 @@
 import type { Dirent } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+
+/**
+ * `$DSH_HOME`, resolved exactly as the Harness does (`resolveDshHome` in
+ * `dsh-home-paths`): unset, empty, or whitespace-only means `~/.dsh`. Every
+ * moqi path under the Harness home goes through this one function, so moqi
+ * never looks somewhere the Harness does not.
+ */
+export function dshHome(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env['DSH_HOME']
+  return resolve(configured !== undefined && configured.trim() !== '' ? configured : join(homedir(), '.dsh'))
+}
 
 /** The sessions root: `$DSH_HOME/sessions`, defaulting to `~/.dsh/sessions`. */
 export function sessionsRoot(): string {
-  const home = process.env['DSH_HOME'] ?? join(homedir(), '.dsh')
-  return join(home, 'sessions')
+  return join(dshHome(), 'sessions')
 }
 
 /**

@@ -22,8 +22,8 @@
 import { execFile } from 'node:child_process'
 import { existsSync, rmdirSync } from 'node:fs'
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path'
-import { dshHome, slugify } from './memory.ts'
-import { projectKey } from './sessions-store.ts'
+import { slugify } from './memory.ts'
+import { dshHome, projectKey } from './sessions-store.ts'
 
 /** How a new session in a repository isolates its changes. */
 export type Isolation = 'off' | 'branch' | 'worktree'

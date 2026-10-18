@@ -27,9 +27,8 @@
  */
 
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { projectKey } from './sessions-store.ts'
+import { dshHome, projectKey } from './sessions-store.ts'
 
 // ------------------------------------------------------------------- types
 
@@ -598,8 +597,7 @@ export function parseRules(text: string): Rule[] {
 
 /** `$DSH_HOME/moqi/permissions`, defaulting to `~/.dsh/moqi/permissions`. */
 export function permissionsDir(): string {
-  const home = process.env['DSH_HOME'] ?? join(homedir(), '.dsh')
-  return join(home, 'moqi', 'permissions')
+  return join(dshHome(), 'moqi', 'permissions')
 }
 
 /** The file a scope's rules live in. `cwd` only matters for `project`. */
