@@ -16,20 +16,42 @@ function check(label: string, condition: boolean): void {
 
 // ------------------------------------------------------------------ approval
 
+// Without a rule to offer: once and deny, nothing else.
 const approval = new ApprovalPanel('shell', 'the command writes outside the workspace', 'rm -rf build')
-check('approval starts on Allow once', approval.decision() === 'allowed-once')
+check('approval starts on Allow once', approval.choice().decision === 'allowed-once' && approval.choice().grant === undefined)
 approval.move(1)
-check('down selects Deny', approval.decision() === 'rejected')
+check('down selects Deny', approval.choice().decision === 'rejected')
 approval.move(1)
-check('the cursor clamps at the last row', approval.decision() === 'rejected')
+check('the cursor clamps at the last row', approval.choice().decision === 'rejected')
 approval.move(-5)
-check('and at the first', approval.decision() === 'allowed-once')
+check('and at the first', approval.choice().decision === 'allowed-once')
+check('2 is deny without a rule', approval.choiceAt(2)?.decision === 'rejected')
+check('3 picks nothing without a rule', approval.choiceAt(3) === undefined)
 const approvalView = approval.view()
 check('the panel names the tool', approvalView.title.includes('shell'))
 check('the reason is carried into the detail', approvalView.detail.includes('writes outside'))
 check('the command is shown', approvalView.detail.includes('rm -rf build'))
 check('exactly two rows', approvalView.rows.length === 2)
 check('the first row is highlighted', approvalView.rows[0]?.selected === true)
+
+// With a rule to offer: once, this session, always (project ⇄ everywhere), deny.
+const offered = new ApprovalPanel('bash', undefined, 'git log --oneline -20', 'bash(git log *)')
+const offeredView = offered.view()
+check('four rows with a rule', offeredView.rows.length === 4)
+check('the session row names the rule', offeredView.rows[1]?.description === 'bash(git log *)')
+check('the always row names rule and scope', offeredView.rows[2]?.description?.includes('bash(git log *) · this project') === true)
+check('1 is once', offered.choiceAt(1)?.grant === undefined && offered.choiceAt(1)?.decision === 'allowed-once')
+check('2 grants this session', offered.choiceAt(2)?.grant === 'session')
+check('3 grants this project by default', offered.choiceAt(3)?.grant === 'project')
+check('4 denies', offered.choiceAt(4)?.decision === 'rejected' && offered.choiceAt(4)?.grant === undefined)
+offered.toggleScope()
+check('tab flips always to everywhere', offered.choiceAt(3)?.grant === 'global')
+check('and the row says so', offered.view().rows[2]?.description?.includes('everywhere') === true)
+offered.toggleScope()
+check('and back', offered.choiceAt(3)?.grant === 'project')
+offered.move(10)
+check('the cursor clamps at deny', offered.choice().decision === 'rejected')
+check('the rules hint is shown', offered.view().hint.includes('3'))
 
 // ------------------------------------------------- spoken approval answers
 

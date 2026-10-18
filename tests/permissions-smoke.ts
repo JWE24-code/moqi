@@ -379,6 +379,26 @@ try {
     check('malformed file left untouched', (await readFile(bad, 'utf8')) === garbage)
   }
 
+  // ------------------------------------------- session-log lookup and labels
+  {
+    const { callArguments, describeRule } = await import('../src/permissions.ts')
+    const log = [
+      { type: 'tool/call', data: { callId: 'c1', name: 'bash', arguments: '{"command":"git log"}' } },
+      { type: 'assistant/message', data: { text: 'hi' } },
+      { type: 'tool/ptc-dispatch-start', data: { subCallId: 'c2:ptc:0', name: 'bash', arguments: { command: 'ls' } } },
+      { type: 'tool/call', data: { callId: 'c3', name: 'bash', arguments: '{"command":"a\\nrm -rf x"}' } },
+    ]
+    check('finds a tool/call by id', callArguments(log, 'c1') === '{"command":"git log"}')
+    check('finds a nested run_code call', (callArguments(log, 'c2:ptc:0') as { command: string }).command === 'ls')
+    check('keeps the exact text, newline and all', JSON.parse(callArguments(log, 'c3') as string).command === 'a\nrm -rf x')
+    check('unknown id: undefined', callArguments(log, 'nope') === undefined)
+    check('no id: undefined', callArguments(log, undefined) === undefined)
+    check('null data is skipped', callArguments([{ type: 'tool/call', data: null }], 'c1') === undefined)
+    check('label: shell rule', describeRule({ tool: 'bash', command: 'git log *' }) === 'bash(git log *)')
+    check('label: tool rule', describeRule({ tool: 'read' }) === 'read')
+    check('label: escalation rule', describeRule({ tool: 'bash', command: 'git fetch *', mode: 'danger-full-access' }) === 'bash(git fetch *) @ danger-full-access')
+  }
+
   // ---------------------------------------------------------- PermissionRules
   // The interface the approval listener uses: raw arguments in, a decision out.
   {

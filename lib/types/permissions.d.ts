@@ -165,6 +165,21 @@ export interface Ask {
     reason?: string;
 }
 /**
+ * A rule as people read it: `bash(git log *)`, `read`, `bash(git fetch *) @ danger-full-access`.
+ */
+export declare function describeRule(rule: Rule): string;
+/**
+ * The exact arguments of one tool call, read from the session log: the
+ * `tool/call` event with `callId`, or — for a call nested inside `run_code` —
+ * the `tool/ptc-dispatch-start` whose `subCallId` it is. The Harness appends
+ * both before any approval is asked, so searching from the newest event finds
+ * them at once. Undefined when absent, which makes every shell rule miss.
+ */
+export declare function callArguments(events: readonly {
+    type: string;
+    data: unknown;
+}[], callId: string | undefined): unknown;
+/**
  * The permission rules one session answers approvals with. This is the
  * interface callers use; the functions above are its implementation.
  *
@@ -183,6 +198,8 @@ export declare class PermissionRules {
     decide(ask: Ask): Promise<ScopedRule | undefined>;
     /** The "always allow" rule the panel should offer for this call, or undefined to offer none. */
     suggest(ask: Ask): Rule | undefined;
+    /** The exact shell command a call runs, for the panel to show; undefined for other tools. */
+    command(ask: Ask): string | undefined;
     /**
      * Allow a rule in a scope, normalized. `session` lasts as long as this
      * object; the others are written to their file.

@@ -62,48 +62,102 @@ export function interpretApproval(text: string): ApprovalDecision | undefined {
   return undefined
 }
 
-/** What the user decided about one approval request. */
+/** What the Harness is told about one approval request. */
 export type ApprovalDecision = 'allowed-once' | 'rejected'
+
+/** Where a granted rule is kept: this session only, this project, or everywhere. */
+export type GrantScope = 'session' | 'project' | 'global'
+
+/**
+ * What the user chose: the Harness outcome, plus — for "this session" and
+ * "always" — the scope the app should keep the offered rule in. The Harness
+ * protocol itself has no lasting grant; the app's rules answer later asks.
+ */
+export interface ApprovalChoice {
+  decision: ApprovalDecision
+  grant?: GrantScope
+}
 
 /**
  * One pending tool approval.
  *
- * There is no persistent grant in the protocol — "allow once" or deny — so the
- * panel offers exactly those two rows and no "always" temptation.
+ * With a rule to offer (`always` is its label, e.g. `bash(git log *)`) the
+ * panel has four rows — once, this session, always, deny — and `tab` flips
+ * "always" between this project and everywhere. Without one (a compound
+ * command, an unreadable call) only once and deny: the app never offers a
+ * grant it cannot state exactly.
  */
 export class ApprovalPanel {
   selected = 0
+  /** Where "always" keeps the rule; `tab` toggles it. */
+  alwaysScope: 'project' | 'global' = 'project'
   readonly toolName: string
   readonly reason: string | undefined
   private readonly command: string | undefined
+  private readonly always: string | undefined
 
-  constructor(toolName: string, reason: string | undefined, command: string | undefined) {
+  constructor(toolName: string, reason: string | undefined, command: string | undefined, always?: string) {
     this.toolName = toolName
     this.reason = reason
     this.command = command
+    this.always = always
+  }
+
+  /** The rows in order; the grant rows only exist when there is a rule to offer. */
+  private choices(): ApprovalChoice[] {
+    const rows: ApprovalChoice[] = [{ decision: 'allowed-once' }]
+    if (this.always !== undefined) {
+      rows.push({ decision: 'allowed-once', grant: 'session' }, { decision: 'allowed-once', grant: this.alwaysScope })
+    }
+    rows.push({ decision: 'rejected' })
+    return rows
   }
 
   move(delta: number): void {
-    this.selected = this.selected + delta < 0 ? 0 : Math.min(this.selected + delta, 1)
+    const last = this.choices().length - 1
+    this.selected = Math.max(0, Math.min(this.selected + delta, last))
   }
 
-  decision(): ApprovalDecision {
-    return this.selected === 0 ? 'allowed-once' : 'rejected'
+  /** Flip where "always" keeps the rule. */
+  toggleScope(): void {
+    this.alwaysScope = this.alwaysScope === 'project' ? 'global' : 'project'
+  }
+
+  /** The choice under the cursor. */
+  choice(): ApprovalChoice {
+    return this.choices()[this.selected]!
+  }
+
+  /** The choice a number key picks (1-based), or undefined past the last row. */
+  choiceAt(number: number): ApprovalChoice | undefined {
+    return this.choices()[number - 1]
   }
 
   view(): PanelView {
     const detail = [this.reason ?? '', this.command === undefined ? '' : `\`\`\`sh\n${this.command}\n\`\`\``]
       .filter((part) => part !== '')
       .join('\n\n')
+    const rows: PanelRow[] = [{ label: t('approval.allow'), description: t('approval.allowDetail'), selected: false }]
+    if (this.always !== undefined) {
+      rows.push(
+        { label: t('approval.session'), description: this.always, selected: false },
+        {
+          label: t('approval.always'),
+          description: `${this.always} · ${t(this.alwaysScope === 'project' ? 'approval.scopeProject' : 'approval.scopeGlobal')}`,
+          selected: false,
+        },
+      )
+    }
+    rows.push({ label: t('approval.deny'), description: t('approval.denyDetail'), selected: false })
+    rows.forEach((row, index) => {
+      row.selected = index === this.selected
+    })
     return {
       kind: 'approval',
       title: t('approval.title', { tool: this.toolName }),
       detail,
-      rows: [
-        { label: t('approval.allow'), description: t('approval.allowDetail'), selected: this.selected === 0 },
-        { label: t('approval.deny'), description: t('approval.denyDetail'), selected: this.selected === 1 },
-      ],
-      hint: t('approval.hint'),
+      rows,
+      hint: t(this.always === undefined ? 'approval.hint' : 'approval.hintRules'),
     }
   }
 }

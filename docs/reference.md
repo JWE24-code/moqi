@@ -27,6 +27,7 @@ overrides background detection; `NO_COLOR` disables styling.
 | Key | Action |
 |---|---|
 | `enter` | Send · steers into a running reply · a menu on top chooses with `enter` too |
+| `1`–`4` (approval panel) | Allow once · allow for this session · always allow · deny — `tab` flips "always" between this project and everywhere, `esc` denies ([details](using-moqi.md#approvals-and-permission-rules)) |
 | `shift+enter` | Insert a newline · `ctrl+j` does the same · multi-line pastes land whole |
 | `↑` / `↓` | On the first / last composer row, recall earlier prompts |
 | `/` | Command palette, 3 rows at a time and scrolling past that · `tab` accepts · `esc` dismisses |

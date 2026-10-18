@@ -702,6 +702,36 @@ export interface Ask {
 }
 
 /**
+ * A rule as people read it: `bash(git log *)`, `read`, `bash(git fetch *) @ danger-full-access`.
+ */
+export function describeRule(rule: Rule): string {
+  const head = rule.command === undefined ? rule.tool : `${rule.tool}(${rule.command})`
+  return rule.mode === undefined ? head : `${head} @ ${rule.mode}`
+}
+
+/**
+ * The exact arguments of one tool call, read from the session log: the
+ * `tool/call` event with `callId`, or — for a call nested inside `run_code` —
+ * the `tool/ptc-dispatch-start` whose `subCallId` it is. The Harness appends
+ * both before any approval is asked, so searching from the newest event finds
+ * them at once. Undefined when absent, which makes every shell rule miss.
+ */
+export function callArguments(
+  events: readonly { type: string; data: unknown }[],
+  callId: string | undefined,
+): unknown {
+  if (callId === undefined) return undefined
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const { type, data } = events[index]!
+    const record = data as Record<string, unknown> | null
+    if (record === null || typeof record !== 'object') continue
+    if (type === 'tool/call' && record['callId'] === callId) return record['arguments']
+    if (type === 'tool/ptc-dispatch-start' && record['subCallId'] === callId) return record['arguments']
+  }
+  return undefined
+}
+
+/**
  * The shell command a call runs, read from its arguments. Shell tools take
  * it as `command` (`dsh-tool-bash`, `dsh-tool-pwsh`). Anything unreadable is
  * `undefined`, which never matches a shell rule.
@@ -751,6 +781,11 @@ export class PermissionRules {
   /** The "always allow" rule the panel should offer for this call, or undefined to offer none. */
   suggest(ask: Ask): Rule | undefined {
     return suggestPattern(ask.toolName, commandOf(ask), ask.reason)
+  }
+
+  /** The exact shell command a call runs, for the panel to show; undefined for other tools. */
+  command(ask: Ask): string | undefined {
+    return commandOf(ask)
   }
 
   /**

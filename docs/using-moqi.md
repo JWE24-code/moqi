@@ -42,6 +42,37 @@ the token leaves the text and the image goes along as a content block, with a
 `🖼 name WxH` line in the transcript. Without the attachment service the path
 is inserted as plain text instead.
 
+## Approvals and permission rules
+
+When the agent needs your say-so — most often a command the sandbox refused,
+retried with an escalation — the approval panel shows the exact command (read
+from the session log, newlines and all) and the reason, with up to four rows:
+
+```
+ Allow bash?
+ escalate sandbox to danger-full-access: the path lies outside the workspace…
+   │ touch /tmp/outside/one.txt
+ ❯ Allow once
+   Allow for this session  bash(touch *) @ danger-full-access
+   Always allow            bash(touch *) @ danger-full-access · this project (tab: everywhere)
+   Deny
+```
+
+`1`–`4` pick a row, `tab` flips "always" between this project and everywhere,
+`esc` denies. "This session" lasts as long as the session (a fork keeps it);
+"always" is written to `$DSH_HOME/moqi/permissions/` — per project, keyed like
+the session store, or `global.yaml` — never into the repository, so a cloned
+repo can't ship its own grants.
+
+The next call a rule covers is answered without a panel, and the status line
+names the rule: `allowed by rule bash(touch *) @ danger-full-access · session`.
+The Harness still audits every decision. A rule only answers an escalation to
+the mode it names or a narrower one, and a compound command is covered only if
+every part is — anything with a substitution, a redirect other than
+`/dev/null`, or input redirection always asks. When no exact rule can be
+stated (a chained command, say), the panel offers once or deny only. A spoken
+answer only ever allows once.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something

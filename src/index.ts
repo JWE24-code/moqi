@@ -109,6 +109,7 @@ import {
   LoginPanel,
   QuestionsPanel,
   interpretApproval,
+  type ApprovalChoice,
   type ApprovalDecision,
   type PanelView,
 } from './tui/panels.ts'
@@ -135,6 +136,7 @@ import { transcriptMarkdown } from './tui/export.ts'
 import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
 import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
+import { callArguments, describeRule, PermissionRules, type Ask, type Rule } from './permissions.ts'
 import {
   activeProfileName,
   forgetPlugin,
@@ -384,6 +386,10 @@ interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void
   /** The session that asked, so its tile can blink and host the panel. */
   tab: SessionTab | undefined
+  /** The call as the rules see it: tool, exact arguments from the session log, reason. */
+  ask: Ask
+  /** The rule "this session" / "always" would keep; undefined offers neither. */
+  offer: Rule | undefined
 }
 
 /** A question set waiting for the user, and the promise that answers it. */
@@ -483,6 +489,12 @@ interface SessionTab {
    * parent's instance.
    */
   workspace: Workspace
+  /**
+   * The rules that answer this session's approvals without a panel: its own
+   * "this session" grants, plus the project and global files. Set together
+   * with `workspace` (see `setWorkspace`); a fork shares its parent's.
+   */
+  permissions: PermissionRules
 }
 
 /** Create an empty session record. */
@@ -516,7 +528,14 @@ function newTab(id: string): SessionTab {
     contextLimit: 0,
     background: new Map(),
     workspace: Workspace.unplaced(process.cwd()),
+    permissions: new PermissionRules(process.cwd()),
   }
+}
+
+/** Give a session its workspace, and the permission rules for that directory. */
+function setWorkspace(tab: SessionTab, workspace: Workspace): void {
+  tab.workspace = workspace
+  tab.permissions = new PermissionRules(workspace.cwd)
 }
 
 
@@ -910,7 +929,7 @@ class TuiApp {
       applyTheme(this.tab.theme)
     } else {
       const sessionId = brandString<SessionId>(`session-${randomUUID()}`)
-      this.tab.workspace = await Workspace.place(cwd, this.isolation)
+      setWorkspace(this.tab, await Workspace.place(cwd, this.isolation))
       this.announce(this.tab.workspace)
       const created = await agents.create({ sessionId, meta: { cwd: this.tab.workspace.cwd }, agentOptions, setup })
       this.tab.agent = created.agent
@@ -967,9 +986,26 @@ class TuiApp {
     this.disposers.push(
       this.ctx.on('approval/request', async (request, next) => {
         if (!this.ownsRequest(request.agent)) return await next()
+        const tab = this.tabForAgent(request.agent)
+        const rules = tab?.permissions ?? new PermissionRules(this.cwd)
+        // The exact arguments, from the session log — never the row's display
+        // summary, which folds whitespace and truncates.
+        const ask: Ask = {
+          toolName: request.toolName,
+          args: callArguments(request.agent.session.snapshotEvents(), request.callId),
+          reason: request.reason,
+        }
+        // A rule that covers this exact call answers without a panel. The
+        // Harness still audits the decision like any other.
+        const covered = await rules.decide(ask).catch(() => undefined)
+        if (covered !== undefined) {
+          this.setStatus(`allowed by rule ${describeRule(covered)} · ${covered.scope}`)
+          this.paint()
+          return 'allowed-once'
+        }
+        const offer = rules.suggest(ask)
         return await new Promise((resolve) => {
-          const tab = this.tabForAgent(request.agent)
-          const pending = { request, resolve, tab }
+          const pending = { request, resolve, tab, ask, offer }
           this.pendingApprovals.push(pending)
           // The session that asked blinks in the stack until it is answered,
           // whether or not its panel is the one on screen.
@@ -1071,10 +1107,12 @@ class TuiApp {
     if (this.panel !== undefined) return
     const approval = this.pendingApprovals[0]
     if (approval !== undefined) {
+      const rules = approval.tab?.permissions
       this.panel = new ApprovalPanel(
         approval.request.toolName,
         approval.request.reason,
-        this.commandForCall(approval.request.callId),
+        rules?.command(approval.ask) ?? this.commandForCall(approval.tab, approval.request.callId),
+        approval.offer === undefined ? undefined : describeRule(approval.offer),
       )
       this.panelTab = approval.tab
       return
@@ -1086,16 +1124,19 @@ class TuiApp {
     }
   }
 
-  /** The full command behind an approval, read from the tool call already streamed. */
-  private commandForCall(callId: string | undefined): string | undefined {
-    if (callId === undefined) return undefined
-    for (const message of this.tab.messages) {
+  /**
+   * A display line for a non-shell call, read from the tool row the session
+   * that asked already streamed — that session's, not whichever is on screen.
+   */
+  private commandForCall(tab: SessionTab | undefined, callId: string | undefined): string | undefined {
+    if (callId === undefined || tab === undefined) return undefined
+    for (const message of tab.messages) {
       for (const tool of messageTools(message)) {
         if (tool.id === callId && tool.detail !== undefined) return tool.detail
       }
     }
     const streaming = findTool(
-      this.tab.streamingSegments,
+      tab.streamingSegments,
       (tool) => tool.id === callId && tool.detail !== undefined,
     )
     return streaming?.detail
@@ -1128,16 +1169,30 @@ class TuiApp {
   }
 
   /**
-   * Answer the open approval and move on to whoever is next in line.
+   * Answer the open approval and move on to whoever is next in line. A grant
+   * keeps the offered rule first, so the next identical call is answered by
+   * it; a grant that cannot be kept (a malformed rules file) still allows
+   * this one call and says why.
    */
-  private settleApproval(panel: ApprovalPanel, decision: ApprovalDecision): void {
+  private settleApproval(panel: ApprovalPanel, choice: ApprovalChoice): void {
     const pending = this.pendingApprovals.shift()
     this.panel = undefined
     this.panelTab = undefined
     this.activateNextPanel()
     if (pending !== undefined) {
       this.clearAttention(pending.tab)
-      this.setStatus(decision === 'allowed-once' ? `allowed ${panel.toolName} once` : `denied ${panel.toolName}`)
+      const { decision, grant } = choice
+      if (decision === 'rejected') this.setStatus(`denied ${panel.toolName}`)
+      else if (grant === undefined || pending.offer === undefined) this.setStatus(`allowed ${panel.toolName} once`)
+      else {
+        const rules = pending.tab?.permissions
+        const rule = pending.offer
+        const kept = rules === undefined ? Promise.reject(new Error('no session')) : rules.grant(rule, grant)
+        kept
+          .then(() => this.setStatus(`allowed ${describeRule(rule)} · ${grant === 'session' ? 'this session' : grant}`))
+          .catch((error: unknown) => this.setStatus(`allowed once — rule not kept: ${describeError(error)}`, true))
+          .finally(() => this.paint())
+      }
       pending.resolve(decision)
     }
     this.paint()
@@ -1243,16 +1298,25 @@ class TuiApp {
         panel.move(1)
         break
       case '1':
-        this.settleApproval(panel, 'allowed-once')
-        return
       case '2':
+      case '3':
+      case '4': {
+        // Number keys pick their row; a number past the last row does nothing.
+        const choice = panel.choiceAt(Number(key.name))
+        if (choice === undefined) break
+        this.settleApproval(panel, choice)
+        return
+      }
+      case 'tab':
+        panel.toggleScope()
+        break
       case 'esc':
       case 'ctrl+c':
         // Fail closed: esc means no, and so does the deny row.
-        this.settleApproval(panel, 'rejected')
+        this.settleApproval(panel, { decision: 'rejected' })
         return
       case 'enter':
-        this.settleApproval(panel, panel.decision())
+        this.settleApproval(panel, panel.choice())
         return
       default:
         break
@@ -1422,7 +1486,7 @@ class TuiApp {
   private async adoptWorkspace(tab: SessionTab): Promise<void> {
     const header = tab.agent?.session.header as { cwd?: string } | undefined
     const cwd = header?.cwd !== undefined && header.cwd !== '' ? header.cwd : this.cwd
-    tab.workspace = await Workspace.adopt(cwd)
+    setWorkspace(tab, await Workspace.adopt(cwd))
   }
 
   /** Re-read a session's branch, repainting when it moved. */
@@ -2017,11 +2081,20 @@ class TuiApp {
 
   // ---------------------------------------------------------------- rendering
 
+  /**
+   * Whether tiles are actually on screen. The tiled view is a preference that
+   * only draws tiles with two or more sessions; with one, the single-pane
+   * frame is drawn and must carry the open panel like any other.
+   */
+  private tilesOnScreen(): boolean {
+    return this.stackMode && this.tabs.length > 1
+  }
+
   private snapshot(): Snapshot {
     const base = this.snapshotFor(this.tab)
     // The stacked view draws every open session, so each pane carries its
     // session's own snapshot; the frame around them stays the focused one's.
-    if (this.stackMode && this.tabs.length > 1) {
+    if (this.tilesOnScreen()) {
       // A panel belongs to the session that raised it: inside its tile, not
       // over the whole stack. A panel whose session closed falls back to the
       // focused pane, so the keyboard owner is always somewhere on screen.
@@ -2093,7 +2166,10 @@ class TuiApp {
       searchActive: this.search !== undefined,
       fleet: this.fleet,
       usage: this.usageView,
-      panel: panel ?? (this.stackMode ? undefined : this.panel?.view()),
+      // Keyed on tiles being drawn, not on the preference: with tiled view
+      // saved and one session open, keying on the preference dropped every
+      // approval panel, and the agent waited on an answer no one could see.
+      panel: panel ?? (this.tilesOnScreen() ? undefined : this.panel?.view()),
       selectedTurn: this.selectedTurn,
       pluginLine: this.tuiHost.statusLine(),
       vimMode: this.vim.enabled ? this.vim.mode : undefined,
@@ -2252,7 +2328,8 @@ class TuiApp {
         if (decision === undefined) {
           this.setStatus('say "allow" or "deny" to answer the request')
         } else {
-          this.settleApproval(this.panel, decision)
+          // A spoken answer only ever allows once: a grant is a deliberate act.
+          this.settleApproval(this.panel, { decision })
         }
         return
       }
@@ -3537,7 +3614,7 @@ class TuiApp {
         const direction = arrowDirection(key.name)
         // Inside the stacked view the arrows are spatial: plain moves focus
         // between panes, shift moves the focused pane itself.
-        if (this.stackMode && this.tabs.length > 1) {
+        if (this.tilesOnScreen()) {
           if (key.name.startsWith('shift+')) this.moveStackTile(direction)
           else this.moveStackFocus(direction)
           return 'handled'
@@ -4605,7 +4682,7 @@ class TuiApp {
     // Same rule as the model just above: the theme of the conversation it was
     // opened from, not the stored default, then diverges independently.
     tab.theme = this.tab.theme
-    tab.workspace = placed ?? (await Workspace.place(this.cwd, this.isolation))
+    setWorkspace(tab, placed ?? (await Workspace.place(this.cwd, this.isolation)))
     this.announce(tab.workspace)
 
     try {
@@ -4728,7 +4805,9 @@ class TuiApp {
     const tab = newTab(String(sessionId))
     tab.theme = this.tab.theme
     // A fork works where its parent works, on the same branch or worktree.
+    // …and with its "this session" grants: a fork continues the same work.
     tab.workspace = this.tab.workspace
+    tab.permissions = this.tab.permissions
     if (carried !== undefined) {
       tab.selection.current = carried
       tab.modelName = String(carried.model)
