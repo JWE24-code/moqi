@@ -57,6 +57,12 @@ export interface PersistedState {
    * view you switched to wins.
    */
   stackView?: boolean
+  /**
+   * How a new session in a git repository isolates its changes — `off`,
+   * `branch`, or `worktree` — as last chosen with `/isolation`; absent means
+   * the default.
+   */
+  isolation?: string
   /** Devices to include in the fleet overview, as `ssh` destinations. */
   peers: string[]
   /** Sessions that were open at the last exit, in tab order. */
@@ -245,6 +251,7 @@ function adoptState(parsed: OnDisk): PersistedState {
     // flipping the default would have silently dropped a chosen expansion.
     expandTools: typeof parsed.expandTools === 'boolean' ? parsed.expandTools : undefined,
     stackView: parsed.stackView === true ? true : undefined,
+    isolation: typeof parsed.isolation === 'string' ? parsed.isolation : undefined,
     sessions,
     activeSession,
     usage: readUsage(parsed.usage),
@@ -287,6 +294,7 @@ export function assembleState(input: {
   setupDone: boolean | undefined
   expandTools: boolean | undefined
   stackView: boolean | undefined
+  isolation: string | undefined
   peers: string[]
   sessions: PersistedSession[]
   activeSession: number
@@ -301,6 +309,7 @@ export function assembleState(input: {
     setupDone: input.setupDone,
     expandTools: input.expandTools,
     stackView: input.stackView,
+    isolation: input.isolation,
     peers: input.peers,
     sessions: input.sessions,
     activeSession: input.activeSession,

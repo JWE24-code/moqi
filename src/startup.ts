@@ -37,6 +37,8 @@ export interface TuiStartupValues {
   bell: boolean
   /** Modal vim editing for the composer; off by default. */
   vim: boolean
+  /** How new sessions in a git repository isolate their changes; absent defers to the stored choice. */
+  isolation: string | undefined
   /** Bring back the sessions that were open at the last exit; on by default. */
   restore: boolean
   /** Devices to include in the fleet overview; empty means this one only. */
@@ -64,6 +66,10 @@ function tuiCommand(): Command {
     .option('--no-mouse', 'disable mouse reporting, so plain drag selects text for the terminal')
     .option('--no-bell', 'stay silent when a session finishes instead of ringing the terminal bell')
     .option('--vim', 'modal vim editing in the composer: esc for normal mode, i to insert')
+    .option(
+      '--isolation <mode>',
+      'where a new session in a git repo works: branch (its own branch, in place), worktree, or off',
+    )
     .option('--no-restore', 'start with one empty session instead of reopening the last ones')
     .option(
       '--peer <host>',
@@ -105,6 +111,7 @@ export function apply(ctx: Context): void {
       mouse?: boolean
       bell?: boolean
       vim?: boolean
+      isolation?: string
       restore?: boolean
       peer?: string[]
       voiceModel?: string
@@ -114,6 +121,11 @@ export function apply(ctx: Context): void {
 
     if (options.resume !== undefined && options.resume.trim() === '') {
       program.error('error: --resume requires a non-empty session id')
+    }
+
+    const isolation = options.isolation ?? process.env['MOQI_ISOLATION']
+    if (isolation !== undefined && !['off', 'branch', 'worktree'].includes(isolation)) {
+      program.error('error: --isolation must be one of off, branch, worktree')
     }
 
     // Left undefined, the app asks the provider for the model's real capacity.
@@ -141,6 +153,7 @@ export function apply(ctx: Context): void {
       // commander maps --no-bell to bell: false and leaves it true otherwise.
       bell: options.bell !== false,
       vim: options.vim === true,
+      isolation,
       restore: options.restore !== false,
       peers: options.peer ?? [],
       // Left undefined the app reads MOQI_WHISPER_MODEL / _BIN, then falls

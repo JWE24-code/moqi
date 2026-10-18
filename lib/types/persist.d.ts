@@ -50,6 +50,12 @@ export interface PersistedState {
      * view you switched to wins.
      */
     stackView?: boolean;
+    /**
+     * How a new session in a git repository isolates its changes — `off`,
+     * `branch`, or `worktree` — as last chosen with `/isolation`; absent means
+     * the default.
+     */
+    isolation?: string;
     /** Devices to include in the fleet overview, as `ssh` destinations. */
     peers: string[];
     /** Sessions that were open at the last exit, in tab order. */
@@ -102,6 +108,7 @@ export declare function assembleState(input: {
     setupDone: boolean | undefined;
     expandTools: boolean | undefined;
     stackView: boolean | undefined;
+    isolation: string | undefined;
     peers: string[];
     sessions: PersistedSession[];
     activeSession: number;

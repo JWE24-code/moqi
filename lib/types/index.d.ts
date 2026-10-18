@@ -28,6 +28,12 @@ export interface Config {
     /** Modal vim editing for the composer; off by default. */
     vim?: boolean;
     /**
+     * How a new session in a git repository isolates its changes: `branch` (the
+     * default), `worktree`, or `off`. Absent defers to the `/isolation` choice
+     * stored from an earlier run.
+     */
+    isolation?: string;
+    /**
      * The view to open in: `stack` tiles every open session on screen at once;
      * anything else — including absent — reads as `tabs`, the default. The view
      * you switched to with `/tiled` is remembered across restarts

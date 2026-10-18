@@ -29,6 +29,8 @@ export interface TuiStartupValues {
     bell: boolean;
     /** Modal vim editing for the composer; off by default. */
     vim: boolean;
+    /** How new sessions in a git repository isolate their changes; absent defers to the stored choice. */
+    isolation: string | undefined;
     /** Bring back the sessions that were open at the last exit; on by default. */
     restore: boolean;
     /** Devices to include in the fleet overview; empty means this one only. */

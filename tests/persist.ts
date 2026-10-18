@@ -429,6 +429,7 @@ try {
     setupDone: true,
     expandTools: undefined,
     stackView: true,
+    isolation: 'worktree',
     peers: [],
     sessions: [],
     activeSession: 0,
@@ -439,6 +440,7 @@ try {
   check('the language survives a round trip', restored.lang === 'zh-CN')
   check('the setup-done flag survives a round trip', restored.setupDone === true)
   check('the stacked-view choice survives a round trip', restored.stackView === true)
+  check('the isolation choice survives a round trip', restored.isolation === 'worktree')
   const fresh = decodeState(JSON.stringify({ ...blank, version: VERSION }))
   check('neither field appears when never set', fresh.lang === undefined && fresh.setupDone === undefined)
 }

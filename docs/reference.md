@@ -16,9 +16,10 @@ Flags, keys, commands, palettes, vim mode, interface language, and MCP.
 | `--vim` | Modal vim editing in the composer: `esc` for normal mode, `i` to insert |
 | `--peer <host>` | Device to include in the Sessions list; repeatable |
 | `--no-restore` | Start with one empty session instead of reopening the last ones |
+| `--isolation <mode>` | Where a new session in a git repo works: `branch` (the default: its own `moqi/` branch, in place), `worktree`, or `off` |
 | `--version` | Print the app version |
 
-`MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
+`MOQI_ISOLATION` sets the same choice; `MOQI_CONTEXT_LIMIT` sets the same budget; `MOQI_THEME=light\|dark`
 overrides background detection; `NO_COLOR` disables styling.
 
 ## Keys
@@ -188,7 +189,7 @@ alongside the app's own:
 | Command | Owner |
 |---|---|
 | `/compact`, and any other plugin command | `ctx.commands` (the Harness registry) |
-| `/new`, `/sessions`, `/tiled`, `/close`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
+| `/new`, `/sessions`, `/tiled`, `/close`, `/branch`, `/worktree`, `/isolation`, `/resume`, `/delete`, `/rename`, `/model`, `/theme`, `/plugins`, `/thinking`, `/tools`, `/usage`, `/export`, `/find`, `/unqueue`, `/interrupt`, `/copy`, `/rewind`, `/fork`, `/tree`, `/jobs`, `/mcp`, `/lang`, `/providers`, `/dispatch`, `/peer`, `/update`, `/help`, `/exit` (`/quit`) | this app |
 
 Unknown commands are dispatched to `ctx.commands.execute()` and only reported
 as unknown if the registry also rejects them.

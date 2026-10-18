@@ -336,6 +336,42 @@ with a status line naming it, and so does a dispatch returning from a
 peer — anything the user has stopped waiting for gets announced, never just
 the turns. `--no-bell` turns the sound off.
 
+## Branches and worktrees
+
+A session's working directory is fixed when it opens, so moqi decides *where*
+its changes land at that moment.
+
+**Branch, the default.** A new session in a git repository starts on a branch
+of its own — `moqi/2026-10-18-f354` — created in place from whatever branch
+you were on. Nothing is copied: the same files, the same `node_modules`, which
+is what you want for a one-file fix. Uncommitted changes travel with the
+switch. The footer shows the branch (`⎇ moqi/…`) and follows it when the model
+switches branches itself. A checkout has one HEAD, so a second session opened
+in the same checkout **shares** that branch rather than switching it under the
+first. `/branch <name>` creates or switches to `moqi/<name>` for the current
+session; it is refused while another session in the same checkout is
+replying. No branch is started on a detached HEAD or mid-rebase, merge,
+cherry-pick, revert, or bisect — the status line says why.
+
+**Worktree, for real isolation.** `/worktree <name> [--base <ref>]` opens a new
+session in a separate checkout on `moqi/<name>`, under
+`$DSH_HOME/worktrees/<project>/<name>` — outside the repository, so Node never
+walks up into the main checkout's `node_modules`. The base is your current
+HEAD, unpushed commits included, unless `--base` names another ref. A worktree
+is a full checkout: install dependencies there if the task needs them.
+
+**Closing cleans up only what changed nothing.** `/close` on a session whose
+branch has no commits of its own switches back to the branch it came from
+(recorded in the repo's config, so this survives a restart) and deletes it; a
+worktree goes when it is also clean. Anything with commits or uncommitted work
+is kept and the status line says where. Quitting never cleans up — open
+sessions come back on the next launch, on the branch or worktree they had.
+
+`/isolation off|branch|worktree` changes what new sessions do and remembers it;
+`--isolation` (or `MOQI_ISOLATION`) overrides it for one run. The Harness
+sandbox still confines writes to the session's directory, so a worktree
+session cannot write into the main checkout.
+
 ## Background agents
 
 The transcript only ever shows the foreground agent, so a turn that delegates

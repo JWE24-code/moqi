@@ -30,6 +30,7 @@
         mouse: !!js ctx.tuiStartup.mouse
         bell: !!js ctx.tuiStartup.bell
         vim: !!js ctx.tuiStartup.vim
+        isolation: !!js ctx.tuiStartup.isolation
         peers: !!js ctx.tuiStartup.peers
         restore: !!js ctx.tuiStartup.restore
         voiceModel: !!js ctx.tuiStartup.voiceModel

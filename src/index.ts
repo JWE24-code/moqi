@@ -134,6 +134,21 @@ import { transcriptMarkdown } from './tui/export.ts'
 import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
 import {
+  BRANCH_PREFIX,
+  currentBranch,
+  defaultBranchName,
+  finishBranch,
+  finishWorktree,
+  isIsolation,
+  isMoqiWorktree,
+  repoRoot,
+  startBranch,
+  startWorktree,
+  type FinishResult,
+  type Isolation,
+  type StartResult,
+} from './git-workspace.ts'
+import {
   activeProfileName,
   forgetPlugin,
   isPluginEnabled,
@@ -211,6 +226,12 @@ export interface Config {
   /** Modal vim editing for the composer; off by default. */
   vim?: boolean
   /**
+   * How a new session in a git repository isolates its changes: `branch` (the
+   * default), `worktree`, or `off`. Absent defers to the `/isolation` choice
+   * stored from an earlier run.
+   */
+  isolation?: string
+  /**
    * The view to open in: `stack` tiles every open session on screen at once;
    * anything else — including absent — reads as `tabs`, the default. The view
    * you switched to with `/tiled` is remembered across restarts
@@ -243,6 +264,7 @@ export const Config: z<Config> = z.object({
   mouse: z.boolean(),
   bell: z.boolean(),
   vim: z.boolean(),
+  isolation: z.string(),
   view: z.string(),
   peers: z.array(z.string()),
   restore: z.boolean(),
@@ -275,6 +297,21 @@ const BUILTIN_COMMANDS: readonly PaletteCommand[] = [
     name: 'rename',
     args: '[title]',
     description: 'Name this session; no argument regenerates the automatic title',
+  },
+  {
+    name: 'branch',
+    args: '[name]',
+    description: 'Put this session on its own moqi/ branch, in place; no argument shows the current one',
+  },
+  {
+    name: 'worktree',
+    args: '<name> [--base <ref>]',
+    description: 'Open a new session in its own worktree, on branch moqi/<name>',
+  },
+  {
+    name: 'isolation',
+    args: '[off|branch|worktree]',
+    description: 'Where new sessions in a git repo work; no argument shows the current choice',
   },
   { name: 'model', args: '[name]', description: 'Switch model; no argument lists them' },
   { name: 'theme', args: '[name]', description: 'Switch the color palette; no argument lists them' },
@@ -446,6 +483,18 @@ interface SessionTab {
    * of the conversation.
    */
   background: Map<string, BackgroundAgent>
+  /**
+   * The directory this session works in, fixed when the Harness created it:
+   * the launch directory, or one of moqi's worktrees.
+   */
+  cwd: string
+  /** The branch checked out at `cwd`, refreshed after each turn; absent outside a repo. */
+  branch?: string
+  /**
+   * How this session was isolated when it opened. `worktree` and `branch`
+   * sessions are cleaned up on `/close` when they changed nothing.
+   */
+  isolation?: 'branch' | 'worktree'
 }
 
 /** Create an empty session record. */
@@ -478,6 +527,7 @@ function newTab(id: string): SessionTab {
     theme: DEFAULT_THEME,
     contextLimit: 0,
     background: new Map(),
+    cwd: process.cwd(),
   }
 }
 
@@ -590,8 +640,10 @@ class TuiApp {
   private readonly tuiHost: TuiHost
   /** Hits from the last `/find --sessions`, indexed by picker row. */
   private storedHits: SessionHit[] = []
-  /** Workspace file listing for `@` completion, rebuilt lazily. */
-  private fileIndex: FileIndex | undefined
+  /** Workspace file listings for `@` completion, one per session directory, built lazily. */
+  private readonly fileIndexes = new Map<string, FileIndex>()
+  /** Where new sessions in a git repository work; see {@link Config.isolation}. */
+  private isolation: Isolation = 'branch'
   /** The token esc dismissed, so typing more reopens the menu but esc stays. */
   private atDismissed: string | undefined
   /** Images staged for the next send, numbered as they were picked. */
@@ -669,6 +721,8 @@ class TuiApp {
     },
     flush: (tab) => {
       void this.flush(tab as SessionTab)
+      // The model may have switched or created a branch during the turn.
+      void this.refreshBranch(tab as SessionTab)
     },
     persist: () => {
       this.persistSoon()
@@ -830,6 +884,9 @@ class TuiApp {
     // The view returns as it was left; the profile's `view` only fills in the
     // default for a first run, the way `thinking` and the theme do.
     this.stackMode = this.persisted.stackView ?? this.config.view === 'stack'
+    // A launch flag (or MOQI_ISOLATION) outranks the stored choice for this run.
+    const isolation = this.config.isolation ?? this.persisted.isolation
+    if (isolation !== undefined && isIsolation(isolation)) this.isolation = isolation
     // Flags and remembered devices are one list from here on; a duplicate
     // between them should not make a peer appear twice in the overview.
     this.peers.replaceAll([...new Set([...(this.config.peers ?? []), ...this.persisted.peers])])
@@ -845,7 +902,7 @@ class TuiApp {
     const fs = this.ctx.get('fs')
     const cwd = fs === undefined ? process.cwd() : fs.processPath(await fs.resolve('.'))
     this.cwd = cwd
-    this.fileIndex = new FileIndex(cwd)
+    this.tab.cwd = cwd
 
     // An explicit --resume names exactly one session, so it outranks whatever
     // happened to be open last time: the user has already said what they want.
@@ -857,6 +914,7 @@ class TuiApp {
       this.tab.id = String(sessionId)
       this.tab.title = this.config.resumeSessionId
       this.tab.messages = readHistory(this.tab.agent.session)
+      await this.adoptWorkspace(this.tab)
       await this.tab.agent.whenIdle()
     } else if (await this.restoreSessions(current)) {
       // The restored active tab may carry a theme that diverged from the
@@ -865,7 +923,9 @@ class TuiApp {
       applyTheme(this.tab.theme)
     } else {
       const sessionId = brandString<SessionId>(`session-${randomUUID()}`)
-      const created = await agents.create({ sessionId, meta: { cwd }, agentOptions, setup })
+      const placed = await this.placeSession(cwd)
+      this.applyPlacement(this.tab, placed)
+      const created = await agents.create({ sessionId, meta: { cwd: placed.cwd }, agentOptions, setup })
       this.tab.agent = created.agent
       this.adoptForeground(this.tab)
       this.tab.id = String(sessionId)
@@ -1345,7 +1405,200 @@ class TuiApp {
       // A session the Harness declines to adopt is one we do not bring back.
       return undefined
     }
+    await this.adoptWorkspace(tab)
     return tab
+  }
+
+  // ---------------------------------------------------------------- isolation
+
+  /**
+   * Take a resumed session's directory from its own header and work out how it
+   * was isolated, without creating anything: a resumed session keeps the
+   * branch or worktree it had.
+   */
+  private async adoptWorkspace(tab: SessionTab): Promise<void> {
+    const header = tab.agent?.session.header as { cwd?: string } | undefined
+    if (header?.cwd !== undefined && header.cwd !== '') tab.cwd = header.cwd
+    await this.refreshBranch(tab)
+    if (isMoqiWorktree(tab.cwd)) tab.isolation = 'worktree'
+    else if (tab.branch?.startsWith(BRANCH_PREFIX) === true) tab.isolation = 'branch'
+  }
+
+  /**
+   * Decide where a fresh session in `cwd` works, per the isolation choice.
+   * Never throws: a git failure falls back to working in place, with the
+   * reason on the status line.
+   */
+  private async placeSession(cwd: string, mode: Isolation = this.isolation): Promise<StartResult> {
+    try {
+      if (mode === 'branch') return await startBranch(cwd)
+      if (mode === 'worktree') {
+        return await startWorktree(cwd, defaultBranchName().slice(BRANCH_PREFIX.length))
+      }
+    } catch (error) {
+      return { kind: 'skipped', cwd, reason: describeError(error) }
+    }
+    return { kind: 'skipped', cwd, reason: 'isolation is off' }
+  }
+
+  /** Record a placement on the tab and say what happened. */
+  private applyPlacement(tab: SessionTab, placed: StartResult): void {
+    tab.cwd = placed.cwd
+    if (placed.kind === 'skipped') {
+      // Outside a repository there is nothing to say; anything else is worth knowing.
+      if (placed.reason !== 'not a git repository' && placed.reason !== 'isolation is off') {
+        this.setStatus(`working in place: ${placed.reason}`)
+      }
+      void this.refreshBranch(tab)
+      return
+    }
+    tab.isolation = placed.kind
+    tab.branch = placed.branch
+    if (placed.kind === 'worktree') this.setStatus(`worktree ${placed.cwd} on ${placed.branch}`)
+    else if (placed.created) this.setStatus(`on ${placed.branch} (from ${placed.base})`)
+  }
+
+  /** Re-read the branch checked out in a session's directory. */
+  private async refreshBranch(tab: SessionTab): Promise<void> {
+    const branch = await currentBranch(tab.cwd)
+    if (branch === tab.branch) return
+    tab.branch = branch
+    this.paint()
+  }
+
+  /** The `@` completion index for a session's own directory. */
+  private fileIndexFor(tab: SessionTab): FileIndex {
+    let index = this.fileIndexes.get(tab.cwd)
+    if (index === undefined) {
+      index = new FileIndex(tab.cwd)
+      this.fileIndexes.set(tab.cwd, index)
+    }
+    return index
+  }
+
+  /** Other open sessions working in the same checkout as `tab`. */
+  private async sharingCheckout(tab: SessionTab): Promise<SessionTab[]> {
+    const root = await repoRoot(tab.cwd)
+    if (root === undefined) return []
+    const others: SessionTab[] = []
+    for (const other of this.tabs) {
+      if (other !== tab && (await repoRoot(other.cwd)) === root) others.push(other)
+    }
+    return others
+  }
+
+  /**
+   * `/branch [name]` — put this session on a `moqi/` branch in place, or say
+   * which branch it is on. Refused while another session in the same checkout
+   * is mid-reply, since switching moves the files under it.
+   */
+  private async branchCommand(rawInput: string): Promise<void> {
+    const name = rawInput.trim()
+    const tab = this.tab
+    if (name === '') {
+      await this.refreshBranch(tab)
+      this.setStatus(tab.branch === undefined ? 'not on a branch' : `on ${tab.branch}`)
+      this.paint()
+      return
+    }
+    const sharing = await this.sharingCheckout(tab)
+    if (sharing.some((other) => other.streaming)) {
+      this.setStatus('another session in this checkout is replying — try again when it settles, or use /worktree', true)
+      this.paint()
+      return
+    }
+    if (tab.streaming) {
+      this.setStatus('this session is replying — switch branches when it settles', true)
+      this.paint()
+      return
+    }
+    try {
+      const placed = await startBranch(tab.cwd, name)
+      if (placed.kind === 'skipped') {
+        this.setStatus(`cannot branch: ${placed.reason}`, true)
+      } else {
+        tab.isolation ??= 'branch'
+        const verb = placed.kind === 'branch' && placed.created ? 'created' : 'switched to'
+        this.setStatus(`${verb} ${placed.branch}${sharing.length > 0 ? ` — shared with ${String(sharing.length)} other session(s)` : ''}`)
+      }
+    } catch (error) {
+      this.setStatus(describeError(error), true)
+    }
+    for (const other of [tab, ...sharing]) await this.refreshBranch(other)
+    this.paint()
+  }
+
+  /** `/worktree <name> [--base <ref>]` — a new session in a worktree of its own. */
+  private async worktreeCommand(rawInput: string): Promise<void> {
+    const parts = rawInput.trim().split(/\s+/).filter((part) => part !== '')
+    let base: string | undefined
+    const baseAt = parts.indexOf('--base')
+    if (baseAt !== -1) {
+      base = parts[baseAt + 1]
+      parts.splice(baseAt, 2)
+    }
+    const name = parts.join('-')
+    if (name === '' || (baseAt !== -1 && base === undefined)) {
+      this.setStatus('usage: /worktree <name> [--base <ref>]', true)
+      this.paint()
+      return
+    }
+    try {
+      const placed = await startWorktree(this.cwd, name, base)
+      if (placed.kind === 'skipped') {
+        this.setStatus(`cannot create a worktree: ${placed.reason}`, true)
+        this.paint()
+        return
+      }
+      await this.newSession(placed)
+    } catch (error) {
+      this.setStatus(describeError(error), true)
+      this.paint()
+    }
+  }
+
+  /** `/isolation [off|branch|worktree]` — show or change, and remember, the choice. */
+  private isolationCommand(rawInput: string): void {
+    const mode = rawInput.trim()
+    if (mode === '') {
+      this.setStatus(`new sessions: ${this.isolation} — /isolation off|branch|worktree to change`)
+    } else if (isIsolation(mode)) {
+      this.isolation = mode
+      this.persistSoon()
+      this.setStatus(`new sessions: ${mode}`)
+    } else {
+      this.setStatus('usage: /isolation off|branch|worktree', true)
+    }
+    this.paint()
+  }
+
+  /**
+   * Close out a closed session's branch or worktree. A branch shared with a
+   * session still open is left alone; nothing with commits or uncommitted
+   * work is ever removed.
+   */
+  private async finishWorkspace(tab: SessionTab): Promise<void> {
+    let result: FinishResult = { kind: 'none' }
+    // A fork, or a restored twin, may still be working right there.
+    if (this.tabs.some((other) => other !== tab && other.cwd === tab.cwd && tab.isolation === 'worktree')) return
+    try {
+      if (tab.isolation === 'worktree') {
+        result = await finishWorktree(tab.cwd)
+      } else if (tab.isolation === 'branch' && tab.branch !== undefined) {
+        if ((await this.sharingCheckout(tab)).length > 0) return
+        result = await finishBranch(tab.cwd, tab.branch)
+      }
+    } catch (error) {
+      this.setStatus(`cleanup: ${describeError(error)}`, true)
+      this.paint()
+      return
+    }
+    if (result.kind === 'removed') this.setStatus(`removed ${result.branch} — it changed nothing`)
+    else if (result.kind === 'kept') {
+      this.setStatus(`kept ${result.branch}${result.path === undefined ? '' : ` at ${result.path}`} — ${result.reason}`)
+    }
+    for (const other of this.tabs) await this.refreshBranch(other)
+    this.paint()
   }
 
   /**
@@ -1820,6 +2073,7 @@ class TuiApp {
       return
     }
     if (removed.closed.streaming === true) this.setStatus('closed a session that was still replying')
+    void this.finishWorkspace(removed.closed)
     if (removed.closed === this.panelTab) this.panelTab = undefined
     if (removed.closed.attention !== undefined) this.clearAttention(removed.closed)
     // Closing a tab can leave a different one active, on its own palette.
@@ -1874,6 +2128,7 @@ class TuiApp {
       title: tab.title,
       host: hostLabel(process.env['DSH_HOST'] ?? 'local harness'),
       modelName: tab.modelName,
+      branch: tab.branch,
       messages: tab.messages,
       streamingSegments: tab.streamingSegments,
       streamingReasoning: tab.streamingReasoning,
@@ -2136,7 +2391,7 @@ class TuiApp {
         title: tab.title,
         status: sessionStatusLabel(tab),
         model: tab.modelName === '' ? undefined : tab.modelName,
-        cwd: this.cwd,
+        cwd: tab.cwd,
       }))
     const key = JSON.stringify(
       sessions.map((session) => [session.sessionId, session.title, session.status]),
@@ -3479,13 +3734,13 @@ class TuiApp {
       const cut = token.query.lastIndexOf('/')
       const directory = cut === -1 ? '' : token.query.slice(0, cut)
       const fragment = cut === -1 ? token.query : token.query.slice(cut + 1)
-      const listing = this.fileIndex?.listDir(directory) ?? { files: [] }
+      const listing = this.fileIndexFor(this.tab).listDir(directory)
       matches = listing.files
         .filter((file) => file.path.toLowerCase().includes(fragment.toLowerCase()))
         .map((file) => ({ path: file.path, directory: file.directory }))
         .slice(0, 200)
     } else {
-      matches = filterFiles(token.query, this.fileIndex?.list() ?? [])
+      matches = filterFiles(token.query, this.fileIndexFor(this.tab).list())
     }
     this.atMenu.update(token, matches, this.atDismissed)
   }
@@ -3541,7 +3796,7 @@ class TuiApp {
     }
     let data: Uint8Array
     try {
-      data = new Uint8Array(await readFile(join(this.cwd, path)))
+      data = new Uint8Array(await readFile(join(this.tab.cwd, path)))
     } catch (error) {
       this.composer.adopt(plainEdit.text, plainEdit.cursor)
       this.setStatus(describeError(error), true)
@@ -3629,6 +3884,7 @@ class TuiApp {
       setupDone: this.persisted.setupDone,
       expandTools: this.expandTools,
       stackView: this.stackMode,
+      isolation: this.isolation,
       peers: this.peers.all(),
       sessions: this.openSessions(),
       activeSession: this.activeSessionIndex(),
@@ -4103,6 +4359,15 @@ class TuiApp {
       case 'close':
         this.closeSession(this.active)
         return true
+      case 'branch':
+        await this.branchCommand(rawInput)
+        return true
+      case 'worktree':
+        await this.worktreeCommand(rawInput)
+        return true
+      case 'isolation':
+        this.isolationCommand(rawInput)
+        return true
       case 'rewind':
         this.showRewind()
         return true
@@ -4383,8 +4648,13 @@ class TuiApp {
     this.paint()
   }
 
-  /** Replace the transcript with a fresh agent and session. */
-  private async newSession(): Promise<void> {
+  /**
+   * Open a fresh agent and session beside the current ones.
+   *
+   * `placed` is where it works when the caller already decided (`/worktree`);
+   * otherwise the isolation choice decides, from the launch directory.
+   */
+  private async newSession(placed?: StartResult): Promise<void> {
     const agents = this.ctx.get('agents')
     const defaultModel = this.ctx.get('agentDefaultModel')
     if (agents === undefined || defaultModel === undefined) return
@@ -4397,8 +4667,6 @@ class TuiApp {
     // just switched away from — but with its OWN selection ref, so later
     // switches in either conversation leave the other alone.
     const seed = this.tab.selection.current ?? defaultModel.currentSelection()
-    const fs = this.ctx.get('fs')
-    const cwd = fs === undefined ? process.cwd() : fs.processPath(await fs.resolve('.'))
     const sessionId = brandString<SessionId>(`session-${randomUUID()}`)
     const tab = newTab(String(sessionId))
     tab.selection.current = seed
@@ -4406,11 +4674,12 @@ class TuiApp {
     // Same rule as the model just above: the theme of the conversation it was
     // opened from, not the stored default, then diverges independently.
     tab.theme = this.tab.theme
+    this.applyPlacement(tab, placed ?? (await this.placeSession(this.cwd)))
 
     try {
       const created = await agents.create({
         sessionId,
-        meta: { cwd },
+        meta: { cwd: tab.cwd },
         agentOptions: { provider: seed.provider, model: seed.model },
         setup: this.selectionSetupFor(tab),
       })
@@ -4526,6 +4795,10 @@ class TuiApp {
     const sessionId = brandString<SessionId>(`session-${randomUUID()}`)
     const tab = newTab(String(sessionId))
     tab.theme = this.tab.theme
+    // A fork works where its parent works, on the same branch or worktree.
+    tab.cwd = this.tab.cwd
+    tab.branch = this.tab.branch
+    tab.isolation = this.tab.isolation
     if (carried !== undefined) {
       tab.selection.current = carried
       tab.modelName = String(carried.model)
@@ -4533,7 +4806,7 @@ class TuiApp {
     try {
       const created = await agents.create({
         sessionId,
-        meta: { cwd: this.cwd, parentSession: session.header.id, isSeeded: true },
+        meta: { cwd: tab.cwd, parentSession: session.header.id, isSeeded: true },
         inheritedEventCount: SessionLogOffset(cut),
         seed,
         agentOptions:

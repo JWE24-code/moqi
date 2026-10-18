@@ -19,6 +19,8 @@ export interface Snapshot {
     title: string;
     host: string;
     modelName: string;
+    /** The branch the session's directory has checked out; absent outside a repo. */
+    branch?: string;
     messages: readonly Message[];
     /** The turn streaming in, prose and calls in arrival order. */
     streamingSegments: readonly Segment[];

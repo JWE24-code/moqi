@@ -87,6 +87,8 @@ export interface Snapshot {
   title: string
   host: string
   modelName: string
+  /** The branch the session's directory has checked out; absent outside a repo. */
+  branch?: string
   messages: readonly Message[]
   /** The turn streaming in, prose and calls in arrival order. */
   streamingSegments: readonly Segment[]
@@ -1213,6 +1215,7 @@ function footerLeft(snapshot: Snapshot): string {
 
   const separator = muted('  ·  ')
   const segments: string[] = [muted(snapshot.modelName)]
+  if (snapshot.branch !== undefined) segments.push(muted(`⎇ ${snapshot.branch}`))
   segments.push(percent >= 80 ? warn(context) : muted(context))
   if (snapshot.haveUsage) {
     segments.push(
