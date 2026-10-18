@@ -208,6 +208,7 @@ export type PickerKind =
   | 'setup'
   | 'permissions'
   | 'memory'
+  | 'quickadd'
   | 'none'
 
 /** One row in the picker. */

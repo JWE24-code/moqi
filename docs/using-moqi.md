@@ -115,6 +115,26 @@ a memory after asking. An edited memory reaches every new session; an edited
 instruction file is picked up by the Harness after the agent's next file
 action, or on resume.
 
+**`# ` quick-add.** A one-line entry that starts with `# ` is a note to keep,
+not a prompt — it never reaches the model, whether you press `enter`, `tab`,
+or `ctrl+enter`. A small picker asks where it goes:
+
+```
+ Keep “tests run with make check”
+ Memory — the agent’s notebook
+    Remember for this project
+    Remember everywhere
+ Instructions — yours, always loaded
+    Add to this project’s AGENTS.md
+    Add to ~/.dsh/AGENTS.md
+```
+
+Memory saves it as its own memory (a note whose title matches an existing
+one gets a numbered name, never replacing it); instructions append it as a
+`- ` bullet to the project root's `AGENTS.md` or the global one, creating the
+file if needed. `esc` keeps nothing — `↑` brings the line back. A bare `#`,
+`#tag`, or a multi-line paste that opens with a heading is sent as usual.
+
 ## Tool calls, where they happened
 
 An agent turn is a sequence: it says something, runs a tool, says something

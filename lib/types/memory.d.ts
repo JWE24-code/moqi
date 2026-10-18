@@ -137,6 +137,14 @@ export declare function instructionChain(cwd: string): InstructionFile[];
  * @throws on an empty line or I/O failure.
  */
 export declare function appendInstruction(path: string, line: string): void;
+/**
+ * The note in a `# ` quick-add, or undefined when `text` is a normal prompt.
+ *
+ * Exactly one line that starts with `# ` and has something after it. A
+ * multi-line paste that happens to open with a markdown heading, a bare `#`,
+ * or `#tag` are prompts like any other.
+ */
+export declare function quickNote(text: string): string | undefined;
 /** A memory as the store hands it out: with the file it lives in, for `$EDITOR`. */
 export interface StoredMemory extends Memory {
     path: string;
@@ -166,6 +174,20 @@ export declare class MemoryStore {
     promptIndex(budget?: IndexBudget): string;
     /** The instruction files the Harness loads here, including ones not yet created. */
     instructions(): InstructionFile[];
+    /**
+     * Keep a `# ` quick-add note as a memory of its own. The note is the body
+     * and the description; its first words are the title. A note whose title
+     * collides with an existing memory gets a numbered name instead — a quick
+     * note never silently replaces something saved earlier.
+     */
+    saveNote(scope: MemoryScope, note: string): StoredMemory;
+    /**
+     * Append a `# ` quick-add note as a bullet to the instruction file the
+     * Harness reads for a scope: `$DSH_HOME/AGENTS.md`, or the project root's
+     * `AGENTS.md`. Creates the file when missing.
+     * @returns the file written.
+     */
+    addInstruction(scope: MemoryScope, note: string): string;
     /** The `MEMORY.md` a scope's index lives in — what `/memory` opens in `$EDITOR`. */
     indexFile(scope: MemoryScope): string;
     private located;

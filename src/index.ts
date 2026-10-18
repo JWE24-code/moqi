@@ -137,7 +137,7 @@ import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey
 import { planRename, snapshotTitle } from './rename.ts'
 import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
 import { callArguments, describeRule, PermissionRules, type Ask, type Rule, type ScopedRule } from './permissions.ts'
-import { MemoryStore } from './memory.ts'
+import { MemoryStore, quickNote } from './memory.ts'
 import { memoryTools } from './memory-tools.ts'
 import {
   activeProfileName,
@@ -670,6 +670,8 @@ class TuiApp {
   private permissionRows: ScopedRule[] = []
   /** Files behind the `/memory` rows, indexed by row id, with what to say once saved. */
   private memoryRows: { path: string; done: string }[] = []
+  /** A `# ` quick-add note waiting for the picker to say where it goes. */
+  private pendingNote: string | undefined
   /** Workspace file listings for `@` completion, one per session directory, built lazily. */
   private readonly fileIndexes = new Map<string, FileIndex>()
   /** Where new sessions in a git repository work; see {@link Config.isolation}. */
@@ -3219,10 +3221,56 @@ class TuiApp {
       'login-method': (item) => this.beginLoginWithMethod(item.id),
       permissions: (item) => this.choosePermissionRow(item.id),
       memory: (item) => this.chooseMemoryRow(item.id),
+      quickadd: (item) => this.keepQuickNote(item.id),
     }
   }
 
   // ------------------------------------------------------------------- memory
+
+  /**
+   * A `# ` line in the composer is a note to keep, not a prompt: take it out
+   * of the composer and ask where it goes. True when the composer held one.
+   * The note stays in the input history, so `↑` brings it back if the picker
+   * is dismissed.
+   */
+  private takeQuickNote(): boolean {
+    const note = quickNote(this.composer.value())
+    if (note === undefined) return false
+    this.composer.reset()
+    this.history.add(`# ${note}`)
+    this.persistSoon()
+    this.pendingNote = note
+    const preview = note.length > 50 ? `${note.slice(0, 50)}…` : note
+    this.picker.show('quickadd', `Keep “${preview}”`, [
+      { id: 'memory:project', title: 'Remember for this project', subtitle: 'Memory — the agent’s notebook' },
+      { id: 'memory:global', title: 'Remember everywhere', subtitle: 'Memory — the agent’s notebook' },
+      { id: 'instructions:project', title: 'Add to this project’s AGENTS.md', subtitle: 'Instructions — yours, always loaded' },
+      { id: 'instructions:global', title: 'Add to ~/.dsh/AGENTS.md', subtitle: 'Instructions — yours, always loaded' },
+    ], { grouped: true })
+    this.setStatus('where should this go? · esc keeps nothing (↑ brings it back)')
+    this.paint()
+    return true
+  }
+
+  /** The `# ` note was given a home: keep it there and say where. */
+  private keepQuickNote(id: string): void {
+    const note = this.pendingNote
+    this.pendingNote = undefined
+    if (note === undefined) return
+    const scope = id.endsWith(':global') ? 'global' : 'project'
+    try {
+      if (id.startsWith('memory:')) {
+        const saved = this.tab.memory.saveNote(scope, note)
+        this.setStatus(`remembered “${saved.title}” (${scope === 'global' ? 'everywhere' : 'this project'}) — new sessions see it`)
+      } else {
+        const file = this.tab.memory.addInstruction(scope, note)
+        this.setStatus(`added to ${file.replace(homedir(), '~')} — picked up after the agent's next file action, or on resume`)
+      }
+    } catch (error) {
+      this.setStatus(`could not keep the note: ${describeError(error)}`, true)
+    }
+    this.paint()
+  }
 
   /** `/memory` opens the panel; `/memory forget <name>` forgets one memory, after asking. */
   private memoryCommand(rawInput: string): void {
@@ -3463,6 +3511,7 @@ class TuiApp {
         // thing `/interrupt` does to whatever is already queued.
         const text = this.composer.value().trim()
         if (text === '' || text.startsWith('/') || !this.tab.streaming) return 'handled'
+        if (this.takeQuickNote()) return 'handled'
         const prompt = this.materializePrompt()
         this.composer.reset()
         this.history.add(prompt.text)
@@ -3498,6 +3547,8 @@ class TuiApp {
     if (chosen !== undefined) {
       this.composer.setValue(`/${chosen.name} `)
       this.palette.close()
+    } else if (this.tab.streaming && this.composer.value().trim() !== '' && this.takeQuickNote()) {
+      // A `# ` note is never queued for the model, whichever key sent it.
     } else if (this.tab.streaming && this.composer.value().trim() !== '') {
       // Queue behind the running turn: enter steers, tab waits.
       const prompt = this.materializePrompt()
@@ -3912,6 +3963,7 @@ class TuiApp {
       void this.runCommand((head ?? '').toLowerCase(), rest.join(' '))
       return
     }
+    if (this.takeQuickNote()) return
     if (this.tab.streaming) {
       // The turn is busy: steer the prompt into it at the next step boundary
       // rather than waiting — the queued form is `tab`.
