@@ -1,5 +1,8 @@
 # AGENTS.md — moqi (moqi-tui)
 
+`CLAUDE.md` is a symlink to this file: edit here, and every agent (Claude Code,
+dsh, Codex, OpenCode) reads the same instructions.
+
 ## What this is
 
 A terminal app for DeepSeek Harness: bordered composer, live token counter,
@@ -38,7 +41,10 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   reads stored sessions lives in `src/session-list.ts`, desktop bridges in
   `src/local-platform.ts`, harness→surface adapters in `src/tui-adapt.ts`,
   cross-session search in `src/cross-find.ts`, the session store layout in
-  `src/sessions-store.ts`. Sonar issues are mirrored into GitHub issues by
+  `src/sessions-store.ts`, session branches/worktrees in
+  `src/git-workspace.ts`, permission rules in `src/permissions.ts`, and agent
+  memory in `src/memory.ts` (all three Harness-free and tested offline).
+  Sonar issues are mirrored into GitHub issues by
   `scripts/sync-sonar-issues.ts`; de-duplication is the `<!-- sonar-key:… -->`
   marker each synced issue body carries.
 
