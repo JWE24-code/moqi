@@ -21,6 +21,17 @@ function text(value: string): [{ type: 'text'; text: string }] {
   return [{ type: 'text', text: value }]
 }
 
+/**
+ * Run a synchronous tool body under the Harness's promise contract
+ * (`execute` must return a `Promise`). Like an `async` function, the body runs
+ * now and a throw becomes a rejection — without an `async` that never awaits.
+ */
+function settle<T>(run: () => T): Promise<T> {
+  return new Promise((resolve) => {
+    resolve(run())
+  })
+}
+
 /** A memory as the model reads it back. */
 function render(memory: StoredMemory): string {
   return [`# ${memory.title}`, `${memory.type} · ${memory.scope} · ${memory.description}`, '', memory.body].join('\n')
@@ -60,14 +71,16 @@ export function memoryTools(store: () => MemoryStore): ToolDefinition[] {
       schema: { type: 'string' },
       render: (_args, value) => text(value),
     },
-    async execute(args) {
-      const saved = store().save(args.scope ?? 'project', {
-        name: args.name,
-        description: args.description,
-        type: args.type,
-        body: args.body,
+    execute(args) {
+      return settle(() => {
+        const saved = store().save(args.scope ?? 'project', {
+          name: args.name,
+          description: args.description,
+          type: args.type,
+          body: args.body,
+        })
+        return `saved "${saved.title}" (${saved.scope}) — every session sees it in its memory list from its next request`
       })
-      return `saved "${saved.title}" (${saved.scope}) — every session sees it in its memory list from its next request`
     },
   })
 
@@ -84,9 +97,11 @@ export function memoryTools(store: () => MemoryStore): ToolDefinition[] {
       render: (_args, value) => text(value),
     },
     isConcurrencySafe: () => true,
-    async execute(args) {
-      const memory = find(store(), args.name, args.scope)
-      return memory === undefined ? `no memory named "${args.name}"` : render(memory)
+    execute(args) {
+      return settle(() => {
+        const memory = find(store(), args.name, args.scope)
+        return memory === undefined ? `no memory named "${args.name}"` : render(memory)
+      })
     },
   })
 
@@ -101,11 +116,13 @@ export function memoryTools(store: () => MemoryStore): ToolDefinition[] {
       schema: { type: 'string' },
       render: (_args, value) => text(value),
     },
-    async execute(args) {
-      const memory = find(store(), args.name, args.scope)
-      if (memory === undefined) return `no memory named "${args.name}"`
-      store().forget(memory.scope, memory.name)
-      return `forgot "${memory.title}" (${memory.scope})`
+    execute(args) {
+      return settle(() => {
+        const memory = find(store(), args.name, args.scope)
+        if (memory === undefined) return `no memory named "${args.name}"`
+        store().forget(memory.scope, memory.name)
+        return `forgot "${memory.title}" (${memory.scope})`
+      })
     },
   })
 
