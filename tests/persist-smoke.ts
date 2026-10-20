@@ -10,7 +10,7 @@
  * a file from another version, a half-written one, an id the session store no
  * longer holds — are exercised directly rather than through a terminal.
  *
- * Run with: node --experimental-strip-types tests/persist.ts
+ * Run with: node --experimental-strip-types tests/persist-smoke.ts
  */
 
 import assert from 'node:assert/strict'
