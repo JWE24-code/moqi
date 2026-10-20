@@ -11,11 +11,11 @@
  * Run with: node scripts/install-profile.mjs [profileName]
  */
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
-import { findDshRoot, linkHarnessPackages } from './harness-root.mjs'
+import { findDshRoot, linkHarnessPackages, which } from './harness-root.mjs'
 
 const requestedProfile = process.argv[2] ?? 'tui'
 // A profile name becomes a directory under the profiles root, so it must be a
@@ -151,12 +151,21 @@ if (dshRoot === undefined) {
   }
 }
 
-// pnpm is what the Harness itself uses for profiles; npm also works.
-const manager = hasCommand('pnpm') ? 'pnpm' : 'npm'
+// The profile is a pnpm project: the Harness installs plugins into it with
+// pnpm, and the `link:` dependency above is a pnpm protocol that npm rejects
+// (EUNSUPPORTEDPROTOCOL), so npm is no fallback. Say so instead of failing
+// inside npm.
+const pnpmPath = which('pnpm')
+if (pnpmPath === undefined) {
+  console.error('install-profile: no `pnpm` on PATH. The Harness manages profiles with pnpm;')
+  console.error('install-profile: install it (npm install -g pnpm) and re-run `moqi install`.')
+  console.error('install-profile: the harness packages are already linked.')
+  process.exit(1)
+}
 try {
-  execFileSync(manager, ['install'], { cwd: profileDir, stdio: 'inherit' })
+  runInstall(pnpmPath, ['install'], profileDir)
 } catch (error) {
-  console.error(`install-profile: ${manager} install failed: ${error.message}`)
+  console.error(`install-profile: pnpm install failed: ${error.message}`)
   console.error(`install-profile: run it yourself in ${profileDir}`)
   console.error('install-profile: the harness packages are already linked, so the app may still boot.')
   process.exit(1)
@@ -164,12 +173,18 @@ try {
 
 console.log(`install-profile: done — run it with:  dsh --profile ${profileName}`)
 
-/** Whether a command exists on PATH. */
-function hasCommand(name) {
-  try {
-    execFileSync('/bin/sh', ['-c', `command -v ${name}`], { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
+/**
+ * Run a package manager with fixed arguments in `cwd`.
+ *
+ * On Windows the package managers are `.cmd` shims, which Node refuses to
+ * spawn without a shell. That command line is fixed — the resolved path in
+ * quotes and literal arguments from this file — so the shell sees nothing
+ * user-supplied.
+ */
+function runInstall(command, args, cwd) {
+  if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command)) {
+    execSync(`"${command}" ${args.join(' ')}`, { cwd, stdio: 'inherit' })
+    return
   }
+  execFileSync(command, args, { cwd, stdio: 'inherit' })
 }

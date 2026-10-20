@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dshEntry, findDshRoot } from '../scripts/harness-root.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -55,6 +56,23 @@ if (asks('-v', '--version')) {
 
 const command = args[0] === 'install' ? 'install' : 'run'
 
+/**
+ * How to start dsh: `DSH_BIN` when set, else this Node running dsh's own bin
+ * script, else plain `dsh` from PATH.
+ *
+ * Running the script directly is what makes Windows work: npm's `dsh` there is
+ * a `.cmd` shim, which Node refuses to spawn without a shell.
+ *
+ * @returns the file to execute and the arguments that go before dsh's own.
+ */
+function dshCommand() {
+  const override = process.env['DSH_BIN']
+  if (override !== undefined && override !== '') return [override, []]
+  const dshRoot = findDshRoot()
+  const entry = dshRoot === undefined ? undefined : dshEntry(dshRoot)
+  return entry === undefined ? ['dsh', []] : [process.execPath, [entry]]
+}
+
 try {
   // The installer is plain Node with no build step, so it runs from source.
   execFileSync(process.execPath, [resolve(root, 'scripts', 'install-profile.mjs'), 'tui'], {
@@ -71,8 +89,8 @@ if (command === 'install') {
 
 // Hand the terminal over to dsh itself; the exit code is the app's.
 try {
-  const dsh = process.env['DSH_BIN'] ?? 'dsh'
-  execFileSync(dsh, ['--profile', 'tui', ...args], { stdio: 'inherit' })
+  const [file, prefix] = dshCommand()
+  execFileSync(file, [...prefix, '--profile', 'tui', ...args], { stdio: 'inherit' })
 } catch (error) {
   process.exitCode = typeof error?.status === 'number' ? error.status : 1
 }
