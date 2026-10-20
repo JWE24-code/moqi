@@ -28,7 +28,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: dsh-compat
@@ -37,6 +36,9 @@ concurrency:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has-work: ${{ steps.plan.outputs.has-work }}
@@ -73,11 +75,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Install scripts are skipped, as npm 11 does by default; the version
-      # is exact, from the plan.
+      # Install scripts are skipped, as npm 11 does by default. The plan's
+      # version is resolved again here so the install names an exact one.
       - name: Install dsh ${{ matrix.version }} and pnpm
         run: |
-          npm install -g --ignore-scripts "@deepseek-ai/dsh@${DSH_VERSION}"
+          version="$(npm view "@deepseek-ai/dsh@${DSH_VERSION}" version)"
+          npm install -g --ignore-scripts "@deepseek-ai/dsh@${version}"
           npm install -g --ignore-scripts pnpm@10.34.7
           dsh --version
 
@@ -92,7 +95,7 @@ jobs:
           npm install -g --ignore-scripts "moqi-tui@${moqi_version}"
           echo "moqi-tui $moqi_version, plugins $specs"
           MOQI_ROOT="$(npm root -g)/moqi-tui" PLUGIN_SPECS="$specs" \
-            node scripts/dsh-compat/check.mjs --source published --out "$RESULTS" || true
+            DSH_COMPAT_SOURCE=published node scripts/dsh-compat/check.mjs || true
 
       - name: Current main of every repository
         run: |
@@ -107,7 +110,7 @@ jobs:
           done
           npm install -g --ignore-scripts "$packs"/moqi-tui-*.tgz
           MOQI_ROOT="$(npm root -g)/moqi-tui" PLUGIN_SPECS="$specs" \
-            node scripts/dsh-compat/check.mjs --source main --out "$RESULTS" || true
+            DSH_COMPAT_SOURCE=main node scripts/dsh-compat/check.mjs || true
 
       - uses: actions/upload-artifact@v4
         with:
@@ -119,6 +122,10 @@ jobs:
     needs: [plan, check]
     if: always() && needs.plan.outputs.has-work == 'true'
     runs-on: ubuntu-latest
+    # The only job that writes: the tracking issue and the failure issues.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -130,4 +137,5 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           DSH_COMPAT_MATRIX: ${{ needs.plan.outputs.matrix }}
-        run: node scripts/dsh-compat/report.mjs results
+          DSH_COMPAT_RESULTS_DIR: results
+        run: node scripts/dsh-compat/report.mjs

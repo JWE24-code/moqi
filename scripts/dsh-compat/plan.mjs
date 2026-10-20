@@ -9,14 +9,22 @@
  */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
+import { which } from '../harness-root.mjs'
 import { buildMatrix, parseState, pickVersions, TRACKING_LABEL } from './state.mjs'
 
 const list = (value) => (value ?? '').split(',').map((s) => s.trim()).filter((s) => s !== '')
 
-const distTags = JSON.parse(execFileSync('npm', ['view', '@deepseek-ai/dsh', 'dist-tags', '--json'], { encoding: 'utf8' }))
+/** A command's absolute path, so nothing earlier on PATH can stand in for it. */
+function resolve(name) {
+  const path = which(name)
+  if (path === undefined) throw new Error(`plan: no ${name} on PATH`)
+  return path
+}
+
+const distTags = JSON.parse(execFileSync(resolve('npm'), ['view', '@deepseek-ai/dsh', 'dist-tags', '--json'], { encoding: 'utf8' }))
 const issues = JSON.parse(
   execFileSync(
-    'gh',
+    resolve('gh'),
     ['issue', 'list', '--repo', process.env.GITHUB_REPOSITORY, '--label', TRACKING_LABEL, '--state', 'open', '--json', 'number,body', '--limit', '1'],
     { encoding: 'utf8' },
   ),

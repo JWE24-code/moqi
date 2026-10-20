@@ -10,22 +10,21 @@
  * `dsh: startup failed` (deepseek-harness #10364). Moqi's own profile refuses
  * to run without a terminal, so on Linux it is booted inside `script`.
  *
- * Usage: check.mjs --source published|main --out results.json
- * Environment: DSH_VERSION, MOQI_ROOT (the installed moqi-tui directory),
- * PLUGIN_SPECS (JSON: plugin name → what `dsh plugin add` gets), RUNNER_TEMP,
- * MATRIX_OS.
+ * Environment: DSH_COMPAT_SOURCE (published or main), RESULTS (the JSON file
+ * results are appended to), DSH_VERSION, MOQI_ROOT (the installed moqi-tui
+ * directory), PLUGIN_SPECS (JSON: plugin name → what `dsh plugin add` gets),
+ * RUNNER_TEMP, MATRIX_OS.
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseArgs } from 'node:util'
-import { dshEntry, findDshRoot } from '../harness-root.mjs'
+import { dshEntry, findDshRoot, which } from '../harness-root.mjs'
+import { SOURCES } from './state.mjs'
 
-const { values } = parseArgs({ options: { source: { type: 'string' }, out: { type: 'string' } } })
-const source = values.source
-const out = values.out
-if (source === undefined || out === undefined) {
-  console.error('usage: check.mjs --source published|main --out results.json')
+const source = process.env.DSH_COMPAT_SOURCE
+const out = process.env.RESULTS
+if (!SOURCES.includes(source) || out === undefined) {
+  console.error(`check: set DSH_COMPAT_SOURCE (${SOURCES.join(' or ')}) and RESULTS`)
   process.exit(2)
 }
 
@@ -106,8 +105,13 @@ function boot(step, profile, home, seconds = 30) {
 /** Boot moqi's own profile inside a pseudo-terminal (Linux only). */
 function bootInTerminal(step, home, seconds = 30) {
   return new Promise((resolve, reject) => {
+    const script = which('script')
+    if (script === undefined) {
+      reject(new StepFailure(step, 'no `script` on PATH to give moqi a terminal'))
+      return
+    }
     const command = `stty rows 40 cols 120; exec "${process.execPath}" "${dsh}" --profile tui --no-restore`
-    const child = spawn('script', ['-qec', command, '/dev/null'], {
+    const child = spawn(script, ['-qec', command, '/dev/null'], {
       cwd: workDir(home),
       env: { ...process.env, DSH_HOME: home, TERM: 'xterm-256color' },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -181,7 +185,7 @@ const results = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : []
 let failures = 0
 for (const [target, check] of Object.entries(checks)) {
   try {
-    await check()
+    await check() // NOSONAR — targets share one global moqi and dsh install, so they run one at a time.
     results.push({ version, os, source, target, ok: true })
     console.log(`ok    ${target} (${source})`)
   } catch (error) {

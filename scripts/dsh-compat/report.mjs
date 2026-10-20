@@ -4,14 +4,15 @@
  * the tracking issue (creating it on first use), and open, update or close
  * one failure issue per target and source.
  *
- * Usage: report.mjs <results-dir>
- * Environment: GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_RUN_ID, GH_TOKEN,
+ * Environment: DSH_COMPAT_RESULTS_DIR (the downloaded artifacts, default
+ * `results`), GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_RUN_ID, GH_TOKEN,
  * DSH_COMPAT_MATRIX (the plan's matrix, for the tags each version had).
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { which } from '../harness-root.mjs'
 import {
   FAILURE_LABEL,
   TRACKING_LABEL,
@@ -30,7 +31,13 @@ const runId = process.env.GITHUB_RUN_ID
 const runUrl = `${repoUrl}/actions/runs/${runId}`
 const scratch = mkdtempSync(join(tmpdir(), 'dsh-compat-'))
 
-const gh = (args) => execFileSync('gh', args, { encoding: 'utf8' })
+// gh by absolute path, so nothing earlier on PATH can stand in for it.
+const ghPath = which('gh')
+if (ghPath === undefined) {
+  console.error('report: no gh on PATH')
+  process.exit(2)
+}
+const gh = (args) => execFileSync(ghPath, args, { encoding: 'utf8' })
 
 /** Pass long text through a file, so no body ever lands on a command line. */
 function bodyFile(name, text) {
@@ -58,7 +65,7 @@ function ensureLabel(name, color, description) {
   }
 }
 
-const results = collect(process.argv[2] ?? 'results')
+const results = collect(process.env.DSH_COMPAT_RESULTS_DIR ?? 'results')
 if (results.length === 0) {
   console.error('report: no results found — every check job failed before writing any')
   process.exit(1)
