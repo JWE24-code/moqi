@@ -4,13 +4,14 @@
  * `findDshRoot()` take the platform and environment as arguments, so the
  * Windows layout (an npm prefix holding `dsh.cmd` and
  * `node_modules/@deepseek-ai/dsh`) is built in a temp directory and searched
- * with `platform: 'win32'`. Also covers the dependency guard.
+ * with `platform: 'win32'`. Also covers the dependency guard and the repair
+ * of profiles made before dsh 0.2.1 (`fixWorkspaceText`, `repairProfile`).
  */
 import assert from 'node:assert/strict'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { dshEntry, findDshRoot, which } from '../scripts/harness-root.mjs'
+import { dshEntry, findDshRoot, fixWorkspaceText, repairProfile, strayHarnessPackages, which } from '../scripts/harness-root.mjs'
 import { harnessDependencies } from '../scripts/check-harness-deps.mjs'
 
 let checks = 0
@@ -107,6 +108,126 @@ check('dshEntry is undefined when the script is missing', dshEntry(join(sandbox,
 check('the guard flags a harness runtime dependency', harnessDependencies({ dependencies: { '@deepseek-ai/cordis': '*', commander: '1' } }).join() === '@deepseek-ai/cordis')
 check('the guard allows harness peers', harnessDependencies({ dependencies: { commander: '1' }, peerDependencies: { '@deepseek-ai/cordis': '*' } }).length === 0)
 check('the guard tolerates no dependencies', harnessDependencies({}).length === 0)
+
+// ---------------------------------------------------- fixWorkspaceText()
+
+const CURRENT = 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n'
+check('workspace: a current file is unchanged', fixWorkspaceText(CURRENT).change === undefined)
+check('workspace: unchanged text is returned as is', fixWorkspaceText(CURRENT).text === CURRENT)
+check('workspace: False is false too', fixWorkspaceText('autoInstallPeers: False\n').change === undefined)
+check(
+  'workspace: false with a trailing comment is kept',
+  fixWorkspaceText('autoInstallPeers: false # dsh 0.2.1\n').change === undefined,
+)
+
+const OLD = 'packages:\n  - .\n\nnodeLinker: hoisted\n'
+const added = fixWorkspaceText(OLD)
+check('workspace: an absent key is added', added.change === 'added')
+check('workspace: the key is appended, the rest kept', added.text === `${OLD}autoInstallPeers: false\n`)
+check(
+  'workspace: no trailing newline still gives a clean line',
+  fixWorkspaceText('nodeLinker: hoisted').text === 'nodeLinker: hoisted\nautoInstallPeers: false\n',
+)
+check('workspace: an empty file gets the key', fixWorkspaceText('').text === 'autoInstallPeers: false\n')
+
+const commented = '# my settings\n# autoInstallPeers: true\nnodeLinker: hoisted\n  # autoInstallPeers: true\n'
+const fromComments = fixWorkspaceText(commented)
+check('workspace: a commented-out key does not count', fromComments.change === 'added')
+check('workspace: comments are kept', fromComments.text === `${commented}autoInstallPeers: false\n`)
+
+const truthy = 'nodeLinker: hoisted\nautoInstallPeers: true # set by me\nstrictPeerDependencies: false\n'
+const flipped = fixWorkspaceText(truthy)
+check('workspace: true is corrected', flipped.change === 'corrected')
+check(
+  'workspace: corrected in place, with its comment and neighbours',
+  flipped.text === 'nodeLinker: hoisted\nautoInstallPeers: false # set by me\nstrictPeerDependencies: false\n',
+)
+check(
+  'workspace: a quoted key is found',
+  fixWorkspaceText('"autoInstallPeers": true\n').text === 'autoInstallPeers: false\n',
+)
+check(
+  'workspace: a block value on the next line is replaced with the key',
+  fixWorkspaceText('autoInstallPeers:\n  true\nnodeLinker: hoisted\n').text === 'autoInstallPeers: false\nnodeLinker: hoisted\n',
+)
+check(
+  'workspace: a nested key is not the top-level one',
+  fixWorkspaceText('catalog:\n  autoInstallPeers: true\n').text === 'catalog:\n  autoInstallPeers: true\nautoInstallPeers: false\n',
+)
+
+const crlf = 'packages:\r\n  - .\r\nnodeLinker: hoisted\r\n'
+check('workspace: CRLF is kept when adding', fixWorkspaceText(crlf).text === `${crlf}autoInstallPeers: false\r\n`)
+check(
+  'workspace: CRLF is kept when correcting',
+  fixWorkspaceText('nodeLinker: hoisted\r\nautoInstallPeers: true\r\n').text === 'nodeLinker: hoisted\r\nautoInstallPeers: false\r\n',
+)
+const flowText = '{ packages: [.], nodeLinker: hoisted }\n'
+const flow = fixWorkspaceText(flowText)
+check('workspace: a flow mapping is reported, not edited', flow.change === 'unsupported' && flow.text === flowText)
+
+// ------------------------------------------------------- repairProfile()
+
+/** A profile directory as dsh and `moqi install` leave it. */
+function profile(name, { workspace, scoped = [], lock = true, dependencies = {} }) {
+  const dir = join(sandbox, 'profiles', name)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: `dsh-profile-${name}`, dependencies }))
+  if (workspace !== undefined) writeFileSync(join(dir, 'pnpm-workspace.yaml'), workspace)
+  if (lock) writeFileSync(join(dir, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n")
+  for (const entry of scoped) {
+    mkdirSync(join(dir, 'node_modules', '@deepseek-ai', entry), { recursive: true })
+    writeFileSync(join(dir, 'node_modules', '@deepseek-ai', entry, 'package.json'), '{}')
+  }
+  mkdirSync(join(dir, 'node_modules', 'dsh-pii-anonymizer'), { recursive: true })
+  return dir
+}
+
+const clean = profile('clean', { workspace: CURRENT })
+check('repair: a current profile needs nothing', repairProfile(clean).length === 0)
+check('repair: and keeps its lockfile', existsSync(join(clean, 'pnpm-lock.yaml')))
+
+const stale = profile('stale', { workspace: OLD, scoped: ['cordis', 'dsh-tools'] })
+const notes = repairProfile(stale)
+check('repair: one line per repair', notes.length === 2)
+check('repair: the workspace line says what and why', notes[0].includes('autoInstallPeers: false') && notes[0].includes('shadow'))
+check('repair: the copies line names them', notes[1].includes('@deepseek-ai/cordis, @deepseek-ai/dsh-tools'))
+check('repair: the copies line names the lockfile', notes[1].includes('pnpm-lock.yaml'))
+check('repair: the key is written', readFileSync(join(stale, 'pnpm-workspace.yaml'), 'utf8') === `${OLD}autoInstallPeers: false\n`)
+check('repair: the stale copies are gone', !existsSync(join(stale, 'node_modules', '@deepseek-ai')))
+check('repair: the lockfile is gone', !existsSync(join(stale, 'pnpm-lock.yaml')))
+check('repair: other packages are kept', existsSync(join(stale, 'node_modules', 'dsh-pii-anonymizer')))
+check('repair: a second run finds nothing to do', repairProfile(stale).length === 0)
+
+const chosen = profile('chosen', {
+  workspace: CURRENT,
+  scoped: ['dsh-extra', 'cordis'],
+  dependencies: { '@deepseek-ai/dsh-extra': '^1.0.0' },
+})
+check('repair: a direct @deepseek-ai dependency is not stray', strayHarnessPackages(chosen).join() === '@deepseek-ai/cordis')
+repairProfile(chosen)
+check('repair: the direct dependency is kept', readdirSync(join(chosen, 'node_modules', '@deepseek-ai')).join() === 'dsh-extra')
+check('repair: only the stray copy is removed', !existsSync(join(chosen, 'node_modules', '@deepseek-ai', 'cordis')))
+
+const lockless = profile('lockless', { workspace: CURRENT, scoped: ['cordis'], lock: false })
+const locklessNotes = repairProfile(lockless)
+check('repair: no lockfile is not an error', locklessNotes.length === 1 && !locklessNotes[0].includes('pnpm-lock.yaml'))
+
+const bare = profile('bare', { lock: false })
+check('repair: no workspace file and no scope needs nothing', repairProfile(bare).length === 0)
+check('repair: a missing workspace file is not created here', !existsSync(join(bare, 'pnpm-workspace.yaml')))
+
+if (process.platform !== 'win32') {
+  // A linked scope entry is removed as a link; its target is never followed.
+  const outside = join(sandbox, 'outside-target')
+  mkdirSync(outside, { recursive: true })
+  writeFileSync(join(outside, 'keep.txt'), 'harness')
+  const linked = profile('linked', { workspace: CURRENT })
+  mkdirSync(join(linked, 'node_modules', '@deepseek-ai'), { recursive: true })
+  symlinkSync(outside, join(linked, 'node_modules', '@deepseek-ai', 'cordis'))
+  repairProfile(linked)
+  check('repair: a linked copy is unlinked', !existsSync(join(linked, 'node_modules', '@deepseek-ai', 'cordis')))
+  check('repair: the link target is untouched', readFileSync(join(outside, 'keep.txt'), 'utf8') === 'harness')
+}
 
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`ok - ${String(checks)} install-discovery checks passed`)

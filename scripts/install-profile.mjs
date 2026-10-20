@@ -15,7 +15,7 @@ import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
-import { findDshRoot, linkHarnessPackages, which } from './harness-root.mjs'
+import { findDshRoot, linkHarnessPackages, repairProfile, strayHarnessPackages, which } from './harness-root.mjs'
 
 const requestedProfile = process.argv[2] ?? 'tui'
 // A profile name becomes a directory under the profiles root, so it must be a
@@ -126,6 +126,14 @@ if (!existsSync(patchPath)) {
 
 console.log(`install-profile: wrote ${profileDir}`)
 
+// A profile made before dsh 0.2.1 has a workspace file without
+// `autoInstallPeers: false`, and pnpm has already put plugins' `@deepseek-ai`
+// peers into it as stale copies that shadow the harness's own. Fix both before
+// the install below, which then re-resolves without them.
+for (const note of repairProfile(profileDir)) {
+  console.log(`install-profile: ${note}`)
+}
+
 // The profile links this package from wherever it lives, so Node resolves its
 // `@deepseek-ai/*` imports from the package's own directory — where, on a
 // clean machine, those packages do not exist. Linking the harness's own copies
@@ -169,6 +177,15 @@ try {
   console.error(`install-profile: run it yourself in ${profileDir}`)
   console.error('install-profile: the harness packages are already linked, so the app may still boot.')
   process.exit(1)
+}
+
+// Copies that come back after a clean resolve are not peers: some plugin
+// lists them under `dependencies`. Deleting them again would not help, so name
+// them and leave the fix (removing or updating that plugin) to the user.
+const reinstalled = strayHarnessPackages(profileDir)
+if (reinstalled.length > 0) {
+  console.warn(`install-profile: a plugin depends on ${reinstalled.join(', ')} — pnpm installed copies that shadow the harness's own;`)
+  console.warn('install-profile: remove or update that plugin if dsh fails to start.')
 }
 
 console.log(`install-profile: done — run it with:  dsh --profile ${profileName}`)
