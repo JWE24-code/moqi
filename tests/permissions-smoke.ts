@@ -94,12 +94,10 @@ try {
     check('plain ask suggestion has no mode', suggestPattern('bash', 'git log', 'run it')?.mode === undefined)
     check('unknown escalation → no suggestion', suggestPattern('bash', 'git log', 'escalate sandbox to root: x') === undefined)
   }
-  {
-    // A suggestion must cover the command it was made from.
-    for (const cmd of ['git log --oneline', 'ls -la', 'npm test', 'cat src/x', "'my tool' run now"]) {
-      const rule = suggestPattern('bash', cmd)!
-      check(`suggestion covers its own command: ${cmd}`, matches([rule], 'bash', cmd) === rule)
-    }
+  // A suggestion must cover the command it was made from.
+  for (const cmd of ['git log --oneline', 'ls -la', 'npm test', 'cat src/x', "'my tool' run now"]) {
+    const rule = suggestPattern('bash', cmd)!
+    check(`suggestion covers its own command: ${cmd}`, matches([rule], 'bash', cmd) === rule)
   }
 
   // ------------------------------------------------------------ escalation
@@ -171,7 +169,7 @@ try {
     ['GIT log', false],
     ["git log 'a;b'", true],
     ['git log "a;b"', true],
-    ['git log a\\;b', true],
+    [String.raw`git log a\;b`, true],
     ["git log 'a $(b)'", true], // single quotes do not expand
     ['git log; rm -rf ~', false],
     ['git log ;rm -rf ~', false],
@@ -234,12 +232,12 @@ try {
 
   // PowerShell: backslash is literal, backtick is refused.
   const pw: Rule[] = [{ tool: 'pwsh', command: 'Get-ChildItem *' }]
-  check('pwsh path with backslashes matches', matches(pw, 'pwsh', 'Get-ChildItem C:\\Users\\x') !== undefined)
-  check('pwsh backslash does not escape $(', matches(pw, 'pwsh', 'Get-ChildItem \\$(rm x)') === undefined)
+  check('pwsh path with backslashes matches', matches(pw, 'pwsh', String.raw`Get-ChildItem C:\Users\x`) !== undefined)
+  check('pwsh backslash does not escape $(', matches(pw, 'pwsh', String.raw`Get-ChildItem \$(rm x)`) === undefined)
   check('pwsh backtick refused', matches(pw, 'pwsh', 'Get-ChildItem `$x') === undefined)
   check('pwsh @() refused', matches(pw, 'pwsh', 'Get-ChildItem @(rm x)') === undefined)
   check('pwsh 2>$null allowed', matches(pw, 'pwsh', 'Get-ChildItem x 2>$null') !== undefined)
-  check('bash escaped quote does not open a quote', m("git log \\'$(rm x)\\'") === false)
+  check('bash escaped quote does not open a quote', m(String.raw`git log \'$(rm x)\'`) === false)
 
   // Raw multi-line command strings of any length.
   {
@@ -273,7 +271,7 @@ try {
       { tool: 'mcp__srv__do-thing' },
       { tool: 'bash', command: 'true' },
       { tool: 'bash', command: '-x' },
-      { tool: 'bash', command: "'it'\\''s' \\\"q\\\" a\\\\b *" },
+      { tool: 'bash', command: String.raw`'it'\''s' \"q\" a\\b *` },
     ]
     const sample = fixtures.map((rule) => normalizeRule(rule))
     const text = formatRules(sample)
@@ -386,7 +384,7 @@ try {
       { type: 'tool/call', data: { callId: 'c1', name: 'bash', arguments: '{"command":"git log"}' } },
       { type: 'assistant/message', data: { text: 'hi' } },
       { type: 'tool/ptc-dispatch-start', data: { subCallId: 'c2:ptc:0', name: 'bash', arguments: { command: 'ls' } } },
-      { type: 'tool/call', data: { callId: 'c3', name: 'bash', arguments: '{"command":"a\\nrm -rf x"}' } },
+      { type: 'tool/call', data: { callId: 'c3', name: 'bash', arguments: String.raw`{"command":"a\nrm -rf x"}` } },
     ]
     check('finds a tool/call by id', callArguments(log, 'c1') === '{"command":"git log"}')
     check('finds a nested run_code call', (callArguments(log, 'c2:ptc:0') as { command: string }).command === 'ls')
