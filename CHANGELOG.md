@@ -6,8 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-20
+
+Installs that work — on DeepSeek Harness 0.2.1, on Windows, on profiles made
+before 0.2.1, and with a clear answer when something is missing — plus a fix
+that stops a backslash from hiding a control character from permission rules.
+
 ### Fixed
 
+- **Install without pnpm always failed, now it says why.** The profile depends
+  on the app through a `link:` path, which npm rejects
+  (`EUNSUPPORTEDPROTOCOL`), so the installer's npm fallback never worked: a
+  machine without pnpm ended with a broken profile. The installer now stops
+  with a message naming pnpm and how to install it.
+- **Windows.** The installer found `dsh` through `/bin/sh`, which Windows does
+  not have, so no Harness packages were linked and the app could not boot. It
+  now searches `PATH` with `PATHEXT` itself, finds dsh's package next to npm's
+  `dsh.cmd` shim, and links with junctions, which need neither Developer Mode
+  nor an elevated shell. The `moqi` launcher runs dsh's own entry script with
+  Node instead of spawning `dsh.cmd`, which Node refuses without a shell.
 - **`moqi install` repairs profiles made before dsh 0.2.1.** Their
   `pnpm-workspace.yaml` lacked `autoInstallPeers: false`, so pnpm put plugins'
   `@deepseek-ai/*` peers into the profile, where they shadowed the Harness's
@@ -26,6 +43,43 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   terminal escape sequences. Control characters are now refused over the whole
   command, in every quoting context and in rule patterns too; commands without
   control characters match exactly as before.
+
+### Changed
+
+- **pnpm is required** to install the profile (`npm install -g pnpm`, or
+  `corepack enable pnpm` on Node 22/24). The Harness's own plugin manager
+  needs it too.
+
+### Documentation
+
+- `docs/install.md` and the README cover pnpm, Windows, the dsh desktop app
+  (no `dsh` on `PATH`, so moqi needs the CLI; what to do if the app stops
+  starting after a plugin install), upgrading a profile made before dsh 0.2.1,
+  Node version managers, and npm 11's "install scripts skipped" warning
+  (harmless).
+
+### Internal
+
+- **CI installs moqi the way a user does, on Linux, macOS and Windows**: dsh
+  at `latest`, the packed tarball, `moqi install`, boot to `--dump-config`, and
+  no `@deepseek-ai/*` copy left in the profile. A guard fails the build if a
+  Harness package is ever listed under `dependencies`.
+- **A watch on every dsh release.** Every three hours `dsh-compat.yml` checks
+  npm for a new `@deepseek-ai/dsh` on `latest`/`next` and tests moqi and its
+  three plugins against it — published and from `main` — recording results in
+  a "dsh compatibility" issue and opening one issue per break.
+- **SonarCloud at zero.** The 55 findings 0.5 introduced are cleared:
+  complexity splits in the permission rules parser, the git workspace, memory,
+  and the app shell, each pinned by tests written against the old code first;
+  no behavior change. Two sequential git loops keep `await` in the loop on
+  purpose and say why.
+- **`npm test` finds its suites.** `scripts/run-tests.mjs` runs every
+  `tests/*-smoke.{ts,mjs}`, then `functional.ts` and `pty.ts`, each in its
+  own process; adding a suite no longer edits `package.json`. `npm test --
+  <filter>` runs a subset and `--list` prints the set.
+- **Workflows are linted.** CI runs actionlint on every workflow, since GitHub
+  only parses a scheduled or manual one when it runs — which is how the dsh
+  watch first shipped with a job-level `runner.temp` it refused to start.
 
 ## [0.5.0] — 2026-10-18
 
