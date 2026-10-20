@@ -75,7 +75,7 @@ runs the gate and lists the tarball contents without touching the registry.
 The local equivalent still works and is worth doing before tagging:
 
 ```sh
-npm test              # 44 suites, including the pty round trip
+npm test              # every suite, including the pty round trip
 npm run test:live     # a real model turn through the TUI (needs credentials)
 npm run test:package  # packs, installs into a clean prefix + DSH_HOME, boots
 npm run build         # and commit lib/ — see below
@@ -94,7 +94,7 @@ long-lived token is stored — and the dry-run path are in
 [`docs/releasing.md`](docs/releasing.md).
 
 ```sh
-npm test              # 44 suites, including the pty round trip
+npm test              # every suite, including the pty round trip
 npm run test:live     # a real model turn through the TUI (needs credentials)
 npm run test:package  # packs, installs into a clean prefix + DSH_HOME, boots
 npm run build         # and commit lib/ — see below

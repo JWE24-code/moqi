@@ -7,11 +7,12 @@
  * therefore invisible locally and fails only on push, which is how
  * `tests/tui-host-smoke.ts` kept CI red for sixteen commits.
  *
- * This walks the import graph of every suite `npm test` actually runs, reading
- * the entry points out of package.json so the two lists cannot drift apart, and
- * names the chain when one reaches the Harness.
+ * This walks the import graph of every suite `npm test` actually runs, asking
+ * the runner (`scripts/run-tests.mjs --list`) for the entry points so the two
+ * lists cannot drift apart, and names the chain when one reaches the Harness.
  */
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -36,12 +37,12 @@ function importsOf(source: string): string[] {
  * under script(1) rather than importing it, so no static walk can find it.
  */
 function entryPoints(): string[] {
-  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
-    scripts: Record<string, string>
-  }
-  const script = pkg.scripts.test ?? ''
-  const found = [...script.matchAll(/(tests\/[\w.-]+\.(?:ts|mjs))/g)].map((m) => m[1]!)
-  assert.ok(found.length > 0, 'the test script names at least one suite')
+  const listed = execFileSync(process.execPath, [resolve(root, 'scripts/run-tests.mjs'), '--list'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+  const found = listed.split('\n').filter((line) => line.startsWith('tests/'))
+  assert.ok(found.length > 0, 'the runner discovers at least one suite')
   return [...new Set([...found, 'tests/pty-subject.ts'])].map((p) => resolve(root, p))
 }
 
@@ -52,7 +53,7 @@ function check(label: string, condition: boolean): void {
 }
 
 const entries = entryPoints()
-check('every entry point in the test script exists', entries.every((f) => existsSync(f)))
+check('every suite the runner discovers exists', entries.every((f) => existsSync(f)))
 
 // Breadth-first over relative imports, remembering how each module was reached
 // so a violation can be reported as a chain rather than a bare file name.

@@ -18,7 +18,13 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
 
 - `npm ci` — install (npm + lockfile; no other package manager).
 - `npm run typecheck` — `tsc` against the linked Harness types.
-- `npm test` — the full smoke suite (~45 suites; must pass before every commit).
+- `npm test` — every suite (must pass before every commit). `scripts/run-tests.mjs`
+  discovers them, so adding one never touches package.json: name it
+  `tests/<topic>-smoke.ts` (or `.mjs` for plain JS) and it runs. Other files in
+  `tests/` (helpers, `preview.ts`, `live-pty.ts`, …) are not suites. Order:
+  `harness-root-smoke.mjs`, `offline-imports-smoke.ts`, the rest sorted, then
+  `functional.ts` and `pty.ts`. `npm test -- memory` runs only suites whose
+  name contains `memory`; `node scripts/run-tests.mjs --list` prints the set.
 - `npm run test:pty` — the pty-driven suite (CI runs it too).
 - `npm run build` — emit to `lib/`.
 - `npm run sonar:sync` — reconcile open Sonar issues into GitHub issues (reads
