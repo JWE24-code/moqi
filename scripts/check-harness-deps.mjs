@@ -7,7 +7,7 @@
  * activate" or `reading 'prepare'` (deepseek-harness discussions #10364 and
  * #10338). This guard keeps the manifest out of that shape.
  *
- * Run with: node scripts/check-harness-deps.mjs [path/to/package.json]
+ * Run with: node scripts/check-harness-deps.mjs
  */
 
 import { readFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ export function harnessDependencies(manifest) {
 }
 
 if (import.meta.filename === resolve(process.argv[1] ?? '')) {
-  const manifestPath = resolve(process.argv[2] ?? resolve(import.meta.dirname, '..', 'package.json'))
+  const manifestPath = resolve(import.meta.dirname, '..', 'package.json')
   const offending = harnessDependencies(JSON.parse(readFileSync(manifestPath, 'utf8')))
   if (offending.length > 0) {
     console.error(`check-harness-deps: ${manifestPath} lists Harness packages under dependencies:`)

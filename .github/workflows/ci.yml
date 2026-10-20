@@ -67,6 +67,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -77,13 +78,18 @@ jobs:
           node-version: 22
       - name: Check no Harness package is a runtime dependency
         run: node scripts/check-harness-deps.mjs
-      - name: Install dsh and pnpm
-        # The Harness manages profiles (and plugins) with pnpm.
-        run: npm install -g @deepseek-ai/dsh@latest pnpm
+      # Install scripts are skipped, as npm 11 does by default: dsh's only
+      # fix a macOS pty helper bit, which booting to --dump-config never needs.
+      - name: Install dsh
+        run: npm install -g --ignore-scripts @deepseek-ai/dsh@latest
+      # The Harness manages profiles (and plugins) with pnpm. 10.x is plain
+      # JavaScript; 11+ ships a native binary that needs its install script.
+      - name: Install pnpm
+        run: npm install -g --ignore-scripts pnpm@10.34.7
       - name: Pack and install moqi
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
-          npm install -g "$RUNNER_TEMP"/moqi-tui-*.tgz
+          npm install -g --ignore-scripts "$RUNNER_TEMP"/moqi-tui-*.tgz
       - name: moqi install, then boot the profile
         env:
           DSH_HOME: ${{ runner.temp }}/dsh-home

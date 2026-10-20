@@ -52,26 +52,31 @@ function isRunnable(path, platform) {
  */
 export function which(name, { platform = process.platform, env = process.env } = {}) {
   const windows = platform === 'win32'
+  const names = windows ? windowsCandidates(name, env) : [name]
   const searchPath = environmentValue(env, 'PATH', platform) ?? ''
-  const extensions = windows
-    ? (environmentValue(env, 'PATHEXT', platform) ?? DEFAULT_PATHEXT).split(';').filter((ext) => ext !== '')
-    : []
-  const hasExtension = windows && extensions.some((ext) => name.toUpperCase().endsWith(ext.toUpperCase()))
-  // PATHEXT is upper case but npm writes `dsh.cmd`; Windows matches either,
-  // and trying the lower-case spelling first keeps the result the file's own.
-  const names = windows
-    ? [...(hasExtension ? [name] : []), ...extensions.map((ext) => name + ext.toLowerCase())]
-    : [name]
-  for (const entry of searchPath.split(windows ? ';' : ':')) {
-    // Windows allows a PATH entry in quotes; the quotes are not part of it.
-    const directory = windows ? entry.replaceAll('"', '') : entry
-    if (directory === '') continue
-    for (const candidate of names) {
-      const full = resolve(directory, candidate)
-      if (isRunnable(full, platform)) return full
-    }
+  // Windows allows a PATH entry in quotes; the quotes are not part of it.
+  const directories = windows
+    ? searchPath.split(';').map((entry) => entry.replaceAll('"', ''))
+    : searchPath.split(':')
+  for (const directory of directories.filter((entry) => entry !== '')) {
+    const found = names.map((candidate) => resolve(directory, candidate)).find((full) => isRunnable(full, platform))
+    if (found !== undefined) return found
   }
   return undefined
+}
+
+/**
+ * The file names Windows tries for a command: the name itself when it already
+ * carries a PATHEXT extension, then the name with each extension. PATHEXT is
+ * upper case but npm writes `dsh.cmd`; Windows matches either, and trying the
+ * lower-case spelling keeps the result the file's own.
+ */
+function windowsCandidates(name, env) {
+  const extensions = (environmentValue(env, 'PATHEXT', 'win32') ?? DEFAULT_PATHEXT)
+    .split(';')
+    .filter((ext) => ext !== '')
+  const hasExtension = extensions.some((ext) => name.toUpperCase().endsWith(ext.toUpperCase()))
+  return [...(hasExtension ? [name] : []), ...extensions.map((ext) => name + ext.toLowerCase())]
 }
 
 /**
