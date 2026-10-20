@@ -196,8 +196,14 @@ class Lexer {
   }
 
   run(): Token[][] | undefined {
+    // Refuse control characters up front, over the whole command, rather than
+    // as each step begins: a step may consume more than one unit (a bash
+    // backslash takes the character after it), and anything it swallows would
+    // otherwise never be checked.
+    for (const c of this.command) {
+      if (isControl(c)) return undefined
+    }
     while (this.i < this.command.length) {
-      if (isControl(this.command[this.i]!)) return undefined
       if (!this.step()) return undefined
     }
     if (this.state !== 'normal') return undefined

@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  # GitHub only parses a workflow when it runs, so a scheduled or manual one
+  # with a bad expression fails first after merge. actionlint catches that on
+  # the pull request. Shell scripts inside `run:` are left to review.
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color -shellcheck=
+
   test:
     runs-on: ubuntu-latest
     strategy:

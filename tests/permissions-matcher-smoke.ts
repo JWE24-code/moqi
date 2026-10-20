@@ -73,10 +73,49 @@ try {
   check('carriage return refused', !accepted('bash', 'ls\r'))
   check('non-ASCII accepted', lexesTo('bash', 'echo héllo', 'echo héllo'))
   check('astral char accepted', lexesTo('bash', 'echo 😀', "echo '😀'"))
-  // Pre-existing quirk, pinned not endorsed: an escaped control char in
-  // bash's normal state is consumed with the backslash and never checked.
-  check('escaped control char is consumed unchecked (bash)', accepted('bash', `echo a${BACKSLASH}\x01`))
-  check('escaped control char in pwsh is checked', !accepted('pwsh', `echo a${BACKSLASH}\x01`))
+  // A backslash must not smuggle a control char past the check: bash's
+  // normal-state escape consumes the character after it in the same step.
+  const echoAll: Rule[] = [{ tool: 'bash', command: 'echo *' }]
+  for (const [name, ctl] of [['SOH', '\x01'], ['ESC', '\x1b'], ['CR', '\r'], ['DEL', '\x7f'], ['NUL', '\x00']]) {
+    check(`bash: escaped ${name} refused`, !accepted('bash', `echo a${BACKSLASH}${ctl}`))
+    check(`bash: escaped ${name} not covered by echo *`, matches(echoAll, 'bash', `echo a${BACKSLASH}${ctl}`) === undefined)
+    check(`bash: escaped ${name} gets no suggestion`, suggestPattern('bash', `echo a${BACKSLASH}${ctl}`) === undefined)
+    check(`pwsh: escaped ${name} refused`, !accepted('pwsh', `echo a${BACKSLASH}${ctl}`))
+  }
+  check('bash: escaped ESC starting a sequence refused', !accepted('bash', `echo ${BACKSLASH}\x1b[2J`))
+  check('bash: escaped control in a later segment refused', !accepted('bash', `ls; echo a${BACKSLASH}\x01`))
+  check('bash: escaped control after && refused', !accepted('bash', `ls && echo ${BACKSLASH}\x01`))
+  check('bash: escaped control in double quotes refused', !accepted('bash', `echo "a${BACKSLASH}\x01"`))
+  check('bash: escaped control in single quotes refused', !accepted('bash', `echo 'a${BACKSLASH}\x01'`))
+  check('bash: control after a quote opens refused', !accepted('bash', `echo '\x01'`))
+  check('bash: control after double-quote escape refused', !accepted('bash', `echo "${BACKSLASH}$\x01"`))
+  check('bash: control after line continuation refused', !accepted('bash', `ls ${BACKSLASH}\n\x01`))
+  check('bash: control after || refused', !accepted('bash', 'ls ||\x01'))
+  check('bash: control after a safe redirect refused', !accepted('bash', 'ls >/dev/null\x01'))
+  check('bash: control after fd duplication refused', !accepted('bash', 'ls 2>&1\x01'))
+  check('bash: control after &> refused', !accepted('bash', 'ls &>/dev/null\x01'))
+  check('pwsh: control in single quotes refused', !accepted('pwsh', "echo 'a\x01'"))
+  check('pwsh: control in double quotes refused', !accepted('pwsh', 'echo "a\x01"'))
+  check('pwsh: control after $null redirect refused', !accepted('pwsh', 'ls >$null\x01'))
+  // The same lexer reads rule patterns: an escaped control char cannot make one.
+  check(
+    'rule: escaped control in a pattern refused',
+    thrown(() => normalizeRule({ tool: 'bash', command: `echo a${BACKSLASH}\x1b` }))?.includes('invalid command') === true,
+  )
+  check(
+    'rule: escaped control pattern never matches',
+    matches([{ tool: 'bash', command: `echo a${BACKSLASH}\x1b` }], 'bash', `echo a${BACKSLASH}\x1b`) === undefined,
+  )
+  check(
+    'rules file: JSON-escaped control in a command refused',
+    thrown(() => parseRules(String.raw`version: 1
+allow:
+  - tool: bash
+    command: "echo a\\\u001b"
+`))?.includes('invalid command') === true,
+  )
+  // Escapes without control chars are unchanged.
+  check('bash: escaped printable still lexes', lexesTo('bash', String.raw`echo a\[2J`, "echo 'a[2J'"))
 
   // -------------------------------------------------------- single quotes
 

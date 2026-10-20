@@ -84,11 +84,16 @@ checkout has run `npm run link-types` and would otherwise never notice.
 ## Tests
 
 ```sh
-npm test        # render, queue, persist, stream, export, sessions, sessions view, theme, patch, pty
-npm test        # render + queue + persist + stream + pty (370 + 8 + 41 + 20 + 13)
+npm test           # every tests/*-smoke.{ts,mjs}, then functional.ts + pty.ts
+npm test -- memory # only the suites whose file name contains "memory"
 npm run test:pty   # just the pty round trip, for a quick loop (needs script(1))
 node --experimental-strip-types tests/preview.ts [normal|palette|picker|stream|think]
 ```
+
+`npm test` runs `scripts/run-tests.mjs`, which discovers the suites (the rule
+is in its header comment) and runs each in its own process, stopping at the
+first failure. A new suite is a new `tests/<topic>-smoke.ts`; nothing else to
+register.
 
 The smoke test renders real frames at sizes from 20x8 to 200x60 and asserts
 the invariants the screen driver depends on: the frame never exceeds the
@@ -137,7 +142,7 @@ regression still would.
     provider parses the real command line.
   - `dsh --profile tui </dev/null` boots the bundle and exits on the non-TTY
     guard.
-- **44 suites**, covering rendering (including a pty round
+- **The suites** (discovered by `scripts/run-tests.mjs`), covering rendering (including a pty round
   trip through the real screen, decoder, and frame renderer), streaming
   projection, queueing, steering, persistence, the usage ledger and its
   colored dashboard, session storage, cross-session search, the panels

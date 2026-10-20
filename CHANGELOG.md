@@ -8,8 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.5.1] — 2026-10-20
 
-Installs that work: on DeepSeek Harness 0.2.1, on Windows, and with a clear
-answer when something is missing.
+Installs that work — on DeepSeek Harness 0.2.1, on Windows, on profiles made
+before 0.2.1, and with a clear answer when something is missing — plus a fix
+that stops a backslash from hiding a control character from permission rules.
 
 ### Fixed
 
@@ -24,6 +25,24 @@ answer when something is missing.
   `dsh.cmd` shim, and links with junctions, which need neither Developer Mode
   nor an elevated shell. The `moqi` launcher runs dsh's own entry script with
   Node instead of spawning `dsh.cmd`, which Node refuses without a shell.
+- **`moqi install` repairs profiles made before dsh 0.2.1.** Their
+  `pnpm-workspace.yaml` lacked `autoInstallPeers: false`, so pnpm put plugins'
+  `@deepseek-ai/*` peers into the profile, where they shadowed the Harness's
+  own and could stop dsh from starting ("required plugin did not activate").
+  The installer now adds or corrects that one line, keeping the rest of the
+  file, and deletes the stale copies together with `pnpm-lock.yaml` so the
+  install re-resolves without them. It prints a line for each repair, and
+  nothing when the profile is fine.
+
+### Security
+
+- **A backslash can no longer slip a control character past a permission
+  rule.** The command matcher refuses any command containing control
+  characters, but a bash backslash directly before one consumed it unchecked,
+  so a rule such as `bash(echo *)` could auto-allow a command carrying raw
+  terminal escape sequences. Control characters are now refused over the whole
+  command, in every quoting context and in rule patterns too; commands without
+  control characters match exactly as before.
 
 ### Changed
 
@@ -54,6 +73,13 @@ answer when something is missing.
   and the app shell, each pinned by tests written against the old code first;
   no behavior change. Two sequential git loops keep `await` in the loop on
   purpose and say why.
+- **`npm test` finds its suites.** `scripts/run-tests.mjs` runs every
+  `tests/*-smoke.{ts,mjs}`, then `functional.ts` and `pty.ts`, each in its
+  own process; adding a suite no longer edits `package.json`. `npm test --
+  <filter>` runs a subset and `--list` prints the set.
+- **Workflows are linted.** CI runs actionlint on every workflow, since GitHub
+  only parses a scheduled or manual one when it runs — which is how the dsh
+  watch first shipped with a job-level `runner.temp` it refused to start.
 
 ## [0.5.0] — 2026-10-18
 
