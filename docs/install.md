@@ -76,20 +76,38 @@ way.
 
 Older profiles may lack `autoInstallPeers: false` in `pnpm-workspace.yaml`.
 Without it, pnpm installs every plugin's `@deepseek-ai/*` peers into the
-profile as stale copies. `moqi install` writes `pnpm-workspace.yaml` only when
-the file is missing, so it doesn't fix an existing one. Fix it by hand (the
-`tui` profile here; use the same steps for any other profile):
+profile as stale copies, which shadow the Harness's own packages.
+
+`moqi install` (and the `moqi` launcher, which runs it) repairs the profile it
+manages before installing:
+
+- If `pnpm-workspace.yaml` lacks `autoInstallPeers: false` or sets it to
+  `true`, it adds or corrects that one line and leaves the rest of the file
+  alone.
+- If `node_modules/@deepseek-ai/` holds copies the profile doesn't list as its
+  own dependencies, it deletes them and `pnpm-lock.yaml`, so the install
+  re-resolves without them.
+
+It prints one line for each repair, and nothing when the profile is already
+fine. If copies come back after that install, a plugin lists them under
+`dependencies` rather than as peers; the installer names them, and the fix is
+to remove or update that plugin.
+
+For a profile moqi doesn't manage, such as the desktop app's `desktop`
+profile, fix it by hand (`<name>` is the profile):
 
 ```sh
-cd ~/.dsh/profiles/tui                 # $DSH_HOME/profiles/tui
+cd ~/.dsh/profiles/<name>              # $DSH_HOME/profiles/<name>
 grep -q '^autoInstallPeers:' pnpm-workspace.yaml \
   || echo 'autoInstallPeers: false' >> pnpm-workspace.yaml
 rm -rf node_modules/@deepseek-ai pnpm-lock.yaml
-moqi install
+pnpm install
 ```
 
-You must delete the lockfile as well. Otherwise pnpm restores the copies it
-recorded there. Afterwards, `node_modules/@deepseek-ai` should not exist.
+If the file already has `autoInstallPeers: true`, change it to `false`; the
+`grep` line only adds a missing key. You must delete the lockfile as well.
+Otherwise pnpm restores the copies it recorded there. Afterwards,
+`node_modules/@deepseek-ai` should not exist.
 
 ## Node version managers (mise, nvm, …)
 

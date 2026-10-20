@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`moqi install` repairs profiles made before dsh 0.2.1.** Their
+  `pnpm-workspace.yaml` lacked `autoInstallPeers: false`, so pnpm put plugins'
+  `@deepseek-ai/*` peers into the profile, where they shadowed the Harness's
+  own and could stop dsh from starting ("required plugin did not activate").
+  The installer now adds or corrects that one line, keeping the rest of the
+  file, and deletes the stale copies together with `pnpm-lock.yaml` so the
+  install re-resolves without them. It prints a line for each repair, and
+  nothing when the profile is fine.
+
 ## [0.5.0] — 2026-10-18
 
 Permission rules, agent memory, and session isolation — the agent asks less,

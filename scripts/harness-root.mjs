@@ -12,7 +12,7 @@
  * @module
  */
 
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, realpathSync, statSync, symlinkSync } from 'node:fs'
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 /** The default for `PATHEXT` when Windows leaves it unset. */
@@ -178,4 +178,178 @@ export function linkHarnessPackages(packageRoot, dshRoot, { platform = process.p
     }
   }
   return { linked, failed }
+}
+
+// ------------------------------------------------------------ profile repair
+//
+// The other half of "exactly one copy of each harness package": a profile made
+// before dsh 0.2.1 has a `pnpm-workspace.yaml` without `autoInstallPeers:
+// false`, so pnpm installs every plugin's `@deepseek-ai/*` peers into
+// `<profile>/node_modules/@deepseek-ai/`. Those copies shadow the harness's
+// own and can stop dsh from starting ("required plugin did not activate",
+// upstream deepseek-harness#10364). `repairProfile` fixes both halves before
+// the installer's `pnpm install`: it sets the workspace key (a line edit that
+// keeps everything else in the file), and it deletes the stale copies together
+// with `pnpm-lock.yaml`, because pnpm restores whatever the lockfile records.
+// It is idempotent: a repaired profile reports nothing.
+
+const SCOPE = '@deepseek-ai'
+const KEY = 'autoInstallPeers'
+const WANTED = `${KEY}: false`
+
+/** A top-level `autoInstallPeers:` key, bare or quoted, and what follows it. */
+const KEY_LINE = /^(["']?)autoInstallPeers\1[ \t]*:(.*)$/
+
+/** YAML 1.2 core-schema spellings of false; any other value is wrong. */
+const FALSE_VALUES = new Set(['false', 'False', 'FALSE'])
+
+/**
+ * The value of a key line, without its trailing comment.
+ *
+ * A `#` starts a comment only after whitespace (or at the start), which is
+ * all a scalar like `false` or `true` can be followed by.
+ */
+function valueOf(rest) {
+  const comment = rest.search(/(?:^|[ \t])#/)
+  return (comment === -1 ? rest : rest.slice(0, comment)).trim()
+}
+
+/**
+ * Make `autoInstallPeers: false` hold in a `pnpm-workspace.yaml` text.
+ *
+ * Only top-level (column 0) keys count. A wrong value is replaced in place,
+ * keeping its trailing comment; an absent key is appended. Line endings
+ * (LF or CRLF) are kept as the file has them. A document written as a single
+ * flow mapping (`{ … }`) cannot take an appended line, so it is reported as
+ * `unsupported` and left alone.
+ *
+ * @param {string} text the file's contents
+ * @returns {{ text: string, change: 'added' | 'corrected' | 'unsupported' | undefined }}
+ */
+export function fixWorkspaceText(text) {
+  const eol = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.split(/\r?\n/)
+  let found = false
+  let corrected = false
+  const out = []
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const match = KEY_LINE.exec(line)
+    if (match === null) {
+      out.push(line)
+      continue
+    }
+    found = true
+    const rest = match[2]
+    const value = valueOf(rest)
+    if (FALSE_VALUES.has(value)) {
+      out.push(line)
+      continue
+    }
+    corrected = true
+    const comment = rest.slice(rest.indexOf(value) + value.length).trim()
+    out.push(comment.startsWith('#') ? `${WANTED} ${comment}` : WANTED)
+    if (value === '') {
+      // The value sat on the indented lines below the key: drop them with it.
+      while (index + 1 < lines.length && /^[ \t]+\S/.test(lines[index + 1])) index += 1
+    }
+  }
+  if (found) {
+    return corrected ? { text: out.join(eol), change: 'corrected' } : { text, change: undefined }
+  }
+  const firstContent = lines.find((line) => line.trim() !== '' && !line.trimStart().startsWith('#'))
+  if (firstContent?.trimStart().startsWith('{')) return { text, change: 'unsupported' }
+  const body = text === '' || text.endsWith('\n') ? text : `${text}${eol}`
+  return { text: `${body}${WANTED}${eol}`, change: 'added' }
+}
+
+/** The packages a profile manifest asks for directly, by name. */
+function directDependencies(profileDir) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+    const names = new Set()
+    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+      const entries = manifest[field]
+      if (entries !== null && typeof entries === 'object') {
+        for (const name of Object.keys(entries)) names.add(name)
+      }
+    }
+    return names
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * The `@deepseek-ai/*` packages installed in a profile that it does not ask
+ * for itself — the copies that shadow the harness's own. A package the
+ * profile lists as a direct dependency is the user's choice and is kept.
+ *
+ * @param {string} profileDir
+ * @returns {string[]} package names, sorted
+ */
+export function strayHarnessPackages(profileDir) {
+  const scopeDir = join(profileDir, 'node_modules', SCOPE)
+  let entries
+  try {
+    if (!lstatSync(scopeDir).isDirectory()) return []
+    entries = readdirSync(scopeDir)
+  } catch {
+    return []
+  }
+  const direct = directDependencies(profileDir)
+  return entries
+    .filter((entry) => !entry.startsWith('.'))
+    .map((entry) => `${SCOPE}/${entry}`)
+    .filter((name) => !direct.has(name))
+    .sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Repair a profile directory in place, before its `pnpm install`.
+ *
+ * Touches only `profileDir`: its `pnpm-workspace.yaml`, its
+ * `node_modules/@deepseek-ai/` entries (symlinks are removed, never
+ * followed), and its `pnpm-lock.yaml`.
+ *
+ * @param {string} profileDir an absolute profile directory
+ * @returns {string[]} one line per repair made, empty when none was needed
+ */
+export function repairProfile(profileDir) {
+  const notes = []
+
+  const workspacePath = join(profileDir, 'pnpm-workspace.yaml')
+  if (existsSync(workspacePath)) {
+    const before = readFileSync(workspacePath, 'utf8')
+    const { text, change } = fixWorkspaceText(before)
+    if (change === 'added' || change === 'corrected') {
+      writeFileSync(workspacePath, text)
+      const what = change === 'added' ? 'added' : 'set'
+      const where = change === 'added' ? 'to' : 'in'
+      notes.push(
+        `${what} \`${WANTED}\` ${where} pnpm-workspace.yaml — without it pnpm installs plugins' ${SCOPE}/* peers into the profile, where they shadow the harness's own`,
+      )
+    } else if (change === 'unsupported') {
+      notes.push(
+        `could not add \`${WANTED}\` to pnpm-workspace.yaml (it is a flow mapping) — add it by hand, or plugins' ${SCOPE}/* peers will shadow the harness's own`,
+      )
+    }
+  }
+
+  const strays = strayHarnessPackages(profileDir)
+  if (strays.length > 0) {
+    const scopeDir = join(profileDir, 'node_modules', SCOPE)
+    for (const name of strays) {
+      rmSync(join(scopeDir, name.slice(SCOPE.length + 1)), { recursive: true, force: true })
+    }
+    if (readdirSync(scopeDir).length === 0) rmSync(scopeDir, { recursive: true, force: true })
+    const lockPath = join(profileDir, 'pnpm-lock.yaml')
+    const lockNote = existsSync(lockPath) ? ' and pnpm-lock.yaml' : ''
+    rmSync(lockPath, { force: true })
+    notes.push(
+      `removed ${String(strays.length)} stale ${SCOPE} ${strays.length === 1 ? 'copy' : 'copies'} (${strays.join(', ')})${lockNote} — they shadow the harness's own packages; the install below re-resolves without them`,
+    )
+  }
+
+  return notes
 }
