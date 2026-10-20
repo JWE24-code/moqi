@@ -108,9 +108,18 @@ export function slugify(input: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, MAX_SLUG)
-    .replace(/^-+|-+$/g, '')
-  if (slug === '') throw new Error(`memory name has no usable characters: ${JSON.stringify(input)}`)
-  return slug
+  const trimmed = trimDashes(slug)
+  if (trimmed === '') throw new Error(`memory name has no usable characters: ${JSON.stringify(input)}`)
+  return trimmed
+}
+
+/** Strip leading and trailing dashes by index, not by a backtracking regex. */
+function trimDashes(value: string): string {
+  let start = 0
+  let end = value.length
+  while (start < end && value[start] === '-') start += 1
+  while (end > start && value[end - 1] === '-') end -= 1
+  return value.slice(start, end)
 }
 
 /** Collapse a value onto one line, so it cannot break front matter or the index. */
@@ -271,7 +280,7 @@ export function list(scope: MemoryScope, cwd: string): Memory[] {
     const slug = linkedSlug(line)
     if (slug !== undefined && slugs.delete(slug)) ordered.push(slug)
   }
-  ordered.push(...[...slugs].sort())
+  ordered.push(...[...slugs].sort((a, b) => a.localeCompare(b)))
   const memories: Memory[] = []
   for (const slug of ordered) {
     const raw = readIfPresent(join(dir, `${slug}.md`))
@@ -426,7 +435,7 @@ export function instructionChain(cwd: string): InstructionFile[] {
     current = parent
   }
   dirs.push(root)
-  for (const dir of dirs.reverse()) {
+  for (const dir of dirs.toReversed()) {
     for (const name of [...BASE_CANDIDATES, ...LOCAL_CANDIDATES]) add(join(dir, name), 'project')
   }
   return files
@@ -540,7 +549,11 @@ export class MemoryStore {
   saveNote(scope: MemoryScope, note: string): StoredMemory {
     const base = noteTitle(note)
     let title = base
-    for (let n = 2; this.read(scope, title) !== undefined; n += 1) title = `${base} ${String(n)}`
+    let n = 2
+    while (this.read(scope, title) !== undefined) {
+      title = `${base} ${String(n)}`
+      n += 1
+    }
     return this.save(scope, {
       name: title,
       description: oneLine(note),

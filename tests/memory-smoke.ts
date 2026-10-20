@@ -35,7 +35,7 @@ try {
   assert.equal(slugify('../../etc/passwd'), 'etc-passwd')
   assert.equal(slugify('a/b'), 'a-b')
   assert.equal(slugify('/abs/path'), 'abs-path')
-  assert.equal(slugify('C:\\Windows\\x'), 'c-windows-x')
+  assert.equal(slugify(String.raw`C:\Windows\x`), 'c-windows-x')
   assert.equal(slugify('Crème brûlée'), 'creme-brulee')
   assert.equal(slugify('x'.repeat(200)).length, 64)
   for (const bad of ['', '.', '..', '../..', '/', '中文', '   ', '---']) {

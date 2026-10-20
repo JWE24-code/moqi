@@ -1227,24 +1227,26 @@ function footerLeft(snapshot: Snapshot): string {
   // Off is never silent: a session that cannot remember should say so.
   if (snapshot.memoryOff === true) segments.push(accent('memory off'))
   segments.push(percent >= 80 ? warn(context) : muted(context))
-  if (snapshot.haveUsage) {
-    segments.push(
-      muted(`↑${formatTokens(snapshot.promptTokens)} ↓${formatTokens(snapshot.completionTokens)}`),
-    )
-    const tps = snapshot.tps ?? 0
-    if (tps > 0) segments.push(muted(`${tps.toFixed(0)} tok/s`))
-    // A cache-hit rate is only honest when the prompt was non-trivial: an
-    // empty request reads as 100% and means nothing.
-    const cacheRead = snapshot.cacheReadTokens ?? 0
-    if (cacheRead > 0 && snapshot.promptTokens > 0) {
-      const rate = Math.min(Math.floor((cacheRead * 100) / snapshot.promptTokens), 100)
-      segments.push(muted(`cache ${String(rate)}%`))
-    }
-  }
+  if (snapshot.haveUsage) segments.push(...usageSegments(snapshot))
 
   let left = segments.join(separator)
   if (snapshot.streaming) left = `${accent(snapshot.spinner)} ${left}`
   return left
+}
+
+/** The footer's usage segments once real usage is known: arrows, tok/s, cache-hit rate. */
+function usageSegments(snapshot: Snapshot): string[] {
+  const segments = [muted(`↑${formatTokens(snapshot.promptTokens)} ↓${formatTokens(snapshot.completionTokens)}`)]
+  const tps = snapshot.tps ?? 0
+  if (tps > 0) segments.push(muted(`${tps.toFixed(0)} tok/s`))
+  // A cache-hit rate is only honest when the prompt was non-trivial: an
+  // empty request reads as 100% and means nothing.
+  const cacheRead = snapshot.cacheReadTokens ?? 0
+  if (cacheRead > 0 && snapshot.promptTokens > 0) {
+    const rate = Math.min(Math.floor((cacheRead * 100) / snapshot.promptTokens), 100)
+    segments.push(muted(`cache ${String(rate)}%`))
+  }
+  return segments
 }
 
 /** The footer's right half, by what most needs saying at this moment. */
