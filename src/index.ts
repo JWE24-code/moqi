@@ -137,7 +137,15 @@ import { transcriptMarkdown } from './tui/export.ts'
 import { deleteStoredSessionDir, encodeSegment, findStoredSessionDir, projectKey, sessionsRoot } from './sessions-store.ts'
 import { planRename, snapshotTitle } from './rename.ts'
 import { describeFinish, isIsolation, pruneLeftovers, Workspace, type Isolation } from './git-workspace.ts'
-import { callArguments, describeRule, PermissionRules, type Ask, type Rule, type ScopedRule } from './permissions.ts'
+import {
+  callArguments,
+  describeRule,
+  PermissionRules,
+  type Ask,
+  type Rule,
+  type Scope,
+  type ScopedRule,
+} from './permissions.ts'
 import { MemoryStore, quickNote } from './memory.ts'
 import { currentMode, modeBadge, nextMode, type SessionMode } from './session-mode.ts'
 import type {} from '@deepseek-ai/dsh-permission-presets' // NOSONAR — types `ctx.get('permissionPresets')` with no runtime import.
@@ -606,6 +614,13 @@ function arrowDirection(name: string): Direction {
   return 'right'
 }
 
+/** How the `/permissions` revoke prompt names where a rule lives. */
+const RULE_SCOPE_WHERE: Record<Scope, string> = {
+  session: 'this session',
+  project: 'this project',
+  global: 'everywhere',
+}
+
 /** The app: owns the screen, the sessions, and every piece of mutable state. */
 class TuiApp {
   /** The open-session strip: owns the tabs and the rules between them. */
@@ -913,25 +928,12 @@ class TuiApp {
     }, { mouse: config.mouse !== false })
   }
 
-  /** Boot the app: resolve the agent, open the screen, and paint. */
-  async start(): Promise<void> {
-    await this.ctx.get('loader')?.await()
-    // Refuse a non-interactive run before anything with a side effect: a new
-    // session's workspace placement switches the repo onto a `moqi/` branch,
-    // and persistence rewrites the open-sessions list every profile shares.
-    // Checked late, a scripted `dsh --profile tui` did both, then exited.
-    if (!Screen.isInteractive()) {
-      throw new Error(
-        'the tui profile needs an interactive terminal; use --profile headless for scripted runs',
-      )
-    }
-
-    const agents = this.ctx.get('agents')
-    const defaultModel = this.ctx.get('agentDefaultModel')
-    if (agents === undefined || defaultModel === undefined) return
-
-    // Adopt whatever survived the last run before deciding what to show: the
-    // composer history and the thinking preference, both best-effort.
+  /**
+   * Load the state the last run left behind and apply it: usage, composer
+   * history, and the stored preferences, each overridden by a launch flag
+   * where the profile gives one.
+   */
+  private async adoptPersistedState(): Promise<void> {
     this.persisted = await loadState()
     this.stateLoaded = true
     this.usage.restore(this.persisted.usage, this.persisted.usageEntries)
@@ -957,6 +959,28 @@ class TuiApp {
     // Flags and remembered devices are one list from here on; a duplicate
     // between them should not make a peer appear twice in the overview.
     this.peers.replaceAll([...new Set([...(this.config.peers ?? []), ...this.persisted.peers])])
+  }
+
+  /** Boot the app: resolve the agent, open the screen, and paint. */
+  async start(): Promise<void> {
+    await this.ctx.get('loader')?.await()
+    // Refuse a non-interactive run before anything with a side effect: a new
+    // session's workspace placement switches the repo onto a `moqi/` branch,
+    // and persistence rewrites the open-sessions list every profile shares.
+    // Checked late, a scripted `dsh --profile tui` did both, then exited.
+    if (!Screen.isInteractive()) {
+      throw new Error(
+        'the tui profile needs an interactive terminal; use --profile headless for scripted runs',
+      )
+    }
+
+    const agents = this.ctx.get('agents')
+    const defaultModel = this.ctx.get('agentDefaultModel')
+    if (agents === undefined || defaultModel === undefined) return
+
+    // Adopt whatever survived the last run before deciding what to show: the
+    // composer history and the thinking preference, both best-effort.
+    await this.adoptPersistedState()
 
     const selection = defaultModel.currentSelection()
     this.tab.selection.current =
@@ -1589,7 +1613,9 @@ class TuiApp {
     } catch (error) {
       this.setStatus(describeError(error), true)
     }
-    for (const other of sharing) await other.workspace.refresh()
+    // Each refresh only re-reads one checkout's current branch into its own
+    // Workspace, so they are independent and can run side by side.
+    await Promise.all(sharing.map((other) => other.workspace.refresh()))
     this.paint()
   }
 
@@ -1639,7 +1665,7 @@ class TuiApp {
     } catch (error) {
       this.setStatus(`cleanup: ${describeError(error)}`, true)
     }
-    for (const other of this.tabs) await other.workspace.refresh()
+    await Promise.all(this.tabs.map((other) => other.workspace.refresh()))
     this.paint()
   }
 
@@ -3474,7 +3500,8 @@ class TuiApp {
     this.memoryRows = targets
     const count = store.list('project').length + store.list('global').length
     const state = this.memoryOn ? '' : ' — OFF, the agent does not see these'
-    this.picker.show('memory', `${count === 0 ? 'Memory — nothing saved yet' : `Memory — ${String(count)} saved`}${state}`, rows, {
+    const saved = count === 0 ? 'Memory — nothing saved yet' : `Memory — ${String(count)} saved`
+    this.picker.show('memory', saved + state, rows, {
       grouped: true,
     })
     this.setStatus(`enter opens in $EDITOR · /memory forget <name> · /memory ${this.memoryOn ? 'off' : 'on'} · esc closes`)
@@ -3541,7 +3568,7 @@ class TuiApp {
     }
     const rule = this.permissionRows[Number.parseInt(id.slice('rule:'.length), 10)]
     if (rule === undefined) return
-    const where = rule.scope === 'session' ? 'this session' : rule.scope === 'project' ? 'this project' : 'everywhere'
+    const where = RULE_SCOPE_WHERE[rule.scope]
     this.confirm(`Revoke ${describeRule(rule)} from ${where}?`, () => {
       this.tab.permissions
         .revoke(rule, rule.scope)
