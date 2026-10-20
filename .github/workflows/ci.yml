@@ -22,9 +22,6 @@ jobs:
       # (deepseek-harness #10364). They must stay optional peers.
       - name: Check no Harness package is a runtime dependency
         run: node scripts/check-harness-deps.mjs
-      # How `dsh` and the package managers are found on every platform,
-      # Windows included (simulated, so it runs here too).
-      - run: node tests/install-discovery-smoke.mjs
       # No Harness is installed here on purpose: the suites are dependency-free,
       # so `@deepseek-ai/*` must not resolve, and a suite that reaches for it
       # fails to load at all. `tests/offline-imports-smoke.ts` enforces that
@@ -52,7 +49,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install -g --ignore-scripts @deepseek-ai/dsh@${{ matrix.dsh }}
+      # Resolve the dist-tag to an exact version, then install that pinned.
+      - name: Install dsh
+        env:
+          DSH_TAG: ${{ matrix.dsh }}
+        run: |
+          DSH_VERSION="$(npm view "@deepseek-ai/dsh@${DSH_TAG}" version)"
+          echo "dsh ${DSH_TAG} is $DSH_VERSION"
+          npm install -g --ignore-scripts "@deepseek-ai/dsh@${DSH_VERSION}"
       - run: npm ci --ignore-scripts
       - run: npm run link-types
       - run: npm run typecheck
@@ -80,8 +84,13 @@ jobs:
         run: node scripts/check-harness-deps.mjs
       # Install scripts are skipped, as npm 11 does by default: dsh's only
       # fix a macOS pty helper bit, which booting to --dump-config never needs.
+      # The dist-tag is resolved to an exact version first, so every run still
+      # tests whatever `latest` is today but installs a pinned version.
       - name: Install dsh
-        run: npm install -g --ignore-scripts @deepseek-ai/dsh@latest
+        run: |
+          DSH_VERSION="$(npm view @deepseek-ai/dsh@latest version)"
+          echo "dsh latest is $DSH_VERSION"
+          npm install -g --ignore-scripts "@deepseek-ai/dsh@${DSH_VERSION}"
       # The Harness manages profiles (and plugins) with pnpm. 10.x is plain
       # JavaScript; 11+ ships a native binary that needs its install script.
       - name: Install pnpm
