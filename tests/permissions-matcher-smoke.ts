@@ -248,10 +248,10 @@ try {
   check('0x1c refused', !toolOk('a\x1cb'))
   check('0x1f refused', !toolOk('a\x1fb'))
   check('DEL refused', !toolOk('a\x7fb'))
-  check('NBSP refused', !toolOk('a b'))
-  check('ideographic space refused', !toolOk('a　b'))
-  check('line separator refused', !toolOk('a b'))
-  check('BOM refused', !toolOk('a﻿b'))
+  check('NBSP refused', !toolOk('a\u00a0b'))
+  check('ideographic space refused', !toolOk('a\u3000b'))
+  check('line separator refused', !toolOk('a\u2028b'))
+  check('BOM refused', !toolOk('a\ufeffb'))
   check('0x80 control accepted', toolOk('a\x80b'))
   check('tool message', thrown(() => normalizeRule({ tool: 'a b' })) === 'invalid tool name "a b"')
 
@@ -319,7 +319,7 @@ try {
 
   check('empty file', same(parsed(''), []))
   check('comments and blanks only', same(parsed('# hi\n\n   \n  # x\n'), []))
-  check('BOM stripped', same(parsed('﻿version: 1\nallow: []\n'), []))
+  check('BOM stripped', same(parsed('\ufeffversion: 1\nallow: []\n'), []))
   check('CRLF lines', same(parsed('version: 1\r\nallow:\r\n  - tool: read\r\n'), [{ tool: 'read' }]))
   check('allow [] with comment', same(parsed('version: 1\nallow: [] # none\n'), []))
   check('allow: with comment', same(parsed('version: 1\nallow: # list\n  - tool: read\n'), [{ tool: 'read' }]))
@@ -337,6 +337,16 @@ try {
   check('zero list indent', same(parsed('version: 1\nallow:\n- tool: read\n'), [{ tool: 'read' }]))
   check('comment between items', same(parsed('version: 1\nallow:\n  - tool: a\n  # c\n  - tool: b\n'), [{ tool: 'a' }, { tool: 'b' }]))
   check('version: quoted 1', same(parsed('version: "1"\nallow: []\n'), []))
+  const commandOf = (value: string): unknown => {
+    const result = parsed(`version: 1\nallow:\n  - tool: bash\n    command: ${value}\n`)
+    return typeof result === 'string' ? result : result[0]?.command
+  }
+  check('comment: the whole whitespace run goes', commandOf('git  log   # c') === 'git log')
+  check('comment: first spaced # wins', commandOf('git log # a  # b') === 'git log')
+  check('comment: glued # then spaced #', commandOf('git log#x # c') === 'line 4: value "git log#x" must be quoted')
+  check('comment: inner spaces kept before a word', commandOf('git  log  *') === 'git log *')
+  check('comment: # at end after space', commandOf('git log #') === 'git log')
+  check('comment: ## after space', commandOf('git log ##') === 'git log')
 
   check('tabs refused', parsed('version: 1\n\tallow: []\n') === 'line 2: tabs are not allowed')
   check('tab in a comment line is fine', same(parsed('#\tx\nversion: 1\nallow: []\n'), []))
