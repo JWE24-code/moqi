@@ -247,9 +247,15 @@ function rewriteKeyLines(lines) {
     corrected = true
     out.push(correctedKeyLine(match[2], value))
     // An empty value sits on the indented lines below the key: drop them too.
-    while (value === '' && index < lines.length && /^[ \t]+\S/.test(lines[index])) index += 1
+    if (value === '') index = skipIndented(lines, index)
   }
   return { out, found, corrected }
+}
+
+/** The index of the first line at or after `start` that is not indented. */
+function skipIndented(lines, start) {
+  const next = lines.findIndex((line, at) => at >= start && !/^[ \t]+\S/.test(line))
+  return next === -1 ? lines.length : next
 }
 
 /**
