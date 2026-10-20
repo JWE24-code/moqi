@@ -54,9 +54,22 @@ class StepFailure extends Error {
 
 const tail = (text, size = 1500) => (text.length > size ? `…${text.slice(-size)}` : text)
 
+/**
+ * Where every dsh and moqi process runs: an empty directory under the target's
+ * DSH_HOME, outside any git repository. Moqi puts each session on its own
+ * branch of the repository it starts in, so booting it from the checkout this
+ * script lives in would switch that checkout onto a `moqi/…` branch.
+ */
+const workDir = (home) => {
+  const dir = join(home, 'work')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}
+
 /** Run a node script to completion; throw a StepFailure when it fails. */
 function run(step, script, args, home) {
   const result = spawnSync(process.execPath, [script, ...args], {
+    cwd: workDir(home),
     env: { ...process.env, DSH_HOME: home },
     encoding: 'utf8',
     timeout: 10 * 60 * 1000,
@@ -71,6 +84,7 @@ function run(step, script, args, home) {
 function boot(step, profile, home, seconds = 30) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [dsh, '--profile', profile], {
+      cwd: workDir(home),
       env: { ...process.env, DSH_HOME: home },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -94,6 +108,7 @@ function bootInTerminal(step, home, seconds = 30) {
   return new Promise((resolve, reject) => {
     const command = `stty rows 40 cols 120; exec "${process.execPath}" "${dsh}" --profile tui --no-restore`
     const child = spawn('script', ['-qec', command, '/dev/null'], {
+      cwd: workDir(home),
       env: { ...process.env, DSH_HOME: home, TERM: 'xterm-256color' },
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
