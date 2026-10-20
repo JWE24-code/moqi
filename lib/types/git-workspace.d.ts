@@ -16,11 +16,14 @@
  * from some other branch, and only removes a worktree that is clean — anything
  * else is kept and reported.
  *
- * Harness-free: node builtins and `git` on PATH only.
+ * Harness-free: node builtins and `git` (found on PATH once, then run by its
+ * absolute path) only.
  */
 /** How a new session in a repository isolates its changes. */
 export type Isolation = 'off' | 'branch' | 'worktree';
 export declare const ISOLATIONS: readonly Isolation[];
+/** How an isolated session was placed: every {@link Isolation} but `off`. */
+export type ActiveIsolation = Exclude<Isolation, 'off'>;
 /** Every branch moqi creates starts with this. */
 export declare const BRANCH_PREFIX = "moqi/";
 /** The outcome of giving a session somewhere to work. */
@@ -105,9 +108,9 @@ export declare function pruneLeftovers(cwd: string, inUse: readonly string[]): P
  * byte-stable for the life of a branch and never disturbs the prompt cache.
  */
 export declare function workspaceGuidance(input: {
-    isolation?: 'branch' | 'worktree' | undefined;
-    branch?: string | undefined;
-    base?: string | undefined;
+    isolation?: ActiveIsolation;
+    branch?: string;
+    base?: string;
     cwd: string;
 }): string;
 /**
@@ -125,7 +128,7 @@ export declare class Workspace {
     /** The checkout `cwd` belongs to (a worktree is its own); undefined outside a repo. */
     readonly root: string | undefined;
     /** How moqi isolated this session; undefined when it works where it was opened. */
-    isolation: 'branch' | 'worktree' | undefined;
+    isolation: ActiveIsolation | undefined;
     /** The branch checked out at `cwd`, as of the last `refresh`. */
     branch: string | undefined;
     /** The branch an isolated session's branch was started from. */
