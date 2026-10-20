@@ -215,6 +215,44 @@ function valueOf(rest) {
 }
 
 /**
+ * The replacement for a key line whose value is not false, keeping its
+ * trailing comment.
+ */
+function correctedKeyLine(rest, value) {
+  const comment = rest.slice(rest.indexOf(value) + value.length).trim()
+  return comment.startsWith('#') ? `${WANTED} ${comment}` : WANTED
+}
+
+/**
+ * Rewrite every top-level `autoInstallPeers` line to `false`.
+ *
+ * @param {string[]} lines
+ * @returns {{ out: string[], found: boolean, corrected: boolean }}
+ */
+function rewriteKeyLines(lines) {
+  let found = false
+  let corrected = false
+  const out = []
+  let index = 0
+  while (index < lines.length) {
+    const line = lines[index]
+    index += 1
+    const match = KEY_LINE.exec(line)
+    const value = match === null ? undefined : valueOf(match[2])
+    found ||= match !== null
+    if (value === undefined || FALSE_VALUES.has(value)) {
+      out.push(line)
+      continue
+    }
+    corrected = true
+    out.push(correctedKeyLine(match[2], value))
+    // An empty value sits on the indented lines below the key: drop them too.
+    while (value === '' && index < lines.length && /^[ \t]+\S/.test(lines[index])) index += 1
+  }
+  return { out, found, corrected }
+}
+
+/**
  * Make `autoInstallPeers: false` hold in a `pnpm-workspace.yaml` text.
  *
  * Only top-level (column 0) keys count. A wrong value is replaced in place,
@@ -229,31 +267,7 @@ function valueOf(rest) {
 export function fixWorkspaceText(text) {
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
   const lines = text.split(/\r?\n/)
-  let found = false
-  let corrected = false
-  const out = []
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-    const match = KEY_LINE.exec(line)
-    if (match === null) {
-      out.push(line)
-      continue
-    }
-    found = true
-    const rest = match[2]
-    const value = valueOf(rest)
-    if (FALSE_VALUES.has(value)) {
-      out.push(line)
-      continue
-    }
-    corrected = true
-    const comment = rest.slice(rest.indexOf(value) + value.length).trim()
-    out.push(comment.startsWith('#') ? `${WANTED} ${comment}` : WANTED)
-    if (value === '') {
-      // The value sat on the indented lines below the key: drop them with it.
-      while (index + 1 < lines.length && /^[ \t]+\S/.test(lines[index + 1])) index += 1
-    }
-  }
+  const { out, found, corrected } = rewriteKeyLines(lines)
   if (found) {
     return corrected ? { text: out.join(eol), change: 'corrected' } : { text, change: undefined }
   }
@@ -316,40 +330,38 @@ export function strayHarnessPackages(profileDir) {
  * @returns {string[]} one line per repair made, empty when none was needed
  */
 export function repairProfile(profileDir) {
-  const notes = []
+  return [repairWorkspaceFile(profileDir), removeStrayCopies(profileDir)].filter(
+    (note) => note !== undefined,
+  )
+}
 
+/** Fix the profile's `pnpm-workspace.yaml`; a note when it changed or could not. */
+function repairWorkspaceFile(profileDir) {
   const workspacePath = join(profileDir, 'pnpm-workspace.yaml')
-  if (existsSync(workspacePath)) {
-    const before = readFileSync(workspacePath, 'utf8')
-    const { text, change } = fixWorkspaceText(before)
-    if (change === 'added' || change === 'corrected') {
-      writeFileSync(workspacePath, text)
-      const what = change === 'added' ? 'added' : 'set'
-      const where = change === 'added' ? 'to' : 'in'
-      notes.push(
-        `${what} \`${WANTED}\` ${where} pnpm-workspace.yaml — without it pnpm installs plugins' ${SCOPE}/* peers into the profile, where they shadow the harness's own`,
-      )
-    } else if (change === 'unsupported') {
-      notes.push(
-        `could not add \`${WANTED}\` to pnpm-workspace.yaml (it is a flow mapping) — add it by hand, or plugins' ${SCOPE}/* peers will shadow the harness's own`,
-      )
-    }
+  if (!existsSync(workspacePath)) return undefined
+  const { text, change } = fixWorkspaceText(readFileSync(workspacePath, 'utf8'))
+  if (change === 'unsupported') {
+    return `could not add \`${WANTED}\` to pnpm-workspace.yaml (it is a flow mapping) — add it by hand, or plugins' ${SCOPE}/* peers will shadow the harness's own`
   }
+  if (change === undefined) return undefined
+  writeFileSync(workspacePath, text)
+  const action = change === 'added' ? 'added' : 'set'
+  const where = change === 'added' ? 'to' : 'in'
+  return `${action} \`${WANTED}\` ${where} pnpm-workspace.yaml — without it pnpm installs plugins' ${SCOPE}/* peers into the profile, where they shadow the harness's own`
+}
 
+/** Delete stray `@deepseek-ai` copies and the lockfile that records them. */
+function removeStrayCopies(profileDir) {
   const strays = strayHarnessPackages(profileDir)
-  if (strays.length > 0) {
-    const scopeDir = join(profileDir, 'node_modules', SCOPE)
-    for (const name of strays) {
-      rmSync(join(scopeDir, name.slice(SCOPE.length + 1)), { recursive: true, force: true })
-    }
-    if (readdirSync(scopeDir).length === 0) rmSync(scopeDir, { recursive: true, force: true })
-    const lockPath = join(profileDir, 'pnpm-lock.yaml')
-    const lockNote = existsSync(lockPath) ? ' and pnpm-lock.yaml' : ''
-    rmSync(lockPath, { force: true })
-    notes.push(
-      `removed ${String(strays.length)} stale ${SCOPE} ${strays.length === 1 ? 'copy' : 'copies'} (${strays.join(', ')})${lockNote} — they shadow the harness's own packages; the install below re-resolves without them`,
-    )
+  if (strays.length === 0) return undefined
+  const scopeDir = join(profileDir, 'node_modules', SCOPE)
+  for (const name of strays) {
+    rmSync(join(scopeDir, name.slice(SCOPE.length + 1)), { recursive: true, force: true })
   }
-
-  return notes
+  if (readdirSync(scopeDir).length === 0) rmSync(scopeDir, { recursive: true, force: true })
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const lockNote = existsSync(lockPath) ? ' and pnpm-lock.yaml' : ''
+  rmSync(lockPath, { force: true })
+  const noun = strays.length === 1 ? 'copy' : 'copies'
+  return `removed ${String(strays.length)} stale ${SCOPE} ${noun} (${strays.join(', ')})${lockNote} — they shadow the harness's own packages; the install below re-resolves without them`
 }
