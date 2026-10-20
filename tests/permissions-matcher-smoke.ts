@@ -40,6 +40,9 @@ function thrown(action: () => unknown): string | undefined {
 
 type Tool = 'bash' | 'pwsh'
 
+/** One backslash, for literals String.raw cannot hold (a trailing `\`, or beside a control char). */
+const BACKSLASH = String.fromCodePoint(0x5c)
+
 /** Whether the lexer accepts the command at all (a lone `*` covers any segment). */
 function accepted(tool: Tool, command: string): boolean {
   return matches([{ tool, command: '*' }], tool, command) !== undefined
@@ -72,13 +75,13 @@ try {
   check('astral char accepted', lexesTo('bash', 'echo 😀', "echo '😀'"))
   // Pre-existing quirk, pinned not endorsed: an escaped control char in
   // bash's normal state is consumed with the backslash and never checked.
-  check('escaped control char is consumed unchecked (bash)', accepted('bash', 'echo a\\\x01'))
-  check('escaped control char in pwsh is checked', !accepted('pwsh', 'echo a\\\x01'))
+  check('escaped control char is consumed unchecked (bash)', accepted('bash', `echo a${BACKSLASH}\x01`))
+  check('escaped control char in pwsh is checked', !accepted('pwsh', `echo a${BACKSLASH}\x01`))
 
   // -------------------------------------------------------- single quotes
 
   check('single-quoted word', lexesTo('bash', "echo 'a b'", "echo 'a b'"))
-  check('backslash literal in single quotes', lexesTo('bash', "echo 'a\\b'", "echo 'a\\b'"))
+  check('backslash literal in single quotes', lexesTo('bash', String.raw`echo 'a\b'`, String.raw`echo 'a\b'`))
   check('substitution literal in single quotes', lexesTo('bash', "echo '$(id)'", "echo '$(id)'"))
   check('operators literal in single quotes', lexesTo('bash', "echo 'a;b|c&d>e<f'", "echo 'a;b|c&d>e<f'"))
   check('unterminated single quote refused', !accepted('bash', "echo 'a"))
@@ -97,15 +100,15 @@ try {
   check('${ in double quotes refused', !accepted('bash', 'echo "${x}"'))
   check('plain $var in double quotes kept literal', lexesTo('bash', 'echo "$x"', "echo '$x'"))
   check('trailing $ in double quotes kept', lexesTo('bash', 'echo "a$"', "echo 'a$'"))
-  check('bash: \\$ in double quotes', lexesTo('bash', 'echo "a\\$b"', "echo 'a$b'"))
-  check('bash: \\` in double quotes', lexesTo('bash', 'echo "a\\`b"', "echo 'a`b'"))
-  check('bash: \\" in double quotes', lexesTo('bash', 'echo "a\\"b"', "echo 'a\"b'"))
-  check('bash: \\\\ in double quotes', lexesTo('bash', 'echo "a\\\\b"', "echo 'a\\b'"))
-  check('bash: \\n (letter) keeps the backslash', lexesTo('bash', 'echo "a\\nb"', "echo 'a\\nb'"))
-  check('bash: line continuation in double quotes', lexesTo('bash', 'echo "a\\\nb"', 'echo ab'))
-  check('bash: backslash at end inside double quotes refused', !accepted('bash', 'echo "a\\'))
-  check('bash: escaped closing quote leaves it open', !accepted('bash', 'echo "a\\"'))
-  check('pwsh: backslash is plain in double quotes', lexesTo('pwsh', 'echo "a\\"', "echo 'a\\'"))
+  check(String.raw`bash: \$ in double quotes`, lexesTo('bash', String.raw`echo "a\$b"`, "echo 'a$b'"))
+  check(`bash: ${BACKSLASH}\` in double quotes`, lexesTo('bash', `echo "a${BACKSLASH}\`b"`, "echo 'a`b'"))
+  check(String.raw`bash: \" in double quotes`, lexesTo('bash', String.raw`echo "a\"b"`, "echo 'a\"b'"))
+  check(String.raw`bash: \\ in double quotes`, lexesTo('bash', String.raw`echo "a\\b"`, String.raw`echo 'a\b'`))
+  check(String.raw`bash: \n (letter) keeps the backslash`, lexesTo('bash', String.raw`echo "a\nb"`, String.raw`echo 'a\nb'`))
+  check('bash: line continuation in double quotes', lexesTo('bash', `echo "a${BACKSLASH}\nb"`, 'echo ab'))
+  check('bash: backslash at end inside double quotes refused', !accepted('bash', `echo "a${BACKSLASH}`))
+  check('bash: escaped closing quote leaves it open', !accepted('bash', String.raw`echo "a\"`))
+  check('pwsh: backslash is plain in double quotes', lexesTo('pwsh', String.raw`echo "a\"`, String.raw`echo 'a\'`))
   check('pwsh: $( in double quotes refused', !accepted('pwsh', 'echo "$(id)"'))
   check('newline inside double quotes is literal', lexesTo('bash', 'echo "a\nb"', "echo 'a\nb'"))
   check('semicolon inside double quotes is literal', lexesTo('bash', 'echo "a;b"', "echo 'a;b'"))
@@ -187,20 +190,20 @@ try {
 
   // ----------------------------------------------- normal: backslash
 
-  check('bash: escaped space joins a word', lexesTo('bash', 'echo a\\ b', "echo 'a b'"))
-  check('bash: escaped ; is literal', lexesTo('bash', 'echo a\\;b', "echo 'a;b'"))
-  check('bash: escaped $ then ( still refused', !accepted('bash', 'echo \\$(id'))
-  check('bash: escaped $ before { is literal', lexesTo('bash', 'echo \\${', "echo '${'"))
-  check('bash: escaped $ before a word', lexesTo('bash', 'echo \\$x', "echo '$x'"))
-  check('bash: trailing backslash refused', !accepted('bash', 'echo a\\'))
-  check('bash: line continuation', lexesTo('bash', 'ls \\\n-l', 'ls -l'))
-  check('bash: line continuation mid-word', lexesTo('bash', 'l\\\ns', 'ls'))
-  check('bash: escaped star is not a wildcard', lexesTo('bash', 'ls \\*', "ls '*'"))
-  check('pwsh: backslash is plain', lexesTo('pwsh', 'echo a\\b', "echo 'a\\b'"))
-  check('pwsh: trailing backslash plain', lexesTo('pwsh', 'echo a\\', "echo 'a\\'"))
-  check('bash: escaped backslash', lexesTo('bash', 'echo a\\\\b', "echo 'a\\b'"))
-  check('bash: escaped > is literal, not a redirect', lexesTo('bash', 'echo a\\>b', "echo 'a>b'"))
-  check('bash: line continuation then fd redirect', lexesTo('bash', 'ls 2\\\n>/dev/null', 'ls'))
+  check('bash: escaped space joins a word', lexesTo('bash', String.raw`echo a\ b`, "echo 'a b'"))
+  check('bash: escaped ; is literal', lexesTo('bash', String.raw`echo a\;b`, "echo 'a;b'"))
+  check('bash: escaped $ then ( still refused', !accepted('bash', String.raw`echo \$(id`))
+  check('bash: escaped $ before { is literal', lexesTo('bash', `echo ${BACKSLASH}\${`, "echo '${'"))
+  check('bash: escaped $ before a word', lexesTo('bash', String.raw`echo \$x`, "echo '$x'"))
+  check('bash: trailing backslash refused', !accepted('bash', `echo a${BACKSLASH}`))
+  check('bash: line continuation', lexesTo('bash', `ls ${BACKSLASH}\n-l`, 'ls -l'))
+  check('bash: line continuation mid-word', lexesTo('bash', `l${BACKSLASH}\ns`, 'ls'))
+  check('bash: escaped star is not a wildcard', lexesTo('bash', String.raw`ls \*`, "ls '*'"))
+  check('pwsh: backslash is plain', lexesTo('pwsh', String.raw`echo a\b`, String.raw`echo 'a\b'`))
+  check('pwsh: trailing backslash plain', lexesTo('pwsh', `echo a${BACKSLASH}`, String.raw`echo 'a\'`))
+  check('bash: escaped backslash', lexesTo('bash', String.raw`echo a\\b`, String.raw`echo 'a\b'`))
+  check('bash: escaped > is literal, not a redirect', lexesTo('bash', String.raw`echo a\>b`, "echo 'a>b'"))
+  check('bash: line continuation then fd redirect', lexesTo('bash', `ls 2${BACKSLASH}\n>/dev/null`, 'ls'))
 
   // ------------------------------------------------- wildcard patterns
 
@@ -222,7 +225,7 @@ try {
   check('an empty word is quoted', norm("echo ''") === "echo ''")
   check('a dollar word is quoted', norm('echo $x') === "echo '$x'")
   check('a quoted star renders quoted', norm("ls '*'") === "ls '*'")
-  check('a backslash word is quoted', norm("echo 'a\\b'") === "echo 'a\\b'")
+  check('a backslash word is quoted', norm(String.raw`echo 'a\b'`) === String.raw`echo 'a\b'`)
   check('star only allowed last', thrown(() => norm('ls * x'))?.includes('`*` is only allowed as the last word') === true)
   check('compound pattern refused', thrown(() => norm('ls; pwd'))?.includes('single command') === true)
   check('empty pattern refused', thrown(() => norm(''))?.includes('single command') === true)
@@ -261,7 +264,7 @@ try {
   check('suggest: empty command', suggestPattern('bash', '') === undefined)
   check('suggest: compound command', suggestPattern('bash', 'ls; pwd') === undefined)
   check('suggest: one word', suggestPattern('bash', 'ls')?.command === 'ls *')
-  check('suggest: pwsh dialect', suggestPattern('pwsh', 'echo a\\b')?.command === "echo 'a\\b' *")
+  check('suggest: pwsh dialect', suggestPattern('pwsh', String.raw`echo a\b`)?.command === String.raw`echo 'a\b' *`)
 
   // ------------------------------------------------- parseRules: scalars
 
@@ -288,12 +291,12 @@ try {
   check('plain: bare CR inside a comment is not stripped', err('read #a\rb') !== undefined)
 
   check('double-quoted', tool1('"read"') === 'read')
-  check('double-quoted with escapes', tool1(String.raw`"abc"`) === 'abc')
+  check('double-quoted with escapes', tool1(String.raw`"a\u0062c"`) === 'abc')
   check('double-quoted escaped quote', thrown(() => one(String.raw`"a\"b"`)) === undefined)
   check('double-quoted escaped quote value', tool1(String.raw`"a\"b"`) === 'a"b')
   check('double-quoted with comment', tool1('"read" # c') === 'read')
   check('double-quoted unterminated', err('"read') === 'line 3: unterminated double-quoted value')
-  check('double-quoted trailing backslash unterminated', err('"read\\"') === 'line 3: unterminated double-quoted value')
+  check('double-quoted trailing backslash unterminated', err(String.raw`"read\"`) === 'line 3: unterminated double-quoted value')
   check('double-quoted trailing text', err('"read" x') === 'line 3: unexpected text after quoted value')
   check('double-quoted bad escape', err(String.raw`"a\qb"`) === 'line 3: unsupported escape in double-quoted value')
   check('double-quoted: a glued # is still a comment', err('"read"#c') === undefined)
@@ -376,10 +379,10 @@ try {
   )
   check('invalid mode', parsed('version: 1\nallow:\n  - tool: a\n    mode: root\n') === 'line 3: invalid mode "root"')
   check('unquoted ; in a value', parsed('version: 1\nallow:\n  - tool: bash\n    command: ls; pwd\n') === 'line 4: value "ls; pwd" must be quoted')
-  check(
-    'invalid command',
-    String(parsed('version: 1\nallow:\n  - tool: bash\n    command: "ls; pwd"\n')).startsWith('line 3: invalid command "ls; pwd": '),
-  )
+  {
+    const invalid = parsed('version: 1\nallow:\n  - tool: bash\n    command: "ls; pwd"\n')
+    check('invalid command', typeof invalid === 'string' && invalid.startsWith('line 3: invalid command "ls; pwd": '))
+  }
   check('empty field value', parsed('version: 1\nallow:\n  - tool: a\n    mode:\n') === 'line 4: empty value')
   check('field with empty after colon-space', parsed('version: 1\nallow:\n  - tool: a\n    mode: \n') === 'line 4: empty value')
   check('missing version', parsed('allow: []\n') === 'missing "version: 1"')
