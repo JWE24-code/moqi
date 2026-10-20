@@ -69,8 +69,11 @@ jobs:
     env:
       DSH_VERSION: ${{ matrix.version }}
       MATRIX_OS: ${{ matrix.os }}
-      RESULTS: ${{ runner.temp }}/results-${{ matrix.version }}-${{ matrix.os }}.json
     steps:
+      # The runner context does not exist at job level, so the results path
+      # is set here, for every later step.
+      - name: Results file
+        run: echo "RESULTS=${RUNNER_TEMP}/results-${DSH_VERSION}-${MATRIX_OS}.json" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
