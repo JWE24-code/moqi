@@ -27,9 +27,11 @@ function text(value: string): [{ type: 'text'; text: string }] {
  * now and a throw becomes a rejection — without an `async` that never awaits.
  */
 function settle<T>(run: () => T): Promise<T> {
-  return new Promise((resolve) => {
-    resolve(run())
-  })
+  try {
+    return Promise.resolve(run())
+  } catch (error) {
+    return Promise.reject(error as Error)
+  }
 }
 
 /** A memory as the model reads it back. */
