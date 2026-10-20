@@ -26,6 +26,7 @@
  * @module moqi-tui/permissions
  */
 
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { dshHome, projectKey } from './sessions-store.ts'
@@ -150,129 +151,211 @@ const SAFE_REDIRECT_PWSH = /^(?:>&\d|>>?[ \t]*(?:\/dev\/null|\$null))(?=$|[ \t\n
  * `&` or `;`) are dropped.
  */
 function lex(command: string, dialect: Dialect): Token[][] | undefined {
-  const segments: Token[][] = []
-  let segment: Token[] = []
-  let text = ''
-  let plain = true
-  let started = false
-  let state: 'normal' | 'single' | 'double' = 'normal'
+  return new Lexer(command, dialect).run()
+}
 
-  const endToken = (): void => {
-    if (started) segment.push({ text, plain })
-    text = ''
-    plain = true
-    started = false
+/** Characters the lexer refuses anywhere outside single quotes. */
+const REFUSED_CHARS: ReadonlySet<string> = new Set(['<', '(', ')', '`'])
+
+/** Characters that end a word, a segment, or start a redirect in the normal state. */
+const OPERATOR_CHARS: ReadonlySet<string> = new Set([' ', '\t', '\n', ';', '&', '|', '>'])
+
+/** Backslash escapes that bash honors inside double quotes. */
+const DOUBLE_QUOTE_ESCAPES = '$`"\\'
+
+/** A control character other than tab and newline (C0 or DEL). */
+function isControl(c: string): boolean {
+  const code = c.codePointAt(0)!
+  return (code < 0x20 && c !== '\t' && c !== '\n') || code === 0x7f
+}
+
+/** `$(` or `${`: the start of a substitution. */
+function isSubstitution(c: string, next: string | undefined): boolean {
+  return c === '$' && (next === '(' || next === '{')
+}
+
+/**
+ * One pass of {@link lex}. Walks the command one UTF-16 unit at a time; each
+ * `step…` method consumes what it reads and returns `false` to refuse the
+ * whole command.
+ */
+class Lexer {
+  private readonly command: string
+  private readonly dialect: Dialect
+  private readonly segments: Token[][] = []
+  private segment: Token[] = []
+  private text = ''
+  private plain = true
+  private started = false
+  private state: 'normal' | 'single' | 'double' = 'normal'
+  private i = 0
+
+  constructor(command: string, dialect: Dialect) {
+    this.command = command
+    this.dialect = dialect
   }
-  const endSegment = (): void => {
-    endToken()
-    if (segment.length > 0) segments.push(segment)
-    segment = []
+
+  run(): Token[][] | undefined {
+    while (this.i < this.command.length) {
+      if (isControl(this.command[this.i]!)) return undefined
+      if (!this.step()) return undefined
+    }
+    if (this.state !== 'normal') return undefined
+    this.endSegment()
+    return this.segments
   }
-  const safeRedirect = (at: number): number => {
-    const re = dialect === 'pwsh' ? SAFE_REDIRECT_PWSH : SAFE_REDIRECT_BASH
-    const found = re.exec(command.slice(at))
+
+  private step(): boolean {
+    if (this.state === 'single') return this.stepSingle()
+    if (this.state === 'double') return this.stepDouble()
+    return this.stepNormal()
+  }
+
+  private stepSingle(): boolean {
+    const c = this.command[this.i]!
+    if (c === "'") this.state = 'normal'
+    else this.text += c
+    this.i += 1
+    return true
+  }
+
+  private stepDouble(): boolean {
+    const c = this.command[this.i]!
+    const next = this.command[this.i + 1]
+    if (c === '"') {
+      this.state = 'normal'
+      this.i += 1
+      return true
+    }
+    if (c === '`' || isSubstitution(c, next)) return false
+    if (c === '\\' && this.dialect === 'bash') return this.doubleQuotedEscape(next)
+    this.text += c
+    this.i += 1
+    return true
+  }
+
+  /** A bash backslash inside double quotes, at `this.i`. */
+  private doubleQuotedEscape(next: string | undefined): boolean {
+    if (next === undefined) return false
+    if (next === '\n') {
+      this.i += 2 // line continuation
+    } else if (DOUBLE_QUOTE_ESCAPES.includes(next)) {
+      this.text += next
+      this.i += 2
+    } else {
+      this.text += '\\'
+      this.i += 1
+    }
+    return true
+  }
+
+  private stepNormal(): boolean {
+    const c = this.command[this.i]!
+    const next = this.command[this.i + 1]
+    if (OPERATOR_CHARS.has(c)) return this.operator(c, next)
+    if (REFUSED_CHARS.has(c) || isSubstitution(c, next)) return false
+    if (c === "'" || c === '"') return this.openQuote(c)
+    if (c === '\\' && this.dialect === 'bash') return this.escape(next)
+    this.text += c
+    this.started = true
+    this.i += 1
+    return true
+  }
+
+  /** A separator, a segment boundary, or a redirect, at `this.i`. */
+  private operator(c: string, next: string | undefined): boolean {
+    switch (c) {
+      case ' ':
+      case '\t':
+        this.endToken()
+        this.i += 1
+        return true
+      case '\n':
+      case ';':
+        this.endSegment()
+        this.i += 1
+        return true
+      case '&':
+        return this.ampersand(next)
+      case '|':
+        this.endSegment()
+        this.i += next === '|' ? 2 : 1
+        return true
+      default: // '>'
+        return this.redirect()
+    }
+  }
+
+  private ampersand(next: string | undefined): boolean {
+    if (next === '>') return this.bothStreamsRedirect()
+    this.endSegment()
+    this.i += next === '&' ? 2 : 1
+    return true
+  }
+
+  /** `&>` redirects both streams: only harmless when to /dev/null. */
+  private bothStreamsRedirect(): boolean {
+    if (this.started) return false
+    const span = this.safeRedirect(this.i + 1)
+    if (span === 0 || this.command[this.i + 2] === '&') return false
+    this.endToken()
+    this.i += 1 + span
+    return true
+  }
+
+  /** `>`: only an fd number (or nothing) may precede a redirect operator. */
+  private redirect(): boolean {
+    if (this.started && !(this.plain && /^\d+$/.test(this.text))) return false
+    const span = this.safeRedirect(this.i)
+    if (span === 0) return false
+    this.resetToken()
+    this.i += span
+    return true
+  }
+
+  private openQuote(c: string): boolean {
+    this.state = c === "'" ? 'single' : 'double'
+    this.plain = false
+    this.started = true
+    this.i += 1
+    return true
+  }
+
+  /** A bash backslash outside quotes, at `this.i`. */
+  private escape(next: string | undefined): boolean {
+    if (next === undefined) return false
+    if (next !== '\n') {
+      this.text += next
+      this.plain = false
+      this.started = true
+    } // else: line continuation, nothing to add
+    this.i += 2
+    return true
+  }
+
+  /** The length of a safe redirect starting at `at`, or 0 when it is not one. */
+  private safeRedirect(at: number): number {
+    const re = this.dialect === 'pwsh' ? SAFE_REDIRECT_PWSH : SAFE_REDIRECT_BASH
+    const found = re.exec(this.command.slice(at))
     return found === null ? 0 : found[0].length
   }
 
-  let i = 0
-  while (i < command.length) {
-    const c = command[i]!
-    const next = command[i + 1]
-    const code = c.charCodeAt(0)
-    if ((code < 0x20 && c !== '\t' && c !== '\n') || code === 0x7f) return undefined
-
-    if (state === 'single') {
-      if (c === "'") state = 'normal'
-      else text += c
-      i += 1
-      continue
-    }
-
-    if (state === 'double') {
-      if (c === '"') state = 'normal'
-      else if (c === '`') return undefined
-      else if (c === '$' && (next === '(' || next === '{')) return undefined
-      else if (c === '\\' && dialect === 'bash') {
-        if (next === undefined) return undefined
-        if (next === '\n') {
-          i += 2
-          continue
-        }
-        if ('$`"\\'.includes(next)) {
-          text += next
-          i += 2
-          continue
-        }
-        text += c
-      } else text += c
-      i += 1
-      continue
-    }
-
-    // normal state
-    if (c === ' ' || c === '\t') {
-      endToken()
-      i += 1
-    } else if (c === '\n' || c === ';') {
-      endSegment()
-      i += 1
-    } else if (c === '&') {
-      if (next === '>') {
-        // `&>` redirects both streams: only harmless when to /dev/null.
-        if (started) return undefined
-        const span = safeRedirect(i + 1)
-        if (span === 0 || command[i + 2] === '&') return undefined
-        endToken()
-        i += 1 + span
-      } else {
-        endSegment()
-        i += next === '&' ? 2 : 1
-      }
-    } else if (c === '|') {
-      endSegment()
-      i += next === '|' ? 2 : 1
-    } else if (c === '>') {
-      // Only an fd number (or nothing) may precede a redirect operator.
-      if (started && !(plain && /^\d+$/.test(text))) return undefined
-      const span = safeRedirect(i)
-      if (span === 0) return undefined
-      text = ''
-      plain = true
-      started = false
-      i += span
-    } else if (c === '<' || c === '(' || c === ')' || c === '`') {
-      return undefined
-    } else if (c === '$' && (next === '(' || next === '{')) {
-      return undefined
-    } else if (c === "'") {
-      state = 'single'
-      plain = false
-      started = true
-      i += 1
-    } else if (c === '"') {
-      state = 'double'
-      plain = false
-      started = true
-      i += 1
-    } else if (c === '\\' && dialect === 'bash') {
-      if (next === undefined) return undefined
-      if (next === '\n') {
-        i += 2 // line continuation
-        continue
-      }
-      text += next
-      plain = false
-      started = true
-      i += 2
-    } else {
-      text += c
-      started = true
-      i += 1
-    }
+  private resetToken(): void {
+    this.text = ''
+    this.plain = true
+    this.started = false
   }
-  if (state !== 'normal') return undefined
-  endSegment()
-  return segments
+
+  private endToken(): void {
+    if (this.started) this.segment.push({ text: this.text, plain: this.plain })
+    this.resetToken()
+  }
+
+  private endSegment(): void {
+    this.endToken()
+    if (this.segment.length > 0) this.segments.push(this.segment)
+    this.segment = []
+  }
 }
 
 // ---------------------------------------------------------------- patterns
@@ -299,7 +382,8 @@ function parsePattern(source: string): Pattern | string {
 /** Quote one word so the pattern lexer reads it back as the same text. */
 function quoteWord(word: string): string {
   if (/^[A-Za-z0-9_./:@%+=,~^-]+$/.test(word)) return word
-  return `'${word.replaceAll("'", `'\\''`)}'`
+  const escaped = word.replaceAll("'", String.raw`'\''`)
+  return `'${escaped}'`
 }
 
 function renderPattern(pattern: Pattern): string {
@@ -325,7 +409,8 @@ function patternMatches(pattern: Pattern, words: string[]): boolean {
  */
 export function normalizeRule(rule: Rule): Rule {
   const tool = rule.tool
-  if (typeof tool !== 'string' || !/^[^\s\x00-\x1f\x7f]+$/.test(tool)) {
+  // `\s` already covers \t \n \v \f \r (0x09–0x0d); the ranges add the rest of C0 and DEL.
+  if (typeof tool !== 'string' || !/^[^\s\x00-\x08\x0e-\x1f\x7f]+$/.test(tool)) {
     throw new Error(`invalid tool name ${JSON.stringify(tool)}`)
   }
   const out: Rule = { tool }
@@ -367,7 +452,7 @@ export function suggestPattern(toolName: string, command: string | undefined, re
   if (!isShellTool(toolName)) return withMode({ tool: toolName })
   if (command === undefined) return undefined
   const segments = lex(command, dialectOf(toolName))
-  if (segments === undefined || segments.length !== 1) return undefined
+  if (segments?.length !== 1) return undefined
   const words = segments[0]!.map((t) => t.text)
   const second = words[1]
   const narrow =
@@ -457,41 +542,73 @@ function yamlScalar(value: string): string {
 /** Read one scalar value; throws on anything outside the subset. */
 function parseScalar(raw: string, line: number): string {
   const value = raw.trim()
-  if (value.startsWith('"')) {
-    const end = closingDoubleQuote(value)
-    if (end === -1) throw new Error(`line ${line}: unterminated double-quoted value`)
-    if (!isCommentOrEmpty(value.slice(end + 1))) throw new Error(`line ${line}: unexpected text after quoted value`)
-    try {
-      return JSON.parse(value.slice(0, end + 1)) as string
-    } catch {
-      throw new Error(`line ${line}: unsupported escape in double-quoted value`)
-    }
+  if (value.startsWith('"')) return parseDoubleQuoted(value, line)
+  if (value.startsWith("'")) return parseSingleQuoted(value, line)
+  return parsePlain(value, line)
+}
+
+function parseDoubleQuoted(value: string, line: number): string {
+  const end = closingDoubleQuote(value)
+  if (end === -1) throw new Error(`line ${line}: unterminated double-quoted value`)
+  if (!isCommentOrEmpty(value.slice(end + 1))) throw new Error(`line ${line}: unexpected text after quoted value`)
+  try {
+    return JSON.parse(value.slice(0, end + 1)) as string
+  } catch {
+    throw new Error(`line ${line}: unsupported escape in double-quoted value`)
   }
-  if (value.startsWith("'")) {
-    let out = ''
-    let i = 1
-    for (;;) {
-      if (i >= value.length) throw new Error(`line ${line}: unterminated single-quoted value`)
-      if (value[i] === "'") {
-        if (value[i + 1] === "'") {
-          out += "'"
-          i += 2
-          continue
-        }
-        break
-      }
+}
+
+/** A `'…'` scalar, where `''` stands for one quote. */
+function parseSingleQuoted(value: string, line: number): string {
+  let out = ''
+  let i = 1
+  while (i < value.length) {
+    if (value[i] !== "'") {
       out += value[i]
       i += 1
+    } else if (value[i + 1] === "'") {
+      out += "'"
+      i += 2
+    } else {
+      if (!isCommentOrEmpty(value.slice(i + 1))) throw new Error(`line ${line}: unexpected text after quoted value`)
+      return out
     }
-    if (!isCommentOrEmpty(value.slice(i + 1))) throw new Error(`line ${line}: unexpected text after quoted value`)
-    return out
   }
-  const plain = value.replace(/\s+#.*$/, '')
+  throw new Error(`line ${line}: unterminated single-quoted value`)
+}
+
+function parsePlain(value: string, line: number): string {
+  const plain = stripComment(value)
   if (plain.length === 0) throw new Error(`line ${line}: empty value`)
   if (!PLAIN_SCALAR.test(plain) || plain.includes(': ')) {
     throw new Error(`line ${line}: value ${JSON.stringify(plain)} must be quoted`)
   }
   return plain
+}
+
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/
+
+/**
+ * Drop a trailing ` # comment`: the first `#` preceded by whitespace, together
+ * with that whitespace run and the rest of the text. Same result as
+ * `text.replace(/\s+#.*$/, '')` without its backtracking: as there, `.` stops
+ * at line terminators, so a `#` with one after it does not start a comment.
+ */
+function stripComment(text: string): string {
+  let lastTerminator = -1
+  for (let i = text.length - 1; i >= 0; i -= 1) {
+    if (LINE_TERMINATOR.test(text[i]!)) {
+      lastTerminator = i
+      break
+    }
+  }
+  for (let hash = text.indexOf('#', lastTerminator + 1); hash !== -1; hash = text.indexOf('#', hash + 1)) {
+    if (hash === 0 || !/\s/.test(text[hash - 1]!)) continue
+    let start = hash - 1
+    while (start > 0 && /\s/.test(text[start - 1]!)) start -= 1
+    return text.slice(0, start)
+  }
+  return text
 }
 
 function closingDoubleQuote(value: string): number {
@@ -515,82 +632,111 @@ function isCommentOrEmpty(rest: string): boolean {
  * @throws Error naming the offending line for anything else.
  */
 export function parseRules(text: string): Rule[] {
+  const parser = new RulesParser()
   const lines = text.replace(/^﻿/, '').split(/\r?\n/)
-  let version: string | undefined
-  let inAllow = false
-  let allowSeen = false
-  const rules: Rule[] = []
-  let item: { tool?: string; command?: string; mode?: string; indent: number; line: number } | undefined
+  lines.forEach((line, index) => parser.line(line, index + 1))
+  return parser.finish()
+}
 
-  const flush = (): void => {
-    if (item === undefined) return
-    if (item.tool === undefined) throw new Error(`line ${item.line}: rule has no tool`)
-    try {
-      const rule: Rule = { tool: item.tool }
-      if (item.command !== undefined) rule.command = item.command
-      if (item.mode !== undefined) rule.mode = item.mode as SandboxMode // validated below
-      rules.push(normalizeRule(rule))
-    } catch (error) {
-      throw new Error(`line ${item.line}: ${(error as Error).message}`)
-    }
-    item = undefined
+/** A list item being read: the keys seen so far, its indent, and where it began. */
+interface RuleItem {
+  tool?: string
+  command?: string
+  mode?: string
+  indent: number
+  line: number
+}
+
+/** The line-by-line state of {@link parseRules}. Every method throws on bad input. */
+class RulesParser {
+  private version: string | undefined
+  private inAllow = false
+  private allowSeen = false
+  private readonly rules: Rule[] = []
+  private item: RuleItem | undefined
+
+  line(line: string, lineNo: number): void {
+    if (/^\s*(?:#.*)?$/.test(line)) return
+    if (line.includes('\t')) throw new Error(`line ${lineNo}: tabs are not allowed`)
+    const top = /^([A-Za-z_]+):(.*)$/.exec(line)
+    if (top === null) this.allowLine(line, lineNo)
+    else this.topLine(top[1]!, top[2]!, lineNo)
   }
-  const setKey = (key: string, raw: string, line: number): void => {
+
+  finish(): Rule[] {
+    this.flush()
+    if (this.rules.length > 0 || this.allowSeen || this.version !== undefined) {
+      if (this.version === undefined) throw new Error('missing "version: 1"')
+      if (!this.allowSeen) throw new Error('missing "allow"')
+    }
+    return this.rules
+  }
+
+  /** `version:` or `allow:` at column 0. */
+  private topLine(key: string, rest: string, lineNo: number): void {
+    this.flush()
+    this.inAllow = false
+    if (key === 'version') this.versionLine(rest, lineNo)
+    else if (key === 'allow') this.allowHeader(rest, lineNo)
+    else throw new Error(`line ${lineNo}: unknown key "${key}"`)
+  }
+
+  private versionLine(rest: string, lineNo: number): void {
+    if (this.version !== undefined) throw new Error(`line ${lineNo}: duplicate "version"`)
+    this.version = parseScalar(rest, lineNo)
+    if (this.version !== '1') throw new Error(`line ${lineNo}: unsupported version ${JSON.stringify(this.version)}`)
+  }
+
+  private allowHeader(rest: string, lineNo: number): void {
+    if (this.allowSeen) throw new Error(`line ${lineNo}: duplicate "allow"`)
+    this.allowSeen = true
+    const value = stripComment(rest).trim()
+    if (value === '[]') return
+    if (value !== '') throw new Error(`line ${lineNo}: "allow" must be a list`)
+    this.inAllow = true
+  }
+
+  /** An indented line: a `- key: value` item start, or a further field of the current item. */
+  private allowLine(line: string, lineNo: number): void {
+    if (!this.inAllow) throw new Error(`line ${lineNo}: unexpected indented line`)
+    const listItem = /^(\s*)- ([A-Za-z_]+):(?: (.*))?$/.exec(line)
+    if (listItem !== null) {
+      this.flush()
+      this.item = { indent: listItem[1]!.length, line: lineNo }
+      this.setKey(listItem[2]!, listItem[3] ?? '', lineNo)
+      return
+    }
+    const field = /^(\s+)([A-Za-z_]+):(?: (.*))?$/.exec(line)
+    if (field !== null && this.item !== undefined && field[1]!.length === this.item.indent + 2) {
+      this.setKey(field[2]!, field[3] ?? '', lineNo)
+      return
+    }
+    throw new Error(`line ${lineNo}: not a rule line`)
+  }
+
+  private setKey(key: string, raw: string, line: number): void {
+    const item = this.item
     if (item === undefined) throw new Error(`line ${line}: "${key}" outside a list item`)
     if (key !== 'tool' && key !== 'command' && key !== 'mode') throw new Error(`line ${line}: unknown key "${key}"`)
     if (item[key] !== undefined) throw new Error(`line ${line}: duplicate key "${key}"`)
     item[key] = parseScalar(raw, line)
   }
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const lineNo = index + 1
-    const line = lines[index]!
-    if (/^\s*(?:#.*)?$/.test(line)) continue
-    if (line.includes('\t')) throw new Error(`line ${lineNo}: tabs are not allowed`)
-
-    const top = /^([A-Za-z_]+):(.*)$/.exec(line)
-    if (top !== null) {
-      flush()
-      inAllow = false
-      const [, key, rest] = top
-      if (key === 'version') {
-        if (version !== undefined) throw new Error(`line ${lineNo}: duplicate "version"`)
-        version = parseScalar(rest!, lineNo)
-        if (version !== '1') throw new Error(`line ${lineNo}: unsupported version ${JSON.stringify(version)}`)
-      } else if (key === 'allow') {
-        if (allowSeen) throw new Error(`line ${lineNo}: duplicate "allow"`)
-        allowSeen = true
-        const value = rest!.replace(/\s+#.*$/, '').trim()
-        if (value === '[]') continue
-        if (value !== '') throw new Error(`line ${lineNo}: "allow" must be a list`)
-        inAllow = true
-      } else {
-        throw new Error(`line ${lineNo}: unknown key "${key}"`)
-      }
-      continue
+  /** Close the current item, validating it as a rule. */
+  private flush(): void {
+    const item = this.item
+    if (item === undefined) return
+    if (item.tool === undefined) throw new Error(`line ${item.line}: rule has no tool`)
+    try {
+      const rule: Rule = { tool: item.tool }
+      if (item.command !== undefined) rule.command = item.command
+      if (item.mode !== undefined) rule.mode = item.mode as SandboxMode // validated below
+      this.rules.push(normalizeRule(rule))
+    } catch (error) {
+      throw new Error(`line ${item.line}: ${(error as Error).message}`)
     }
-
-    if (!inAllow) throw new Error(`line ${lineNo}: unexpected indented line`)
-    const listItem = /^(\s*)- ([A-Za-z_]+):(?: (.*))?$/.exec(line)
-    if (listItem !== null) {
-      flush()
-      item = { indent: listItem[1]!.length, line: lineNo }
-      setKey(listItem[2]!, listItem[3] ?? '', lineNo)
-      continue
-    }
-    const field = /^(\s+)([A-Za-z_]+):(?: (.*))?$/.exec(line)
-    if (field !== null && item !== undefined && field[1]!.length === item.indent + 2) {
-      setKey(field[2]!, field[3] ?? '', lineNo)
-      continue
-    }
-    throw new Error(`line ${lineNo}: not a rule line`)
+    this.item = undefined
   }
-  flush()
-  if (rules.length > 0 || allowSeen || version !== undefined) {
-    if (version === undefined) throw new Error('missing "version: 1"')
-    if (!allowSeen) throw new Error('missing "allow"')
-  }
-  return rules
 }
 
 // ------------------------------------------------------------------- store
@@ -637,12 +783,23 @@ export async function loadAllRules(
 ): Promise<{ rules: ScopedRule[]; errors: RulesFileError[] }> {
   const rules: ScopedRule[] = sessionRules.map((r) => ({ ...r, scope: 'session' }))
   const errors: RulesFileError[] = []
-  for (const scope of ['project', 'global'] as const) {
-    try {
-      for (const rule of await loadRules(scope, cwd)) rules.push({ ...rule, scope })
-    } catch (error) {
-      if (error instanceof RulesFileError) errors.push(error)
-      else throw error
+  // The two reads are independent; read them together, then merge in scope order.
+  const scopes = ['project', 'global'] as const
+  const loaded = await Promise.all(
+    scopes.map((scope) =>
+      loadRules(scope, cwd).then(
+        (scopeRules) => ({ scope, ok: true, scopeRules, error: undefined }),
+        (error: unknown) => ({ scope, ok: false, scopeRules: [] as Rule[], error }),
+      ),
+    ),
+  )
+  for (const { scope, ok, scopeRules, error } of loaded) {
+    if (ok) {
+      for (const rule of scopeRules) rules.push({ ...rule, scope })
+    } else if (error instanceof RulesFileError) {
+      errors.push(error)
+    } else {
+      throw error
     }
   }
   return { rules, errors }
@@ -678,7 +835,7 @@ export async function removeRule(scope: FileScope, cwd: string, rule: Rule): Pro
 /** Write-then-rename, mode 0600, creating the directory (0700) as needed. */
 async function writeRules(path: string, rules: readonly Rule[]): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  const scratch = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+  const scratch = `${path}.${process.pid}.${randomUUID()}.tmp`
   try {
     await writeFile(scratch, formatRules(rules), { mode: 0o600 })
     await rename(scratch, path)
