@@ -73,15 +73,22 @@ Full key reference, flags, and commands: [docs/reference.md](docs/reference.md).
 
 ## Install
 
-Requires a working `dsh` on `PATH` (`npm install -g @deepseek-ai/dsh`) and
-Node 22+.
+Needs Node 22+, the dsh CLI and pnpm. The same line works on Linux, macOS and
+Windows:
 
 ```sh
-npm install -g moqi-tui
+npm install -g @deepseek-ai/dsh pnpm moqi-tui
 moqi
 ```
 
-The launcher installs the profile and hands the terminal to dsh. From source:
+The launcher installs the profile and hands the terminal to dsh. pnpm is
+required because the profile is a pnpm project. Without it, `moqi install`
+stops and tells you to install it.
+
+The dsh **desktop app** gives you no `dsh` command. Moqi needs the CLI, so run
+the line above even if the desktop app is installed.
+
+From source:
 
 ```sh
 git clone https://github.com/JWE24-code/moqi ~/Projects/moqi
@@ -91,8 +98,9 @@ npm run install-profile
 dsh --profile tui
 ```
 
-What the installer writes and how typechecking links the Harness's own types:
-[docs/install.md](docs/install.md).
+Upgrading an older profile, switching Node versions, plugins in the desktop
+app, what the installer writes, and how typechecking links the Harness's own
+types: [docs/install.md](docs/install.md).
 
 ## License
 
