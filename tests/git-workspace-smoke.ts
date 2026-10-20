@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, isAbsolute, join } from 'node:path'
 
 const home = mkdtempSync(join(tmpdir(), 'moqi-git-home-'))
 const work = realpathSync(mkdtempSync(join(tmpdir(), 'moqi-git-work-')))
@@ -26,8 +26,16 @@ process.env['GIT_COMMITTER_EMAIL'] = 'test@example.invalid'
 
 const ws = await import('../src/git-workspace.ts')
 
+/** git, resolved once to an absolute path so no spawn searches `PATH`. */
+const gitBin = (process.env['PATH'] ?? '')
+  .split(delimiter)
+  .filter((dir) => isAbsolute(dir))
+  .map((dir) => join(dir, 'git'))
+  .find((candidate) => existsSync(candidate))
+if (gitBin === undefined) throw new Error('git-workspace-smoke: no git on PATH')
+
 const sh = (cwd: string, ...args: string[]): string =>
-  execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim()
+  execFileSync(gitBin, ['-C', cwd, ...args], { encoding: 'utf8' }).trim()
 
 /** A repository on `main` with one commit. */
 function repo(name: string): string {
@@ -249,10 +257,10 @@ try {
   if (idleTree.kind !== 'worktree' || liveTree.kind !== 'worktree') throw new Error('expected worktrees')
   sh(p, 'switch', '-q', 'moqi/kept-by-session')
   const prunedNames = await ws.pruneLeftovers(p, [p, liveTree.cwd])
-  assert.deepEqual(prunedNames.sort(), ['moqi/empty', 'moqi/idle-tree'])
+  assert.deepEqual(prunedNames.toSorted((a, b) => a.localeCompare(b)), ['moqi/empty', 'moqi/idle-tree'])
   assert.ok(!existsSync(idleTree.cwd))
   assert.ok(existsSync(liveTree.cwd), 'a worktree an open session uses is left alone')
-  const left = sh(p, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/').split('\n').sort()
+  const left = sh(p, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/').split('\n').toSorted((a, b) => a.localeCompare(b))
   assert.deepEqual(left, ['feature', 'main', 'moqi/has-work', 'moqi/kept-by-session', 'moqi/live-tree'])
   assert.deepEqual(await ws.pruneLeftovers(plain, []), [], 'outside a repository there is nothing to prune')
 

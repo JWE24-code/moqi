@@ -38,9 +38,10 @@ try {
   assert.deepEqual(run(`${quotedFake} --wait`, awkward), ['--wait', awkward])
 
   // The invocation never splices the path into the command text.
-  const [, args] = editorInvocation('vi', '/tmp/x; rm -rf ~')
+  const hostile = join(dir, 'x; rm -rf ~')
+  const [, args] = editorInvocation('vi', hostile)
   assert.equal(args[1], 'vi "$1"')
-  assert.equal(args[3], '/tmp/x; rm -rf ~')
+  assert.equal(args[3], hostile)
 
   console.log('editor-smoke: ok')
 } finally {

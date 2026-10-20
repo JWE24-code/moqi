@@ -16,18 +16,22 @@
  * from some other branch, and only removes a worktree that is clean — anything
  * else is kept and reported.
  *
- * Harness-free: node builtins and `git` on PATH only.
+ * Harness-free: node builtins and `git` (found on PATH once, then run by its
+ * absolute path) only.
  */
 
 import { execFile } from 'node:child_process'
-import { existsSync, rmdirSync } from 'node:fs'
-import { dirname, join, relative, resolve, isAbsolute } from 'node:path'
+import { accessSync, constants, existsSync, rmdirSync, statSync } from 'node:fs'
+import { delimiter, dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import { slugify } from './memory.ts'
 import { dshHome, projectKey } from './sessions-store.ts'
 
 /** How a new session in a repository isolates its changes. */
 export type Isolation = 'off' | 'branch' | 'worktree'
 export const ISOLATIONS: readonly Isolation[] = ['off', 'branch', 'worktree']
+
+/** How an isolated session was placed: every {@link Isolation} but `off`. */
+export type ActiveIsolation = Exclude<Isolation, 'off'>
 
 /** Every branch moqi creates starts with this. */
 export const BRANCH_PREFIX = 'moqi/'
@@ -37,7 +41,7 @@ const LOCK_TAG = 'moqi session pid '
 
 /** Whether a worktree's lock names a moqi process other than this one that is still running. */
 function lockedByLiveMoqi(block: string): boolean {
-  const pid = Number.parseInt(new RegExp(`^locked ${LOCK_TAG}(\\d+)$`, 'm').exec(block)?.[1] ?? '', 10)
+  const pid = Number.parseInt(new RegExp(String.raw`^locked ${LOCK_TAG}(\d+)$`, 'm').exec(block)?.[1] ?? '', 10)
   if (!Number.isInteger(pid) || pid === process.pid) return false
   try {
     process.kill(pid, 0)
@@ -64,10 +68,44 @@ export function isIsolation(value: string): value is Isolation {
   return (ISOLATIONS as readonly string[]).includes(value)
 }
 
+/**
+ * The absolute path of the first `git` in an absolute PATH entry, searched the
+ * way `execFile` itself searches (on Windows, `.com` then `.exe`). Undefined
+ * when there is none.
+ */
+function findGit(): string | undefined {
+  const names = process.platform === 'win32' ? ['git.com', 'git.exe'] : ['git']
+  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) {
+    if (!isAbsolute(dir)) continue
+    for (const name of names) {
+      const candidate = join(dir, name)
+      try {
+        accessSync(candidate, constants.X_OK)
+        if (statSync(candidate).isFile()) return candidate
+      } catch {
+        // not here, or not executable
+      }
+    }
+  }
+  return undefined
+}
+
+let gitPath: string | undefined
+
+/**
+ * The `git` every command runs: resolved once, on first use, so a later PATH
+ * change cannot swap in a different binary. When no absolute PATH entry has
+ * one, plain `git` keeps the old lookup, and its error.
+ */
+function gitBinary(): string {
+  gitPath ??= findGit() ?? 'git'
+  return gitPath
+}
+
 /** Run git in `cwd`; resolves with trimmed stdout, rejects with git's own message. */
 function git(cwd: string, args: string[]): Promise<string> {
   return new Promise((done, fail) => {
-    execFile('git', ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(gitBinary(), ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error === null) {
         done(stdout.trim())
         return
@@ -256,7 +294,9 @@ export async function pruneLeftovers(cwd: string, inUse: readonly string[]): Pro
     const path = /^worktree (.+)$/m.exec(block)?.[1]
     if (path === undefined || !isMoqiWorktree(path) || used.has(resolve(path))) continue
     if (lockedByLiveMoqi(block)) continue
-    const result = await finishWorktree(path).catch(() => ({ kind: 'none' }) as FinishResult)
+    // Sequential on purpose: each removal takes the repository's ref and config
+    // locks, and whether a branch holds work depends on which others still exist.
+    const result = await finishWorktree(path).catch(() => ({ kind: 'none' }) as FinishResult) // NOSONAR — git commands on one repository must run one at a time.
     if (result.kind === 'removed') pruned.push(result.branch)
   }
   // Then branches checked out nowhere.
@@ -266,12 +306,19 @@ export async function pruneLeftovers(cwd: string, inUse: readonly string[]): Pro
   const branches = await git(root, ['for-each-ref', '--format=%(refname:short)', `refs/heads/${BRANCH_PREFIX}`])
   for (const branch of branches.split('\n').filter((name) => name !== '')) {
     if (checkedOut.has(branch)) continue
-    if ((await uniqueCommits(root, branch)) > 0) continue
-    await git(root, ['branch', '-D', branch])
-    await probe(root, ['config', '--remove-section', `branch.${branch}`])
-    pruned.push(branch)
+    // Sequential on purpose: two empty branches on the same otherwise-unreached
+    // commit each look deletable until the other one is gone.
+    if (await pruneBranch(root, branch)) pruned.push(branch) // NOSONAR — each check must see the previous deletion.
   }
   return pruned
+}
+
+/** Delete `branch` and its config when no commit of its own would be lost; true when deleted. */
+async function pruneBranch(root: string, branch: string): Promise<boolean> {
+  if ((await uniqueCommits(root, branch)) > 0) return false
+  await git(root, ['branch', '-D', branch])
+  await probe(root, ['config', '--remove-section', `branch.${branch}`])
+  return true
 }
 
 /**
@@ -284,13 +331,13 @@ export async function pruneLeftovers(cwd: string, inUse: readonly string[]): Pro
  * byte-stable for the life of a branch and never disturbs the prompt cache.
  */
 export function workspaceGuidance(input: {
-  isolation?: 'branch' | 'worktree' | undefined
-  branch?: string | undefined
-  base?: string | undefined
+  isolation?: ActiveIsolation
+  branch?: string
+  base?: string
   cwd: string
 }): string {
   const { isolation, branch, cwd } = input
-  if (isolation === undefined || branch === undefined || !branch.startsWith(BRANCH_PREFIX)) return ''
+  if (isolation === undefined || branch?.startsWith(BRANCH_PREFIX) !== true) return ''
   const base = input.base === undefined ? 'the branch it was started from' : `\`${input.base}\``
   const from = input.base === undefined ? '' : ` from \`${input.base}\``
   const lines = ['# Workspace (set by moqi)', '']
@@ -329,7 +376,7 @@ export class Workspace {
   /** The checkout `cwd` belongs to (a worktree is its own); undefined outside a repo. */
   readonly root: string | undefined
   /** How moqi isolated this session; undefined when it works where it was opened. */
-  isolation: 'branch' | 'worktree' | undefined
+  isolation: ActiveIsolation | undefined
   /** The branch checked out at `cwd`, as of the last `refresh`. */
   branch: string | undefined
   /** The branch an isolated session's branch was started from. */
@@ -340,10 +387,10 @@ export class Workspace {
   private constructor(fields: {
     cwd: string
     root: string | undefined
-    isolation?: 'branch' | 'worktree' | undefined
-    branch?: string | undefined
-    base?: string | undefined
-    notice?: string | undefined
+    isolation?: ActiveIsolation
+    branch?: string
+    base?: string
+    notice?: string
   }) {
     this.cwd = fields.cwd
     this.root = fields.root
@@ -385,7 +432,7 @@ export class Workspace {
   static async adopt(cwd: string): Promise<Workspace> {
     const root = await repoRoot(cwd)
     const branch = root === undefined ? undefined : await currentBranch(cwd)
-    let isolation: 'branch' | 'worktree' | undefined
+    let isolation: ActiveIsolation | undefined
     if (isMoqiWorktree(cwd)) isolation = 'worktree'
     else if (branch?.startsWith(BRANCH_PREFIX) === true) isolation = 'branch'
     const base = branch === undefined ? undefined : await recordedBase(cwd, branch)
@@ -476,7 +523,8 @@ export class Workspace {
 export function describeFinish(result: FinishResult): string | undefined {
   if (result.kind === 'removed') return `removed ${result.branch} — it changed nothing`
   if (result.kind === 'kept') {
-    return `kept ${result.branch}${result.path === undefined ? '' : ` at ${result.path}`} — ${result.reason}`
+    const where = result.path === undefined ? '' : ' at ' + result.path
+    return `kept ${result.branch}${where} — ${result.reason}`
   }
   return undefined
 }
