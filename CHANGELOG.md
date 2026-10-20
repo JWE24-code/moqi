@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **A backslash can no longer slip a control character past a permission
+  rule.** The command matcher refuses any command containing control
+  characters, but a bash backslash directly before one consumed it unchecked,
+  so a rule such as `bash(echo *)` could auto-allow a command carrying raw
+  terminal escape sequences. Control characters are now refused over the whole
+  command, in every quoting context and in rule patterns too; commands without
+  control characters match exactly as before.
+
 ## [0.5.0] — 2026-10-18
 
 Permission rules, agent memory, and session isolation — the agent asks less,
