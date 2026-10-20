@@ -1,0 +1,133 @@
+name: dsh compatibility
+
+# Watches npm for new @deepseek-ai/dsh releases and tests moqi and its three
+# plugins against each one, published and from main, on Linux and Windows
+# (plus macOS for `latest`). Results go to the "dsh compatibility" tracking
+# issue; a break opens a `dsh-compat-failure` issue, closed again by the first
+# release that passes. See scripts/dsh-compat/.
+#
+# Upstream has no hook to tell us about a release, so this polls. A run with
+# nothing new to test stops after the plan job, in well under a minute.
+on:
+  schedule:
+    - cron: "41 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: dist-tags to watch (comma list; alpha ships almost daily)
+        type: string
+        default: latest,next
+      versions:
+        description: exact dsh versions to test as well (comma list)
+        type: string
+        default: ""
+      force:
+        description: retest versions already in the tracking issue
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: dsh-compat
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has-work: ${{ steps.plan.outputs.has-work }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DSH_COMPAT_TAGS: ${{ inputs.tags || 'latest,next' }}
+          DSH_COMPAT_VERSIONS: ${{ inputs.versions }}
+          DSH_COMPAT_FORCE: ${{ inputs.force && '1' || '0' }}
+        run: node scripts/dsh-compat/plan.mjs
+
+  check:
+    needs: plan
+    if: needs.plan.outputs.has-work == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      DSH_VERSION: ${{ matrix.version }}
+      MATRIX_OS: ${{ matrix.os }}
+      RESULTS: ${{ runner.temp }}/results-${{ matrix.version }}-${{ matrix.os }}.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Install scripts are skipped, as npm 11 does by default; the version
+      # is exact, from the plan.
+      - name: Install dsh ${{ matrix.version }} and pnpm
+        run: |
+          npm install -g --ignore-scripts "@deepseek-ai/dsh@${DSH_VERSION}"
+          npm install -g --ignore-scripts pnpm@10.34.7
+          dsh --version
+
+      - name: Published packages
+        run: |
+          specs='{}'
+          for name in dsh-jev-loop dsh-pii-anonymizer moqi-jev-loop; do
+            v="$(npm view "$name" version)"
+            specs="$(node -e 'const s=JSON.parse(process.argv[1]); s[process.argv[2]]=process.argv[3]; console.log(JSON.stringify(s))' "$specs" "$name" "$name@$v")"
+          done
+          moqi_version="$(npm view moqi-tui version)"
+          npm install -g --ignore-scripts "moqi-tui@${moqi_version}"
+          echo "moqi-tui $moqi_version, plugins $specs"
+          MOQI_ROOT="$(npm root -g)/moqi-tui" PLUGIN_SPECS="$specs" \
+            node scripts/dsh-compat/check.mjs --source published --out "$RESULTS" || true
+
+      - name: Current main of every repository
+        run: |
+          packs="$RUNNER_TEMP/packs"
+          mkdir -p "$packs"
+          npm pack --pack-destination "$packs"
+          specs='{}'
+          for name in dsh-jev-loop dsh-pii-anonymizer moqi-jev-loop; do
+            git clone --quiet --depth 1 "https://github.com/JWE24-code/$name.git" "$RUNNER_TEMP/src-$name"
+            tarball="$(cd "$RUNNER_TEMP/src-$name" && npm pack --ignore-scripts --pack-destination "$packs" | tail -1)"
+            specs="$(node -e 'const s=JSON.parse(process.argv[1]); s[process.argv[2]]=process.argv[3]; console.log(JSON.stringify(s))' "$specs" "$name" "$packs/$tarball")"
+          done
+          npm install -g --ignore-scripts "$packs"/moqi-tui-*.tgz
+          MOQI_ROOT="$(npm root -g)/moqi-tui" PLUGIN_SPECS="$specs" \
+            node scripts/dsh-compat/check.mjs --source main --out "$RESULTS" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.version }}-${{ matrix.os }}
+          path: ${{ env.RESULTS }}
+          if-no-files-found: warn
+
+  report:
+    needs: [plan, check]
+    if: always() && needs.plan.outputs.has-work == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          DSH_COMPAT_MATRIX: ${{ needs.plan.outputs.matrix }}
+        run: node scripts/dsh-compat/report.mjs results

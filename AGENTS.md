@@ -40,7 +40,11 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   `dsh`'s `@deepseek-ai/*` packages. A clean checkout without an installed dsh
   typechecks red and tests green; that is the known shape, not a regression.
 - CI: `ci.yml` (test matrix + pty), `live.yml` (round trip), `publish.yml`,
-  `sonar-issues.yml` (weekly Sonar → GitHub issue sync).
+  `sonar-issues.yml` (weekly Sonar → GitHub issue sync), `dsh-compat.yml`
+  (every 3 h: tests moqi and the three plugins, published and from main,
+  against each new dsh release on `latest`/`next`; results in the
+  "dsh compatibility" issue, breaks as `dsh-compat-failure` issues; logic in
+  `scripts/dsh-compat/`, pure half tested by `tests/dsh-compat-smoke.mjs`).
 - Structure: `src/index.ts` is the composition root — the cordis plugin shape
   (`name`/`inject`/`Config`/`apply`) plus the `TuiApp` class. Everything that
   reads stored sessions lives in `src/session-list.ts`, desktop bridges in
