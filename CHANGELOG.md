@@ -6,8 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-26
+
+Installs on dsh 0.2.1, including Windows, and SonarCloud down to zero issues.
+
+### Changed
+
+- **`moqi install` requires pnpm, and says so.** The profile's `link:`
+  dependency is a pnpm protocol that npm rejects, so the npm fallback never
+  produced a working profile; the installer now stops with a clear message
+  when pnpm is missing instead of running it.
+
 ### Fixed
 
+- **Moqi installs and launches on Windows.** Commands are found through one
+  cross-platform lookup (`PATH` + `PATHEXT`) instead of `/bin/sh -c 'command
+  -v'`, dsh is located next to npm's `.cmd` shim, the Harness packages are
+  linked as junctions, and dsh is launched as `node <its bin script>`, so no
+  `.cmd` has to be spawned. Before, `moqi install` on Windows reported "no
+  `dsh` installation found" and `spawnSync npm ENOENT`.
 - **`moqi install` repairs profiles made before dsh 0.2.1.** Their
   `pnpm-workspace.yaml` lacked `autoInstallPeers: false`, so pnpm put plugins'
   `@deepseek-ai/*` peers into the profile, where they shadowed the Harness's
