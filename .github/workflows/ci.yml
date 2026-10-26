@@ -46,6 +46,29 @@ jobs:
       # util-linux script(1); it skips itself cleanly where that is absent.
       - run: npm run test:pty
 
+  # SonarCloud CI-based analysis, so Sonar sees test coverage — Automatic
+  # Analysis cannot import it (sonar-project.properties holds the scope).
+  # A pull request from a fork gets no secrets, so the scan steps skip there
+  # rather than fail; its tests still run in the `test` job.
+  sonar:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Blame data for new-code detection and issue assignment.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:coverage
+      - name: SonarCloud scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v8
+
   # Compile the Harness-typed files (src/index.ts, src/startup.ts) against the
   # real @deepseek-ai packages, which `npm test` never touches because src/tui/
   # is dependency-free. This is the only gate that catches upstream API drift,

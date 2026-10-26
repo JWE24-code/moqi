@@ -10,6 +10,9 @@ node_modules
 # Claude Code worktrees and local session state live inside the repo.
 .claude
 
+# Coverage report from `npm run test:coverage`; CI uploads it to SonarCloud.
+coverage
+
 # Packed artifacts from npm pack / the package check.
 *.tgz
 
