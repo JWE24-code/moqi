@@ -67,7 +67,8 @@ jobs:
       - run: npm run test:coverage
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@v8
+        # Pinned to a commit: this step holds the Sonar token.
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
 
   # Compile the Harness-typed files (src/index.ts, src/startup.ts) against the
   # real @deepseek-ai packages, which `npm test` never touches because src/tui/
