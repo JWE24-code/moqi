@@ -26,6 +26,8 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   `functional.ts` and `pty.ts`. `npm test -- memory` runs only suites whose
   name contains `memory`; `node scripts/run-tests.mjs --list` prints the set.
 - `npm run test:pty` — the pty-driven suite (CI runs it too).
+- `npm run test:coverage` — `npm test` under c8 (`.c8rc.json`); writes
+  `coverage/lcov.info` for `src/`, which the CI `sonar` job uploads.
 - `npm run build` — emit to `lib/`.
 - `npm run sonar:sync` — reconcile open Sonar issues into GitHub issues (reads
   the `SONAR_*`/`GITHUB_*` environment; `SONAR_SYNC_DRY_RUN=1` reports the plan
@@ -45,7 +47,9 @@ npm as `moqi-tui`; plugins extend it through the `tuiHost` seam.
   (`scripts/link-harness-types.mjs`) after `npm ci` — it symlinks the installed
   `dsh`'s `@deepseek-ai/*` packages. A clean checkout without an installed dsh
   typechecks red and tests green; that is the known shape, not a regression.
-- CI: `ci.yml` (test matrix + pty), `live.yml` (round trip), `publish.yml`,
+- CI: `ci.yml` (test matrix + pty, plus the SonarCloud scan with coverage —
+  CI-based analysis per `sonar-project.properties`; Automatic Analysis must
+  stay off in SonarCloud), `live.yml` (round trip), `publish.yml`,
   `sonar-issues.yml` (weekly Sonar → GitHub issue sync), `dsh-compat.yml`
   (every 3 h: tests moqi and the three plugins, published and from main,
   against each new dsh release on `latest`/`next`; results in the
