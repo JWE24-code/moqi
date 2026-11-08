@@ -101,6 +101,27 @@ export interface QuestionSpec {
         approve: string;
     };
 }
+/**
+ * A question as the Harness asks it — structurally its `AskUserQuestionItem`,
+ * declared here so this module stays Harness-free. The intent is open: the
+ * protocol adds tags over time (dsh 0.2.2 added `approval`).
+ */
+export interface IncomingQuestion extends Omit<QuestionSpec, 'intent'> {
+    intent?: {
+        readonly kind: string;
+        readonly approve?: string;
+        readonly reject?: string;
+        readonly always?: string;
+    };
+}
+/**
+ * Narrow a Harness question to what the panel renders. The panel knows one
+ * intent, `plan-review`; for any other tag the protocol says to render the
+ * generic option list, and answers stay option labels either way. An
+ * `approval` that names no options gets its approve / always / reject labels
+ * as the options, so it is still answerable.
+ */
+export declare function toQuestionSpec(item: IncomingQuestion): QuestionSpec;
 /** One answered question, in the shape the Harness expects back. */
 export interface QuestionAnswer {
     id: string;
