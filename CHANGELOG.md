@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every prompt went unanswered on dsh 0.2.2.** The bundle patch set
+  `personaSuffix: Your working directory is {{cwd}}.`, but dsh 0.2.2 no longer
+  registers a `cwd` prompt variable, so each turn ended with
+  `unknown prompt variable "{{cwd}}"` before reaching the model, and moqi
+  showed nothing. The suffix is gone; dsh's working-directory plugin already
+  gives the model the current directory each turn.
+
 ## [0.5.1] — 2026-10-26
 
 Installs on dsh 0.2.1, including Windows, and SonarCloud down to zero issues.

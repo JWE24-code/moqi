@@ -5,9 +5,13 @@
 # cmdline snapshot, and the app row consumes them lazily the way the shipped
 # headless bundle does.
 
+# No personaSuffix: dsh 0.2.2 registers only {{provider}} and {{model}} as
+# prompt variables, so the old "Your working directory is {{cwd}}." suffix
+# failed every turn with `unknown prompt variable "{{cwd}}"`. The
+# working-directory plugin already puts `Current working directory: "…"` in
+# the runtime context of each turn.
 - id: system-prompt
   config:
-    personaSuffix: Your working directory is {{cwd}}.
     personaPrefix: >-
       You are a coding agent powered by the {{model}} model.
 
