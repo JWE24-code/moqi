@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-11-08
+
+Runs on dsh 0.2.2.
+
+### Fixed
+
+- **Every prompt went unanswered on dsh 0.2.2.** The bundle patch set
+  `personaSuffix: Your working directory is {{cwd}}.`, but dsh 0.2.2 no longer
+  registers a `cwd` prompt variable, so each turn ended with
+  `unknown prompt variable "{{cwd}}"` before reaching the model, and moqi
+  showed nothing. The suffix is gone; dsh's working-directory plugin already
+  gives the model the current directory each turn.
+- **`/model` switches the conversation again on dsh 0.2.2.** dsh 0.2.2 moved
+  model routing into the Agent (`agent.model`, recorded in the Session) and
+  dropped the selection ref moqi used to hand each Agent, so a switch only
+  changed the footer while requests kept going to the old model. Every tab
+  now selects on its own Agent when it opens a session and on `/model`; the
+  switch is recorded in the Session and dsh adds its "model changed" notice.
+- **Questions with the new `approval` intent are answerable.** dsh 0.2.2 added
+  an `approval` intent beside `plan-review`. moqi renders it as the generic
+  option list, as the protocol asks of a UI that does not know a tag, using
+  the approve / always / reject labels as options when none are given.
+
 ## [0.5.1] — 2026-10-26
 
 Installs on dsh 0.2.1, including Windows, and SonarCloud down to zero issues.

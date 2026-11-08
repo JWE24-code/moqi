@@ -23,7 +23,6 @@ import type {
   Agent,
   AssistantStreamFrame,
   ModelSelection,
-  ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model' // NOSONAR — empty type-only import pulls the module augmentation in with no runtime import.
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -110,6 +109,7 @@ import {
   LoginPanel,
   QuestionsPanel,
   interpretApproval,
+  toQuestionSpec,
   type ApprovalChoice,
   type ApprovalDecision,
   type PanelView,
@@ -490,10 +490,11 @@ interface SessionTab {
    */
   logSyncedSeq: number
   /**
-   * This session's own model selection. Each Agent gets the ref of the tab
-   * that created it, so `/model` in one conversation never reroutes another.
+   * This session's own model choice, mirrored for the footer, persistence and
+   * seeding new tabs. The Agent owns the route (`agent.model`); every write
+   * here is pushed to it through `syncAgentModel`.
    */
-  selection: ModelSelectionRef
+  selection: { current: ModelSelection | undefined }
   /** Label of the model this session is using, for the footer. */
   modelName: string
   /**
@@ -561,7 +562,7 @@ function newTab(id: string): SessionTab {
     drainQueue: false,
     status: 'idle',
     logSyncedSeq: 0,
-    selection: { current: undefined, assembled: undefined },
+    selection: { current: undefined },
     modelName: '',
     theme: DEFAULT_THEME,
     contextLimit: 0,
@@ -579,6 +580,10 @@ function setWorkspace(tab: SessionTab, workspace: Workspace): void {
   tab.memory = new MemoryStore(workspace.cwd)
 }
 
+/** Whether two model choices name the same route and effort. */
+function sameSelection(a: Readonly<ModelSelection> | undefined, b: Readonly<ModelSelection>): boolean {
+  return a !== undefined && a.provider === b.provider && a.model === b.model && a.reasoningEffort === b.reasoningEffort
+}
 
 /** A plugin row with no spec: installed silently, or shipped in the box. */
 function pluginFallback(entry: { installed: boolean }): string {
@@ -1000,6 +1005,7 @@ class TuiApp {
       const sessionId = brandString<SessionId>(this.config.resumeSessionId)
       const resumed = await agents.resume({ resumeSessionId: sessionId, agentOptions, setup })
       this.tab.agent = resumed.agent
+      this.syncAgentModel(this.tab)
       this.adoptForeground(this.tab)
       this.tab.id = String(sessionId)
       this.tab.title = this.config.resumeSessionId
@@ -1017,6 +1023,7 @@ class TuiApp {
       this.announce(this.tab.workspace)
       const created = await agents.create({ sessionId, meta: { cwd: this.tab.workspace.cwd }, agentOptions, setup })
       this.tab.agent = created.agent
+      this.syncAgentModel(this.tab)
       this.adoptForeground(this.tab)
       this.tab.id = String(sessionId)
       await this.tab.agent.whenIdle()
@@ -1199,7 +1206,7 @@ class TuiApp {
     }
     const question = this.pendingQuestions[0]
     if (question !== undefined) {
-      this.panel = new QuestionsPanel([...question.request.questions])
+      this.panel = new QuestionsPanel(question.request.questions.map(toQuestionSpec))
       this.panelTab = question.tab
     }
   }
@@ -1541,6 +1548,7 @@ class TuiApp {
         setup: this.selectionSetupFor(tab),
       })
       tab.agent = resumed.agent
+      this.syncAgentModel(tab)
       await tab.agent.whenIdle()
       tab.messages = readHistory(resumed.agent.session)
     } catch {
@@ -1670,17 +1678,29 @@ class TuiApp {
   }
 
   /**
-   * Agent setup for one session: couples that tab's own selection ref to the
-   * new Agent's context. `installModelSelection` binds this exact object to
-   * Agent-scoped prompt assembly and request routing, and the Agent re-reads
-   * `current` when each step enters assembly — so a model switch is a
-   * mutation of the tab's ref, and every tab mutates only its own. Handing
-   * every Agent the same ref (the previous design) is exactly how a switch in
-   * one session silently rerouted all the others.
+   * Hand the tab's model choice to its Agent. Since dsh 0.2.2 each Agent owns
+   * its route (`agent.model`, recorded durably in its own Session), so a
+   * switch in one tab can never reroute another; moqi keeps `tab.selection`
+   * only as its own mirror for the footer, persistence and new-tab seeding.
+   * Called whenever a tab gains an Agent and on `/model`. A choice equal to
+   * what the Agent already resolves is skipped, so attaching never records a
+   * redundant selection in the Session.
+   */
+  private syncAgentModel(tab: SessionTab): void {
+    const wanted = tab.selection.current
+    const model = tab.agent?.model
+    if (wanted === undefined || model === undefined) return
+    if (sameSelection(model.current(), wanted)) return
+    model.select(wanted)
+  }
+
+  /**
+   * Agent setup for one session. `installModelSelection` adds the scoped
+   * model-switch notice; routing itself is the Agent's (see `syncAgentModel`).
    */
   private selectionSetupFor(tab: SessionTab): (agentCtx: Context) => void {
     return (agentCtx: Context): void => {
-      installModelSelection(agentCtx, tab.selection)
+      installModelSelection(agentCtx)
       // The session's workspace rules — the AGENTS.md block for its branch or
       // worktree — resolved per assembly from this tab's live state, and
       // scoped to this one agent. Empty when the session is not isolated.
@@ -5146,6 +5166,7 @@ class TuiApp {
       // A new session is an additional one: the conversation that was open
       // keeps running, and its reply will still arrive and ring.
       tab.agent = created.agent
+      this.syncAgentModel(tab)
       this.refreshMode(tab)
       this.adoptForeground(tab)
       this.tabs.push(tab)
@@ -5276,6 +5297,7 @@ class TuiApp {
         setup: this.selectionSetupFor(tab),
       })
       tab.agent = created.agent
+      this.syncAgentModel(tab)
       this.refreshMode(tab)
       this.adoptForeground(tab)
       this.tabs.push(tab)
@@ -5730,10 +5752,10 @@ class TuiApp {
       return
     }
 
-    // Mutating this tab's installed ref is the whole switch: the running
-    // Agent reads it when the next step enters prompt assembly, so the
-    // conversation and the Session carry on untouched — and no other tab's
-    // Agent shares the ref, so they are not rerouted.
+    // Selecting on this tab's own Agent is the whole switch: it is recorded in
+    // that Session and applies from the next model step, so the conversation
+    // carries on untouched — and every other tab has its own Agent, so none
+    // of them is rerouted.
     const tab = this.tab
     const next = {
       ...(tab.selection.current ?? defaultModel.currentSelection()),
@@ -5741,6 +5763,7 @@ class TuiApp {
       model: row.model,
     }
     tab.selection.current = next
+    this.syncAgentModel(tab)
     tab.modelName = row.model
     // A restored tab should answer on the model its conversation was moved to.
     this.persistSoon()
@@ -6121,6 +6144,7 @@ class TuiApp {
         setup: this.selectionSetupFor(this.tab),
       })
       this.tab.agent = resumed.agent
+      this.syncAgentModel(this.tab)
       this.adoptForeground(this.tab)
       await this.tab.agent.whenIdle()
       // The tab now *is* that session. Leaving the old id behind made presence
